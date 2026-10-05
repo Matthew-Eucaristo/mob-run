@@ -234,13 +234,15 @@ for (let i = 0; i < NROCK; i++) propSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(
 for (let i = 0; i < NSPIRE; i++) propSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 + 2.2, 55), s: rnd(0.4, 1.5), ry: rnd(0, 6), kind: 1 });
 function tintProps() {
   const z = ZONES[Math.max(0, zoneIdx)];
-  let ri2 = 0, si = 0;
+  let ri2 = 0, si = 0, ci = 0;
   for (const p of propSeed) {
     if (p.kind === 0) { rockMesh.setColorAt(ri2++, tmpCol.set(z.post).lerp(col3(z.ground), 0.35)); }
-    else { spireMesh.setColorAt(si++, tmpCol.set(z.edge || z.post).lerp(col3(z.bg), 0.15)); }
+    else if (p.kind === 1) { spireMesh.setColorAt(si++, tmpCol.set(z.edge || z.post).lerp(col3(z.bg), 0.15)); }
+    else { crysMesh.setColorAt(ci++, tmpCol.set(z.sky).lerp(col3('#ffffff'), 0.25)); }
   }
   rockMesh.instanceColor && (rockMesh.instanceColor.needsUpdate = true);
   spireMesh.instanceColor && (spireMesh.instanceColor.needsUpdate = true);
+  crysMesh.instanceColor && (crysMesh.instanceColor.needsUpdate = true);
 }
 
 /* distant mountains silhouettes */
@@ -272,7 +274,7 @@ const stars = new THREE.Points(starGeo, starMat);
 scene.add(stars);
 const ZONE_STARS = [0.9, 0.3, 0.15, 0.85, 0.45];
 
-const NMOTES = 160;
+const NMOTES = 220;
 const moteGeo = new THREE.BufferGeometry();
 {
   const mp = new Float32Array(NMOTES * 3);
@@ -468,6 +470,25 @@ const scorchMesh = new THREE.InstancedMesh(
 scorchMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(scorchMesh);
 const scorches = [];
+
+/* --- glowing crystals along the roadside (zone-tinted) --- */
+const NCRY = 30;
+const crysMesh = new THREE.InstancedMesh(
+  new THREE.OctahedronGeometry(1, 0),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.2, emissive: 0x334455, emissiveIntensity: 0.7 }), NCRY);
+crysMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(crysMesh);
+for (let i = 0; i < NCRY; i++) propSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 + 2.6, 48), s: rnd(0.4, 1.3), ry: rnd(0, 6), kind: 2 });
+
+/* --- dark ground patches: break up the flat roadside --- */
+const NPT = 56;
+const patchMesh = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, opacity: 0.32, depthWrite: false }), NPT);
+patchMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(patchMesh);
+const patchSeed = [];
+for (let i = 0; i < NPT; i++) patchSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 - 1.5, 46), s: rnd(1.2, 4.2), ry: rnd(0, 6) });
 function addScorch(x, wy, s) {
   scorches.push({ x, wy, s: s || 1.6, t: 0 });
   if (scorches.length > MAXSC) scorches.shift();
@@ -652,7 +673,7 @@ const meteorGeo = new THREE.DodecahedronGeometry(0.55, 0);
 const meteorMat = new THREE.MeshStandardMaterial({ color: 0xff7a3d, emissive: 0xff4a1a, emissiveIntensity: 0.9, roughness: 0.6 });
 
 function spawnMeteor(wy) {
-  const h = { kind: 'meteor', x: rnd(road.x0 + 60, road.x1 - 60), wy, r: rnd(55, 85),
+  const h = { kind: 'meteor', x: rnd(road.x0 + 60, road.x1 - 60), wy, r: rnd(65, 95),
     armed: false, dead: false, tImpact: 0, deadT: 0, pop: 1 };
   const grp = new THREE.Group();
   const ring = new THREE.Mesh(hazRingGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
@@ -679,7 +700,7 @@ function spawnHazard(wy) {
       const left = chance(0.5);
       const x = left ? road.x0 + wpx / 2 : road.x1 - wpx / 2;
       const len = rnd(150, 260);
-      const h = { kind: 'lava', x, w: wpx, wy: ly, len, drain: 2 + Math.floor(d / 4), pop: 0 };
+      const h = { kind: 'lava', x, w: wpx, wy: ly, len, drain: 4 + Math.floor(d / 3), pop: 0 };
       const grp = new THREE.Group();
       const outer = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0xb32d12, transparent: true, opacity: 0.85, depthWrite: false }));
       outer.rotation.x = -Math.PI / 2; outer.position.y = 0.045;
@@ -698,7 +719,7 @@ function spawnHazard(wy) {
   } else if (roll < 0.68) {
     /* sawblade sweeping across the road on a rail */
     const h = {
-      kind: 'saw', wy, r: 88, drain: 4 + Math.floor(d / 4),
+      kind: 'saw', wy, r: 88, drain: 6 + Math.floor(d / 3),
       mid: (road.x0 + road.x1) / 2 + rnd(-40, 40),
       amp: (road.x1 - road.x0) / 2 - rnd(95, 125),
       speed: rnd(0.0011, 0.0021), phase: rnd(0, 6), pop: 0,
@@ -724,7 +745,7 @@ function spawnHazard(wy) {
     const gapW = (road.x1 - road.x0) * rnd(0.38, 0.55);
     const gapX = rnd(road.x0 + gapW / 2 + 24, road.x1 - gapW / 2 - 24);
     const len = rnd(220, 320);
-    const h = { kind: 'choke', wy: wy + len / 2, len, gapX, gapW, drain: 3 + Math.floor(d / 4), pop: 0 };
+    const h = { kind: 'choke', wy: wy + len / 2, len, gapX, gapW, drain: 5 + Math.floor(d / 3), pop: 0 };
     const grp = new THREE.Group();
     const gapL = gapX - gapW / 2, gapR = gapX + gapW / 2;
     for (const seg of [[road.x0, gapL], [gapR, road.x1]]) {
@@ -791,8 +812,9 @@ function schedule() {
     else if (roll < 0.90 && G.level >= 2) spawnHazard(nextY);
     else spawnWall(nextY);
     if (chance(0.13)) spawnPickup(nextY + rnd(-150, 150));
-    if (G.level >= 2 && chance(0.1)) spawnMeteor(nextY + rnd(-120, 240));
-    nextY += rnd(560, 860) - Math.min(G.level * 16, 150);
+    if (G.level >= 2 && chance(0.15)) spawnMeteor(nextY + rnd(-120, 240));
+    if (G.level >= 5 && chance(0.06)) spawnMeteor(nextY + rnd(-300, -80));
+    nextY += rnd(520, 800) - Math.min(G.level * 18, 190);
     bossCounter += 1;
     if (bossCounter >= 6) { bossCounter = 0; spawnBoss(nextY + 350); nextY += 900; }
   }
@@ -835,7 +857,7 @@ function mkEnemy(kind, x, wy, hp) {
   else if (kind === 'brute') { e.r = rnd(22, 27); e.drift = rnd(2, 5); e.col = '#a32233'; e.drain = 2; }
   else if (kind === 'split') { e.r = rnd(14, 16); e.drift = rnd(8, 14); e.col = '#c96bff'; e.drain = 1; }
   else if (kind === 'gold') { e.r = rnd(13, 15); e.drift = rnd(6, 10); e.col = '#ffd75d'; e.drain = 1; }
-  else if (kind === 'boss') { e.r = 26; e.drift = 4; e.col = '#c93a2e'; e.drain = 2; e.boss = true; }
+  else if (kind === 'boss') { e.r = 26; e.drift = 4; e.col = '#c93a2e'; e.drain = 3; e.boss = true; }
   else { e.r = rnd(11, 15); e.drift = rnd(6, 16); e.col = '#e8485a'; e.drain = 1; }
   return e;
 }
@@ -957,7 +979,7 @@ function squadRadius() { return clamp(15 + G.soldiers * 0.42, 22, 88); }
 
 function addSoldiers(n) {
   const prevPeak = G.peak;
-  G.soldiers = clamp(Math.round(n), 0, 9999);
+  G.soldiers = clamp(Math.round(n), 0, 20000);
   G.peak = Math.max(G.peak, G.soldiers);
   while (G.mileIdx < MILES.length && G.peak >= MILES[G.mileIdx]) {
     if (MILES[G.mileIdx] > prevPeak) {
@@ -1399,7 +1421,7 @@ function update(dt) {
     if (p.t > 7 || p.wy < G.camY - 140 || p.x < road.x0 - 80 || p.x > road.x1 + 80) { ebullets.splice(i, 1); continue; }
     const dx = p.x - G.armyX, dy = p.wy - G.camY, rr = sr * 0.8 + p.r;
     if (dx * dx + dy * dy < rr * rr) {
-      addSoldiers(G.soldiers - Math.max(2, Math.ceil(G.soldiers * 0.05)));
+      addSoldiers(G.soldiers - Math.max(2, Math.ceil(G.soldiers * 0.07)));
       for (let k = 0; k < 10 && parts.length < MAXP - 12; k++)
         parts.push(mkPart(p.x + rnd(-10, 10), p.wy + rnd(-8, 8), '#ff5d6a'));
       dmgFlash(); sfx.hurt(); vib(30); flingSoldier(); flingSoldier();
@@ -1414,10 +1436,10 @@ function update(dt) {
 
   /* enemies drift toward the squad */
   drainAcc += dt;
-  const drainTick = 0.36;
+  const drainTick = 0.32;
   const doDrain = drainAcc >= drainTick;
   let tickDmg = 0;
-  const drainCap = Math.max(1, Math.ceil(G.soldiers * 0.08));
+  const drainCap = Math.max(1, Math.ceil(G.soldiers * 0.1));
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     if (e._dead) { e.label.remove(); enemies.splice(i, 1); continue; }
@@ -1447,11 +1469,13 @@ function update(dt) {
       if (Math.random() < 0.35) sfx.hurt();
       if (Math.random() < 0.5) dmgFlash();
       vib(20);
-      hurt(e, G.soldiers * 0.7 + 6);
+      hurt(e, G.soldiers * 0.55 + 5);
       if (Math.random() < 0.55) flingSoldier();
     }
   }
-  /* environmental hazards chip away at the squad while it overlaps them */
+  /* environmental hazards chip away at the squad while it overlaps them.
+     Hazards get their own, harsher cap — they are supposed to threaten. */
+  let hazDmg = 0;
   for (let i = hazards.length - 1; i >= 0; i--) {
     const h = hazards[i];
     if (h.dead) {
@@ -1483,7 +1507,7 @@ function update(dt) {
           const dd = Math.hypot(h.x - G.armyX, h.wy - G.camY);
           if (dd < h.r + sr) {
             const frac = clamp(1 - dd / (h.r + sr), 0.15, 1);
-            addSoldiers(G.soldiers - Math.max(3, Math.ceil(G.soldiers * 0.3 * frac)));
+            addSoldiers(G.soldiers - Math.max(3, Math.ceil(G.soldiers * 0.4 * frac)));
             for (let k = 0; k < 4; k++) flingSoldier();
             dmgFlash(); vib(50);
           }
@@ -1500,7 +1524,7 @@ function update(dt) {
         ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(G.armyX - h.gapX) + sr * 0.75 > h.gapW / 2
         : Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) < h.r + sr * 0.75;
     if (touching) {
-      tickDmg += h.drain;
+      hazDmg += h.drain;
       G.shake = Math.max(G.shake, 3);
       dmgFlash(); vib(25);
       if (Math.random() < 0.5) sfx.hurt();
@@ -1509,6 +1533,8 @@ function update(dt) {
         parts.push(mkPart(G.armyX + rnd(-sr * 0.6, sr * 0.6), G.camY + rnd(-6, 18), h.kind === 'lava' ? '#ff7a3d' : '#ff5d6a'));
     }
   }
+  if (doDrain && hazDmg > 0)
+    addSoldiers(G.soldiers - Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))));
   if (doDrain && tickDmg > 0)
     addSoldiers(G.soldiers - Math.min(tickDmg, drainCap));
   if (doDrain) drainAcc = 0;
@@ -1529,7 +1555,7 @@ function update(dt) {
       continue;
     }
     if (w.wy - G.camY < sr + 30 && G.armyX + sr * 0.6 > w.x0 && G.armyX - sr * 0.6 < w.x1) {
-      if (doDrain) { addSoldiers(G.soldiers - Math.max(1, Math.ceil(G.soldiers * 0.1))); G.shake = 5; flingSoldier(); }
+      if (doDrain) { addSoldiers(G.soldiers - Math.max(1, Math.ceil(G.soldiers * 0.12))); G.shake = 5; flingSoldier(); }
       w.hp -= G.soldiers * 6 * dt;
       if (w.hp <= 0) killWall(w);
     }
@@ -1614,6 +1640,7 @@ function draw(now) {
   stripMat.color.copy(curZone.post);
   moon.material.color.copy(tmpCol.set(z.sky).lerp(col3('#ffffff'), 0.6));
   moteMat.color.copy(tmpCol.set(z.sky));
+  patchMesh.material.color.copy(tmpCol.copy(curZone.ground).multiplyScalar(0.55));
 
   /* scorch decals */
   let sci = 0;
@@ -1695,19 +1722,33 @@ function draw(now) {
   chevMesh.material.color.copy(curZone.dash);
 
   /* roadside props */
-  let ri2 = 0, si = 0;
+  let ri2 = 0, si = 0, ci = 0;
   for (const p of propSeed) {
     const span = PROP_RANGE;
     const zPos = -(((p.x > 0 ? 1 : -1) * 7 + p.ry * 31 + scroll) % span) - 20;
-    dummy.position.set(p.x, p.kind === 0 ? p.s * 0.5 : p.s * 1.8, zPos);
-    dummy.rotation.set(0, p.ry, p.kind === 0 ? p.ry * 0.3 : 0);
-    dummy.scale.setScalar(p.s);
+    dummy.position.set(p.x, p.kind === 0 ? p.s * 0.5 : p.kind === 1 ? p.s * 1.8 : p.s * 0.85, zPos);
+    dummy.rotation.set(0, p.ry + (p.kind === 2 ? t * 0.15 : 0), p.kind === 0 ? p.ry * 0.3 : 0);
+    dummy.scale.set(p.s, p.kind === 2 ? p.s * 1.7 : p.s, p.s);
     dummy.updateMatrix();
     if (p.kind === 0 && ri2 < NROCK) rockMesh.setMatrixAt(ri2++, dummy.matrix);
     if (p.kind === 1 && si < NSPIRE) spireMesh.setMatrixAt(si++, dummy.matrix);
+    if (p.kind === 2 && ci < NCRY) crysMesh.setMatrixAt(ci++, dummy.matrix);
   }
   rockMesh.count = ri2; rockMesh.instanceMatrix.needsUpdate = true;
   spireMesh.count = si; spireMesh.instanceMatrix.needsUpdate = true;
+  crysMesh.count = ci; crysMesh.instanceMatrix.needsUpdate = true;
+
+  /* ground patches */
+  let pi2 = 0;
+  for (const p of patchSeed) {
+    const zPos = -(((p.x > 0 ? 1 : -1) * 11 + p.ry * 29 + scroll) % PROP_RANGE) - 20;
+    dummy.position.set(p.x, 0.012, zPos);
+    dummy.rotation.set(-Math.PI / 2, 0, p.ry);
+    dummy.scale.set(p.s * 1.5, p.s, 1);
+    dummy.updateMatrix();
+    patchMesh.setMatrixAt(pi2++, dummy.matrix);
+  }
+  patchMesh.count = pi2; patchMesh.instanceMatrix.needsUpdate = true;
 
   /* shadows (filled across sections below) */
   let shI = 0;
