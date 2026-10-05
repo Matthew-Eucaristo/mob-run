@@ -203,6 +203,16 @@ const dashMat = new THREE.MeshBasicMaterial({ color: ZONES[0].dash });
 const dashMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.02, 1.6), dashMat, NDASH);
 scene.add(dashMesh);
 
+/* speed lines: streaks at the roadside once the run gets fast */
+const NSL = 16;
+const speedLineMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(0.05, 0.05, 3),
+  new THREE.MeshBasicMaterial({ color: 0x9db8ff, transparent: true, opacity: 0, depthWrite: false }), NSL);
+speedLineMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(speedLineMesh);
+const slSeed = [];
+for (let i = 0; i < NSL; i++) slSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 + 2.5, 20), off: rnd(0, 120), h: rnd(0.5, 4) });
+
 /* chevron arrows on the road */
 const chevTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -919,14 +929,21 @@ function spawnWall(wy) {
   walls.push(w);
 }
 
+const bossAuraGeo = new THREE.RingGeometry(0.85, 1, 36);
 function spawnBoss(wy) {
   const d = G.level;
   const hp = Math.round(42 + d * 46);
   const bx = (road.x0 + road.x1) / 2 + rnd(-60, 60);
-  const boss = mkEnemy('boss', bx, wy, hp);
+    const boss = mkEnemy('boss', bx, wy, hp);
   boss.roar = 1;
   /* variant: purple shooter boss lobs orbs at the squad */
   if (d >= 2 && chance(0.45)) { boss.shooter = true; boss.col = '#8a3ae0'; boss.fireT = 1.1; }
+  const aura = new THREE.Mesh(bossAuraGeo, new THREE.MeshBasicMaterial({
+    color: boss.shooter ? 0xa04de8 : 0xff5d3d, transparent: true, opacity: 0.4,
+    side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  aura.rotation.x = -Math.PI / 2;
+  scene.add(aura);
+  boss.aura = aura;
   enemies.push(boss);
   zoneBanner.textContent = '⚠ BOSS';
   zoneBanner.style.color = '#ff5d6a';
@@ -1108,7 +1125,7 @@ function startGame() {
 function clearWorld() {
   for (const g of gates) removeGate(g);
   for (const w of walls) { scene.remove(w.mesh); w.label.remove(); }
-  for (const e of enemies) e.label.remove();
+  for (const e of enemies) { e.label.remove(); if (e.aura) scene.remove(e.aura); }
   for (const b of barrels) { scene.remove(b.grp); b.label.remove(); }
   for (const p of pickups) scene.remove(p.mesh);
   for (const r of rewards) scene.remove(r.mesh);
@@ -1137,7 +1154,7 @@ function gameOver() {
 function revive() {
   if (G.mode !== 'over' || revived) return;
   revived = true;
-  for (const e of enemies) e.label.remove();
+  for (const e of enemies) { e.label.remove(); if (e.aura) scene.remove(e.aura); }
   enemies.length = 0; deadEnemies.length = 0;
   overOv.style.display = 'none';
   G.mode = 'run';
@@ -1442,7 +1459,7 @@ function update(dt) {
   const drainCap = Math.max(1, Math.ceil(G.soldiers * 0.1));
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e._dead) { e.label.remove(); enemies.splice(i, 1); continue; }
+    if (e._dead) { e.label.remove(); if (e.aura) scene.remove(e.aura); enemies.splice(i, 1); continue; }
     e.wy -= e.drift * dt;
     e.pop = Math.min(1, e.pop + dt * 4);
     if (e.hitT) e.hitT -= dt;
@@ -1460,7 +1477,7 @@ function update(dt) {
         tone(210, 0.13, 'sawtooth', 0.05, 120);
       }
     }
-    if (e.wy < G.camY - 320) { e.label.remove(); enemies.splice(i, 1); continue; }
+    if (e.wy < G.camY - 320) { e.label.remove(); if (e.aura) scene.remove(e.aura); enemies.splice(i, 1); continue; }
     const near = e.wy - G.camY < sr + e.r && e.wy - G.camY > -(sr + e.r + 90);
     e.attacking = near && Math.abs(e.x - G.armyX) < sr + e.r;
     if (e.attacking && doDrain) {
@@ -1606,7 +1623,7 @@ function update(dt) {
   }
 
   for (let i = enemies.length - 1; i >= 0; i--) {
-    if (enemies[i]._dead) { enemies[i].label.remove(); enemies.splice(i, 1); }
+    if (enemies[i]._dead) { enemies[i].label.remove(); if (enemies[i].aura) scene.remove(enemies[i].aura); enemies.splice(i, 1); }
   }
 }
 
@@ -1710,6 +1727,21 @@ function draw(now) {
     ringMat.opacity = Math.max(0, 0.75 * (1 - rk));
   } else ringMat.opacity = 0;
 
+  /* speed lines */
+  {
+    const target = clamp((G.speed - 220) / 160, 0, 0.45);
+    speedLineMesh.material.opacity += (target - speedLineMesh.material.opacity) * 0.05;
+    for (let i = 0; i < NSL; i++) {
+      const sl = slSeed[i];
+      const zPos = -(((sl.off + scroll * 2.4) % 120) - 10);
+      dummy.position.set(sl.x, sl.h, zPos);
+      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      speedLineMesh.setMatrixAt(i, dummy.matrix);
+    }
+    speedLineMesh.instanceMatrix.needsUpdate = true;
+  }
+
   /* chevrons */
   for (let i = 0; i < NCHEV; i++) {
     const zPos = -((i * CHEV_GAP + scroll * 1.15) % (NCHEV * CHEV_GAP)) + 5;
@@ -1804,7 +1836,7 @@ function draw(now) {
   for (const e of enemies) {
     if (e.hp <= 0) continue;
     const zP = wz(e.wy);
-    if (zP > 14) { e.label.style.display = 'none'; continue; }
+    if (zP > 14) { e.label.style.display = 'none'; if (e.aura) e.aura.visible = false; continue; }
     const d = EDEF[e.kind] || EDEF.normal;
     let s = e.r * K * (e.boss ? 1.7 : 1.8) * e.pop * (e.boss ? 1 : (e.attacking ? 1 + Math.sin(t * 14) * 0.08 : 1));
     if (s < 0.01) s = 0.01;
@@ -1828,6 +1860,11 @@ function draw(now) {
         eyeMesh.setMatrixAt(ei, dummy.matrix);
         eyeMesh.setColorAt(ei, tmpCol.set(e.boss ? '#ff9d5d' : '#ffffff'));
         ei++;
+      }
+      if (e.aura) {
+        e.aura.position.set(wx(e.x), 0.06, zP);
+        e.aura.scale.setScalar(s * 2.5 + Math.sin(t * 5) * 0.15);
+        e.aura.visible = zP < 14;
       }
       if (shI < MAXSH) {
         dummy.position.set(wx(e.x), 0.015, zP);
