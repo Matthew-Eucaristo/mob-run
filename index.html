@@ -21,9 +21,6 @@
   #hudWeapon { font-size:12px; font-weight:800; color:#ffe97d; margin-top:3px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #hudR { top:calc(10px + env(safe-area-inset-top)); right:12px; text-align:right; }
   #hudDist { font-size:20px; font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.6); }
-  #hudKills { font-size:13px; font-weight:700; color:#b9c9e8; }
-  #hudStreak { font-size:13px; font-weight:800; color:#7de8ff; margin-top:2px; min-height:16px;
-    text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #hudLevel { top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     font-size:13px; font-weight:800; color:#b9c9e8; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #lvlBar { top:calc(30px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
@@ -51,10 +48,7 @@
     font-size:13px; color:#8fa8cc; z-index:5; pointer-events:none; opacity:0; transition:opacity .6s;
     text-shadow:0 1px 4px rgba(0,0,0,.6); }
 
-  #muteBtn { position:fixed; top:calc(8px + env(safe-area-inset-top)); right:10px; z-index:20;
-    background:rgba(20,28,50,.72); color:#fff; border:1px solid rgba(255,255,255,.16); border-radius:10px;
-    font-size:17px; padding:5px 10px; cursor:pointer; }
-  #hudR { right:52px; }
+  #hudR { right:12px; }
 
   .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
     justify-content:center; background:rgba(8,12,24,.86); color:#eaf2ff; text-align:center; padding:24px;
@@ -76,22 +70,17 @@
 <div id="labels"></div>
 <div id="floats"></div>
 <div class="hud" id="hudL"><div class="t">ARMY</div><div id="hudArmy">10</div><div id="hudWeapon">PISTOL</div></div>
-<div class="hud" id="hudR"><div id="hudDist">0m</div><div id="hudKills">☠ 0</div><div id="hudStreak"></div></div>
+<div class="hud" id="hudR"><div id="hudDist">0m</div></div>
 <div class="hud" id="hudLevel"></div>
 <div class="hud" id="lvlBar"><div id="lvlFill"></div></div>
 <div id="zoneBanner"></div>
 <div id="vignette"></div>
 <div id="hint">◀ drag left &amp; right ▶</div>
-<button id="muteBtn" title="sound">🔊</button>
 <div class="overlay" id="startOverlay">
   <h1>MOB RUN</h1>
   <h2>the game from those ads — now in 3D</h2>
-  <p>Drag left &amp; right to steer your army.<br>
-  Pick the best gates — <b style="color:#7dff9b">×5 beats +40</b> when you're big.<br>
-  <b style="color:#ff9d5d">Shoot the barrels</b> for weapon upgrades — pistol to annihilator.<br>
-  Watch out: some gates <b style="color:#7de8ff">move</b>, and red mobs eat your army.</p>
+  <p>Drag to steer &middot; pick the best gates &middot; shoot barrels for loot</p>
   <div class="tap">TAP TO START</div>
-  <div class="keys">desktop: ◀ ▶ arrow keys / drag</div>
   <div class="keys" id="bestLine" style="color:#ffd75d; font-weight:800; margin-top:10px"></div>
 </div>
 <div class="overlay" id="overOverlay" style="display:none">

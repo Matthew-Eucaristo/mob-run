@@ -8,14 +8,12 @@ const overOv = document.getElementById('overOverlay');
 const overStats = document.getElementById('overStats');
 const reviveBtn = document.getElementById('reviveBtn');
 const bestLine = document.getElementById('bestLine');
-const muteBtn = document.getElementById('muteBtn');
+/* sound: always on; 'M' mutes */
 const labelsEl = document.getElementById('labels');
 const floatsEl = document.getElementById('floats');
 const hudArmy = document.getElementById('hudArmy');
 const hudWeapon = document.getElementById('hudWeapon');
 const hudDist = document.getElementById('hudDist');
-const hudKills = document.getElementById('hudKills');
-const hudStreak = document.getElementById('hudStreak');
 const hudLevel = document.getElementById('hudLevel');
 const lvlFill = document.getElementById('lvlFill');
 const zoneBanner = document.getElementById('zoneBanner');
@@ -95,10 +93,7 @@ const sfx = {
   boom: () => { noise(0.5, 0.22); tone(70, 0.4, 'sine', 0.15, 35); },
   barrel: () => { noise(0.15, 0.1); tone(300, 0.12, 'triangle', 0.08, 80); },
 };
-muteBtn.addEventListener('click', (e) => {
-  e.stopPropagation(); muted = !muted;
-  muteBtn.textContent = muted ? '🔇' : '🔊';
-});
+/* 'M' toggles sound on desktop */
 
 /* ---------------- zones ---------------- */
 const ZONES = [
@@ -174,6 +169,7 @@ document.addEventListener('touchmove', e => e.preventDefault(), { passive: false
 document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') keyDir = -1;
   else if (e.key === 'ArrowRight') keyDir = 1;
+  else if (e.key === 'm' || e.key === 'M') muted = !muted;
   else if (e.key === ' ' || e.key === 'Enter') press();
 });
 document.addEventListener('keyup', e => {
@@ -915,7 +911,6 @@ function applyGate(g) {
     (!gunUp && (p.t === 'mul' || p.t === 'div') ? gateLabel(p) + ' → ' : '') + lab,
     good ? (p.t === 'mul' || gunUp ? '#ffd75d' : '#7dff9b') : '#ff5d6a',
     p.t === 'mul' || gunUp ? 32 : 24, 3.4);
-  if (G.streak >= 3) floatText(G.armyX, G.camY + 10, 'STREAK ×' + G.streak, '#7de8ff', 19, 4.6);
   if (good) (p.t === 'mul' && p.v >= 3 || gunUp ? sfx.great : sfx.good)();
   else sfx.bad();
   g.punch = 1;
@@ -1029,8 +1024,8 @@ function gameOver() {
   if (isBest) { G.best = d; try { localStorage.setItem('mobrun_best', String(d)); } catch (e) { } }
   overStats.innerHTML =
     `${isBest ? '<b style="color:#ffd75d">NEW BEST!</b><br>' : ''}` +
-    `Distance <b>${d}m</b> · Kills <b>${G.kills}</b><br>` +
-    `Biggest army <b>${G.peak}</b> · Level <b>${G.level}</b> · Best <b>${G.best}m</b>`;
+    `<span style="font-size:32px;font-weight:900">${d}m</span><br>` +
+    `<span style="font-size:13px;color:#8fa8cc">kills ${G.kills} &middot; peak army ${G.peak} &middot; best ${G.best}m</span>`;
   overOv.style.display = 'flex';
   if (reviveBtn) reviveBtn.style.display = revived ? 'none' : 'block';
   sfx.boss(); vib(80);
@@ -1060,8 +1055,6 @@ function hurt(e, dmg) {
   e.hp -= dmg;
   e.hitT = 0.1;
   e.wy += Math.min(7, dmg * 0.18);
-  if (e.hp > 0 && dmg >= 8 && floats.length < 28 && Math.random() < 0.5)
-    floatText(e.x, e.wy, '-' + Math.round(dmg), '#ffffff', 12, 2.0);
   if (e.hp > 0 && parts.length < MAXP - 8 && Math.random() < 0.55)
     parts.push(mkPart(e.x + rnd(-5, 5), e.wy + rnd(-4, 4), '#e8f2ff'));
   if (e.hp <= 0 && !e._dead) {
@@ -1096,10 +1089,7 @@ function hurt(e, dmg) {
         scene.add(m);
         pickups.push({ x: e.x, wy: e.wy, kind: 'heal', taken: false, mesh: m });
       }
-      if (chance(0.12)) {
-        addSoldiers(G.soldiers + 1);
-        floatText(e.x, e.wy, '+1 RECRUIT', '#ffd75d', 14, 2);
-      }
+      if (chance(0.12)) addSoldiers(G.soldiers + 1);
     }
   }
 }
@@ -1123,7 +1113,6 @@ function hitBarrel(bar, dmg) {
       m.position.set(wx(bar.x), 1.4, wz(bar.wy));
       scene.add(m);
       rewards.push({ x: bar.x, wy: bar.wy, t: 0, kind: bar.kind, mesh: m });
-      floatText(bar.x, bar.wy, 'LOOT!', '#7de8ff', 18, 3);
     }
     scene.remove(bar.grp); bar.label.style.display = 'none';
   }
@@ -1843,9 +1832,7 @@ function draw(now) {
   hudWeapon.textContent = WT[G.tier].name;
   hudWeapon.style.color = WT[G.tier].col;
   hudDist.textContent = Math.floor(G.dist) + 'm';
-  hudKills.textContent = '☠ ' + G.kills;
-  hudStreak.textContent = G.streak >= 2 ? 'STREAK ×' + G.streak : (G.killChain >= 6 ? 'CHAIN ×' + G.killChain : '');
-  hudLevel.textContent = 'LV ' + G.level + ' · ' + ZONE_NAMES[zi];
+  hudLevel.textContent = 'LV ' + G.level;
   if (lvlFill) lvlFill.style.width = ((G.dist % 120) / 120 * 100).toFixed(1) + '%';
   hintEl.style.opacity = hintT > 0 ? '0.9' : '0';
 
