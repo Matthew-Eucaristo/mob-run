@@ -5,89 +5,223 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MOB RUN">
+<meta name="theme-color" content="#12140f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>MOB RUN 3D — Gate Army</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { height:100%; overflow:hidden; background:#0e1526;
+  html,body { height:100%; overflow:hidden; background:#12140f;
     font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; -webkit-user-select:none; user-select:none; }
   #game { position:fixed; inset:0; display:block; touch-action:none; }
   body { overscroll-behavior:none; }
 
   /* HUD */
-  .hud { position:fixed; z-index:5; pointer-events:none; color:#eaf2ff; }
+  .hud { position:fixed; z-index:5; pointer-events:none; color:#f3ecdf; }
   #hudL { top:calc(10px + env(safe-area-inset-top)); left:12px; }
-  #hudL .t { font-size:10px; letter-spacing:2px; color:#8fa8cc; font-weight:700; }
-  #hudArmy { font-size:30px; font-weight:900; color:#7dff9b; line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.6); }
+  #hudL .t { font-size:10px; letter-spacing:2px; color:#b6aa96; font-weight:700; }
+  #hudArmy { font-size:30px; font-weight:900; color:#f3ecdf; line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.6);
+    transform-origin:left center; }
+  #hudArmy.pop { animation:coinPop .22s ease; }
   #hudWeapon { font-size:12px; font-weight:800; color:#ffe97d; margin-top:3px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #hudR { top:calc(10px + env(safe-area-inset-top)); right:12px; text-align:right; }
+  #hudCoins { font-size:16px; font-weight:900; color:#e2b657; text-shadow:0 2px 8px rgba(0,0,0,.6);
+    display:inline-block; transform-origin:right center; }
+  #hudCoins.pop { animation:coinPop .28s cubic-bezier(.2,.8,.2,1); }
   #hudDist { font-size:20px; font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.6); }
   #hudLevel { top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
-    font-size:13px; font-weight:800; color:#b9c9e8; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
+    font-size:13px; font-weight:800; color:#d9cbb6; letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #lvlBar { top:calc(30px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
-    width:min(46vw,300px); height:5px; background:rgba(255,255,255,.12); border-radius:3px; overflow:hidden; }
-  #lvlFill { height:100%; width:0%; background:linear-gradient(90deg,#7de8ff,#c96bff); border-radius:3px;
+    width:min(46vw,300px); height:5px; background:rgba(243,236,223,.14); border-radius:3px; overflow:hidden; }
+  #lvlFill { height:100%; width:0%; background:linear-gradient(90deg,#e2b657,#c4512c); border-radius:3px;
     transition:width .18s linear; }
 
   /* in-world projected labels */
   #labels, #floats { position:fixed; inset:0; z-index:4; pointer-events:none; overflow:hidden; }
   .lb { position:absolute; transform:translate(-50%,-50%); font-weight:900; font-size:15px; color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.5); white-space:nowrap; will-change:transform,opacity; }
-  .lb.boss { color:#ffb0a0; font-size:17px; }
+  .lb.boss { color:#ffb089; font-size:18px; letter-spacing:.4px; }
   .lb.wall { color:#cdd9f2; font-size:15px; }
   .lb.barrel { font-size:14px; }
   .fl { position:absolute; transform:translate(-50%,-50%); font-weight:900; white-space:nowrap;
     text-shadow:0 2px 6px rgba(0,0,0,.7); will-change:transform,opacity; }
 
   #vignette { position:fixed; inset:0; z-index:6; pointer-events:none; opacity:0;
-    background:radial-gradient(ellipse at center, transparent 52%, rgba(255,30,55,.55) 100%);
-    transition:opacity .55s; }
+    background:radial-gradient(ellipse at center, transparent 52%, rgba(160,42,24,.55) 100%);
+    transition:opacity .35s; }
+  #vignette.doom { transition:opacity .18s;
+    background:radial-gradient(ellipse at center, rgba(70,16,8,.2) 18%, rgba(92,22,12,.82) 100%); }
   #zoneBanner { position:fixed; top:26%; left:50%; transform:translate(-50%,-50%);
-    font-size:34px; font-weight:900; letter-spacing:6px; color:#dfe9ff; opacity:0; z-index:5;
+    font-size:34px; font-weight:900; letter-spacing:6px; color:#f3ecdf; opacity:0; z-index:5;
     text-shadow:0 2px 18px rgba(0,0,0,.7); pointer-events:none; transition:opacity .45s; }
+  #zoneBanner.go { animation:bannerIn .48s cubic-bezier(.16,.84,.28,1); }
   #hint { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
-    font-size:13px; color:#8fa8cc; z-index:5; pointer-events:none; opacity:0; transition:opacity .6s;
-    text-shadow:0 1px 4px rgba(0,0,0,.6); }
+    font-size:13px; color:#b6aa96; z-index:5; pointer-events:none; opacity:0; transition:opacity .6s;
+    text-shadow:0 1px 4px rgba(0,0,0,.6); white-space:normal; text-align:center;
+    max-width:min(92vw, 520px); line-height:1.35; }
+  #hudSkills { font-size:10px; font-weight:800; color:#d9cbb6; margin-top:4px; max-width:46vw;
+    line-height:1.35; text-shadow:0 1px 4px rgba(0,0,0,.6); }
+  #hudForm { bottom:calc(42px + env(safe-area-inset-bottom)); left:12px; }
+  #formLabel { font-size:13px; font-weight:900; letter-spacing:1px; }
+  #formTrack { width:96px; height:5px; margin-top:4px; background:rgba(255,255,255,.14); border-radius:3px; position:relative; }
+  #formFill { position:absolute; top:-1px; width:10px; height:7px; border-radius:3px; background:#e2b657;
+    box-shadow:0 0 8px rgba(226,182,87,.7); transition:left .08s linear; }
+  #skillCards { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px; max-width:860px; }
+  .skillCard { pointer-events:auto; width:min(240px, 86vw); text-align:left; cursor:pointer;
+    background:rgba(22,20,16,.96); border:2px solid #e2b657; border-radius:16px; padding:16px 14px 14px;
+    color:#f3ecdf; font:inherit; box-shadow:0 10px 30px rgba(0,0,0,.35);
+    animation:cardIn .42s cubic-bezier(.16,.84,.28,1) both; }
+  .skillCard:nth-child(2) { animation-delay:.07s; }
+  .skillCard:nth-child(3) { animation-delay:.14s; }
+  .skillCard:active { transform:scale(0.98); }
+  .skillCard b { display:block; font-size:18px; letter-spacing:.5px; margin:4px 0 6px; }
+  .skillCard i { font-style:normal; font-size:22px; color:#e2b657; }
+  .skillCard span { display:block; color:#d2c4ae; font-size:13px; line-height:1.4; font-weight:600; }
+  .skillCard em { display:block; margin-top:8px; color:#e2b657; font-size:11px; font-style:normal; letter-spacing:1px; }
 
   #hudR { right:12px; }
 
+  #skillOverlay { background:rgba(12,11,9,.94); }
   .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center;
-    justify-content:center; background:rgba(8,12,24,.86); color:#eaf2ff; text-align:center; padding:24px;
-    touch-action:none; }
+    justify-content:center; background:rgba(12,11,9,.86); color:#f3ecdf; text-align:center; padding:24px;
+    touch-action:pan-y; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #overOverlay { background:rgba(12,10,8,.78); }
+  #overOverlay.on { animation:wipeIn .5s cubic-bezier(.16,.84,.28,1) both; }
+  #overOverlay.on h1 { animation:slam .55s cubic-bezier(.16,.84,.28,1) both; }
+  #overOverlay.on .stats { animation:cardIn .45s .12s both; }
+  #startOverlay h1 { animation:slam .7s cubic-bezier(.16,.84,.28,1) both; }
+  .textbtn { pointer-events:auto; margin-top:16px; border:2px solid rgba(255,215,93,.8);
+    background:rgba(22,18,12,.9); color:#ffd75d; font:inherit; font-weight:800; letter-spacing:1.2px;
+    border-radius:999px; padding:12px 18px; cursor:pointer; min-height:44px; }
+  .textbtn:active { transform:scale(0.98); }
+  #formBtns { display:none !important; }
+  #formBtns button { pointer-events:auto; min-width:84px; min-height:52px; border-radius:14px;
+    border:2px solid rgba(226,182,87,.8); background:rgba(16,14,10,.78); color:#f3ecdf;
+    font:inherit; font-weight:800; font-size:12px; letter-spacing:1px; transition:transform .12s ease, background .12s ease; }
+  #formBtns button.on { background:rgba(226,182,87,.28); border-color:#f3ecdf; }
+  #formBtns button:active { transform:scale(0.96); }
+  body.touch #hudForm { bottom:calc(18px + env(safe-area-inset-bottom)); }
+  #installCard { display:none; margin-top:14px; width:min(420px, 92vw); text-align:left;
+    background:rgba(22,20,16,.96); border:2px solid #e2b657; border-radius:16px; padding:14px 14px 12px; }
+  #installCard b { display:block; letter-spacing:1px; font-size:15px; }
+  #installCard p { margin:8px 0 0; font-size:13px; max-width:none; }
+  .installRow { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+  .installRow button { pointer-events:auto; min-height:44px; border-radius:999px; font:inherit;
+    font-weight:800; letter-spacing:.8px; padding:10px 16px; cursor:pointer; }
+  #installBtn { border:0; background:#e2b657; color:#1a140c; }
+  #installNo { border:2px solid #8a7d68; background:transparent; color:#d9cbb6; }
+  #shopOverlay { z-index:12; justify-content:flex-start; background:#12140f;
+    padding-top:calc(22px + env(safe-area-inset-top));
+    padding-bottom:calc(22px + env(safe-area-inset-bottom)); }
+  #shopCoins { font-size:22px; font-weight:900; color:#e2b657; margin:4px 0 12px; }
+  #shopGrid { display:grid; grid-template-columns:repeat(2, minmax(132px, 1fr)); gap:10px; width:min(520px, 94vw); }
+  .skinCard { pointer-events:auto; text-align:left; cursor:pointer; color:#f3ecdf; font:inherit;
+    background:rgba(22,20,16,.94); border:2px solid #3a3428; border-radius:14px; padding:10px;
+    transition:transform .12s ease, border-color .12s ease; }
+  .skinCard:active { transform:scale(0.98); }
+  .skinCard i { display:block; height:34px; border-radius:8px; margin-bottom:8px; box-shadow:inset 0 0 0 2px rgba(255,255,255,.18); }
+  .skinCard b { display:block; font-size:14px; letter-spacing:.6px; }
+  .skinCard span { display:block; margin-top:4px; color:#e2b657; font-size:12px; font-weight:800; }
+  .skinCard.on { border-color:#e2b657; }
+  .skinCard.broke span { color:#a98484; }
   .overlay h1 { font-size:clamp(44px,12vw,86px); font-weight:900; letter-spacing:2px;
-    background:linear-gradient(180deg,#7de8ff,#5db2ff 60%,#c96bff); -webkit-background-clip:text;
-    background-clip:text; color:transparent; filter:drop-shadow(0 4px 24px rgba(93,178,255,.35)); }
-  .overlay h2 { font-weight:600; color:#8fa8cc; margin:4px 0 18px; font-size:15px; }
-  .overlay p { max-width:420px; line-height:1.55; color:#b9c9e8; font-size:14px; }
-  .overlay .tap { margin-top:34px; font-size:22px; font-weight:800; color:#7dff9b;
+    background:linear-gradient(180deg,#f6f1e6,#e2b657 58%,#c4512c); -webkit-background-clip:text;
+    background-clip:text; color:transparent; filter:drop-shadow(0 4px 18px rgba(0,0,0,.45)); }
+  .overlay h2 { font-weight:600; color:#b6aa96; margin:4px 0 18px; font-size:15px; }
+  .overlay p { max-width:420px; line-height:1.55; color:#d2c4ae; font-size:14px; }
+  .overlay .tap { margin-top:34px; font-size:22px; font-weight:800; color:#e7d7a8;
     animation:pulse 1.1s ease-in-out infinite; }
   .overlay .stats { margin-top:18px; font-size:17px; line-height:1.7; }
-  .overlay .keys { margin-top:26px; font-size:11px; color:#5f729a; }
+  .overlay .keys { margin-top:26px; font-size:11px; color:#8a7d68; }
   @keyframes pulse { 0%,100%{opacity:.45; transform:scale(1)} 50%{opacity:1; transform:scale(1.07)} }
+  @keyframes cardIn { from { opacity:0; transform:translateY(14px) scale(.97); } to { opacity:1; transform:none; } }
+  @keyframes slam { from { opacity:0; transform:scale(1.14) translateY(8px); } to { opacity:1; transform:none; } }
+  @keyframes wipeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes bannerIn { from { opacity:0; transform:translate(-50%,-40%) scale(1.08); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+  @keyframes coinPop { 0% { transform:scale(1); } 40% { transform:scale(1.22); } 100% { transform:scale(1); } }
+  @media (pointer: coarse) {
+    #hint { top:calc(86px + env(safe-area-inset-top)); bottom:auto; max-width:78vw; }
+    #hudForm { bottom:calc(18px + env(safe-area-inset-bottom)); }
+  }
+  @media (max-width: 700px) {
+    #hudArmy { font-size:26px; }
+    #hudDist, #hudCoins { font-size:15px; }
+    #zoneBanner { font-size:22px; letter-spacing:3px; }
+    .overlay h1 { font-size:clamp(40px, 16vw, 64px); }
+    .overlay { padding:16px 14px calc(18px + env(safe-area-inset-bottom)); }
+    #hint { top:calc(86px + env(safe-area-inset-top)); bottom:auto; max-width:78vw; }
+    #hudForm { bottom:calc(22px + env(safe-area-inset-bottom)); }
+    .skillCard { width:min(100%, 340px); padding:12px 14px 10px; }
+    #skillCards { gap:8px; }
+    .skillCard b { font-size:16px; }
+  }
+  @media (max-height: 740px) {
+    #skillOverlay, #shopOverlay { justify-content:flex-start; padding-top:calc(16px + env(safe-area-inset-top)); }
+    .overlay .tap { margin-top:16px; }
+    .overlay h1 { font-size:clamp(36px, 12vw, 56px); }
+  }
+  @media (orientation: landscape) and (max-height: 480px) {
+    #hudForm { display:none; }
+    #startOverlay p { display:none; }
+    #skillCards { flex-wrap:nowrap; }
+    .skillCard { width:30vw; padding:10px 10px 8px; }
+    .skillCard span { font-size:12px; }
+    .overlay .tap { margin-top:8px; }
+  }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="labels"></div>
 <div id="floats"></div>
-<div class="hud" id="hudL"><div class="t">ARMY</div><div id="hudArmy">10</div><div id="hudWeapon">PISTOL</div></div>
-<div class="hud" id="hudR"><div id="hudDist">0m</div></div>
+<div class="hud" id="hudL"><div class="t">ARMY</div><div id="hudArmy">10</div><div id="hudWeapon">PISTOL</div><div id="hudSkills"></div></div>
+<div class="hud" id="hudR"><div id="hudCoins">★ 0</div><div id="hudDist">0m</div></div>
 <div class="hud" id="hudLevel"></div>
 <div class="hud" id="lvlBar"><div id="lvlFill"></div></div>
 <div id="zoneBanner"></div>
 <div id="vignette"></div>
-<div id="hint">◀ drag left &amp; right ▶</div>
+<div id="hint">swipe sideways to steer · up for a column · down to spread wide</div>
+<div class="hud" id="hudForm"><div class="t">FORMATION</div><div id="formLabel">SQUARE</div><div id="formTrack"><div id="formFill"></div></div></div>
+<div id="formBtns">
+  <button type="button" id="btnCol">COLUMN</button>
+  <button type="button" id="btnWide">WIDE</button>
+</div>
 <div class="overlay" id="startOverlay">
   <h1>MOB RUN</h1>
   <h2>the game from those ads — now in 3D</h2>
-  <p>Drag to steer &middot; pick the best gates &middot; shoot barrels for loot</p>
+  <p>One thumb is enough. Swipe sideways to steer, up for a column, down to spread wide, and pick a gate. Coins sit on the road. Hang off the asphalt and soldiers fall.</p>
   <div class="tap">TAP TO START</div>
+  <button class="textbtn" id="shopBtn" type="button">LOCKER</button>
+  <div class="keys">arrows or WASD · M mute · skills every level</div>
   <div class="keys" id="bestLine" style="color:#ffd75d; font-weight:800; margin-top:10px"></div>
+</div>
+<div class="overlay" id="skillOverlay" style="display:none">
+  <h2 style="letter-spacing:3px; color:#f3ecdf; font-size:22px;">CHOOSE A SKILL</h2>
+  <p style="margin-top:6px;">Stack them. The run gets mean later — this is how you keep up.</p>
+  <div id="skillCards"></div>
 </div>
 <div class="overlay" id="overOverlay" style="display:none">
   <h1>WIPED OUT</h1>
   <div class="stats" id="overStats"></div>
-  <div class="tap" id="reviveBtn" style="color:#7de8ff; margin-top:26px">&#9193; REVIVE (one time)</div>
-  <div class="tap" style="margin-top:16px; font-size:16px; color:#8fa8cc">or tap anywhere to run again</div>
+  <div id="installCard">
+    <b>ADD MOB RUN</b>
+    <p id="installHint">Keep it on your home screen. It opens full screen, like an app.</p>
+    <div class="installRow">
+      <button type="button" id="installBtn">INSTALL</button>
+      <button type="button" id="installNo">NOT NOW</button>
+    </div>
+  </div>
+  <button class="textbtn" id="shopBtnOver" type="button">LOCKER</button>
+  <div class="tap" id="reviveBtn" style="color:#e2b657; margin-top:18px">&#9193; REVIVE (one time)</div>
+  <div class="tap" style="margin-top:12px; font-size:16px; color:#b6aa96">or tap anywhere to run again</div>
+</div>
+<div class="overlay" id="shopOverlay" style="display:none">
+  <h2 style="letter-spacing:3px; color:#f3ecdf; font-size:22px;">LOCKER</h2>
+  <div id="shopCoins">0 COINS</div>
+  <div id="shopGrid"></div>
+  <button class="textbtn" id="shopClose" type="button">BACK</button>
 </div>
 <script type="module" src="game3d.js"></script>
 </body>
