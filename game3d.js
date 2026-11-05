@@ -1834,6 +1834,29 @@ function hurtMob(m, dmg) {
 }
 
 const bossAuraGeo = new THREE.RingGeometry(0.85, 1, 36);
+/* variant silhouettes: gunners carry shoulder cannons, splitters glow with three cores */
+const cannonGeo = mergeParts([
+  { geo: new THREE.CylinderGeometry(0.24, 0.28, 1.25, 12), m: M4(0, 0, 0.3, Math.PI / 2, 0, 0), c: '#7a7494' },
+  { geo: new THREE.CylinderGeometry(0.3, 0.3, 0.16, 12), m: M4(0, 0, 0.92, Math.PI / 2, 0, 0), c: '#ffcf3d' },
+  { geo: new THREE.CylinderGeometry(0.31, 0.31, 0.1, 12), m: M4(0, 0, 0.0, Math.PI / 2, 0, 0), c: '#ffcf3d' },
+  { geo: BOX(0.5, 0.42, 0.55), m: M4(0, -0.08, -0.2), c: '#4a4466' },
+]);
+const cannonMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.5, emissive: 0x331a00, emissiveIntensity: 0.5 });
+const coreMat = new THREE.MeshBasicMaterial({ color: 0xd8a8ff });
+function bossBits(boss) {
+  const g = new THREE.Group();
+  if (boss.shooter) {
+    for (const sx of [-1, 1]) { const c = new THREE.Mesh(cannonGeo, cannonMat); c.position.set(sx * 1.0, 2.45, 0.1); g.add(c); }
+  } else if (boss.splitter) {
+    for (const [x, y] of [[0, 1.35], [-0.38, 1.85], [0.38, 1.85]]) {
+      const c = new THREE.Mesh(SPH(0.17, 10), coreMat); c.position.set(x, y, 0.78); g.add(c);
+    }
+  } else return null;
+  g.visible = false;   /* shown once the draw loop has placed it */
+  scene.add(g);
+  return g;
+}
+function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
 function spawnBoss(wy) {
   const d = G.level;
   const hp = Math.round(42 + d * 46 + G.soldiers * 1.5 * (1 + G.dist / 1400));
@@ -1850,6 +1873,7 @@ function spawnBoss(wy) {
   aura.rotation.x = -Math.PI / 2;
   scene.add(aura);
   boss.aura = aura;
+  boss.acc = bossBits(boss);
   enemies.push(boss);
   if (d >= 3 && chance(0.5)) {
     enemies.push(mkEnemy('normal', clamp(bx - 60, road.x0 + 16, road.x1 - 16), wy + 40, Math.round(10 + d * 4)));
@@ -2380,7 +2404,7 @@ function chooseSkill(id) {
 function clearWorld() {
   for (const g of gates) removeGate(g);
   for (const w of walls) { scene.remove(w.mesh); w.label.remove(); }
-  for (const e of enemies) { e.label.remove(); if (e.aura) scene.remove(e.aura); }
+  for (const e of enemies) { e.label.remove(); dropBossBits(e); }
   for (const b of barrels) { scene.remove(b.grp); b.label.remove(); }
   for (const c of cages) { scene.remove(c.grp); c.label.remove(); }
   cages = [];
@@ -2528,7 +2552,7 @@ function revive() {
   G.coins -= c; saveSave();
   revived = true;
   musicStart();
-  for (const e of enemies) { e.label.remove(); if (e.aura) scene.remove(e.aura); }
+  for (const e of enemies) { e.label.remove(); dropBossBits(e); }
   enemies.length = 0; deadEnemies.length = 0;
   for (const m of mobs) m.label.remove();
   mobs.length = 0; ebullets.length = 0;
@@ -3531,7 +3555,7 @@ function update(dt) {
   const drainCap = Math.max(1, Math.ceil(G.soldiers * 0.1));
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e._dead) { e.label.remove(); if (e.aura) scene.remove(e.aura); enemies.splice(i, 1); continue; }
+    if (e._dead) { e.label.remove(); dropBossBits(e); enemies.splice(i, 1); continue; }
     e.wy -= e.drift * dt;
     if (e.kind === 'leaper') {
       const dir = Math.sign(G.armyX - e.x) || 1;
@@ -3561,7 +3585,7 @@ function update(dt) {
         tone(210, 0.13, 'sawtooth', 0.05, 120);
       }
     }
-    if (e.wy < G.camY - 320) { e.label.remove(); if (e.aura) scene.remove(e.aura); enemies.splice(i, 1); continue; }
+    if (e.wy < G.camY - 320) { e.label.remove(); dropBossBits(e); enemies.splice(i, 1); continue; }
     const near = e.wy - G.camY < sr + e.r && e.wy - G.camY > -(sr + e.r + 90);
     e.attacking = near && Math.abs(e.x - G.armyX) < sr + e.r;
     if (e.attacking && doDrain) {
@@ -3831,7 +3855,7 @@ function update(dt) {
   }
 
   for (let i = enemies.length - 1; i >= 0; i--) {
-    if (enemies[i]._dead) { enemies[i].label.remove(); if (enemies[i].aura) scene.remove(enemies[i].aura); enemies.splice(i, 1); }
+    if (enemies[i]._dead) { enemies[i].label.remove(); dropBossBits(enemies[i]); enemies.splice(i, 1); }
   }
   checkMissions();
   /* level up: a beat of slow motion and a ring before the cards come up */
@@ -4173,7 +4197,7 @@ function draw(now) {
   for (const e of enemies) {
     if (e.hp <= 0) continue;
     const zP = wz(e.wy);
-    if (zP > 14) { e.label.style.display = 'none'; if (e.aura) e.aura.visible = false; continue; }
+    if (zP > 14) { e.label.style.display = 'none'; if (e.aura) e.aura.visible = false; if (e.acc) e.acc.visible = false; continue; }
     const d = EDEF[e.kind] || EDEF.normal;
     let s = e.r * K * (e.boss ? 1.7 : 1.8) * Math.max(e.boss ? 0.45 : 0, e.pop) * (e.boss ? 1 : (e.attacking ? 1 + Math.sin(t * 14) * 0.08 : 1));
     if (e.boss) s = Math.max(1.35, Math.min(1.85, s));
@@ -4198,6 +4222,13 @@ function draw(now) {
         eyeMesh.setMatrixAt(ei, dummy.matrix);
         eyeMesh.setColorAt(ei, tmpCol.set(e.boss ? '#ff9d5d' : '#ffffff'));
         ei++;
+      }
+      if (e.acc) {
+        e.acc.visible = true;
+        e.acc.position.set(wx(e.x), hop, zP);
+        e.acc.rotation.set(e.attacking ? 0.35 : 0, Math.sin(t * 2.2 + e.x) * 0.14, 0);
+        e.acc.scale.setScalar(s);
+        if (e.splitter) for (let k = 0; k < e.acc.children.length; k++) e.acc.children[k].scale.setScalar(1 + Math.sin(t * 6 + k * 2) * 0.18);
       }
       if (e.aura) {
         const ring = Math.max(e.boss ? 3.4 : 0.35, s * (e.boss ? 2.4 : 2.5));
