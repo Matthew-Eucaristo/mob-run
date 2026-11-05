@@ -313,11 +313,11 @@
   .skinCard:active { transform:translateY(2px); box-shadow:0 2px 0 var(--ink); }
   .skinCard > i { display:block; font-size:44px; line-height:1; font-style:normal; filter:drop-shadow(0 2px 0 var(--ink)); }
   .skinCard b { display:block; font-family:var(--disp); font-weight:400; font-size:14px; letter-spacing:.4px; margin-top:4px; }
-  .skinCard span { display:inline-flex; align-items:center; margin-top:4px; font-family:var(--disp); font-size:13px; padding:1px 8px;
+  .skinCard > span { display:inline-flex; align-items:center; gap:3px; margin-top:4px; font-family:var(--disp); font-size:13px; padding:1px 8px;
     border-radius:8px; background:var(--green); color:#fff; border:2px solid var(--ink); }
   .skinCard.on { background:#fff; outline:3px solid var(--yellow); outline-offset:-7px; }
-  .skinCard.on span { background:var(--ink2); color:var(--mint); }
-  .skinCard.broke span { background:#c9bcd6; color:#5c4f6e; }
+  .skinCard.on > span { background:var(--ink2); color:var(--mint); }
+  .skinCard.broke > span { background:#c9bcd6; color:#5c4f6e; }
   #shopClose { margin:18px 0 6px; }
 
   #pauseOverlay { z-index:11; }

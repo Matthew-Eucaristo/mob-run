@@ -1897,7 +1897,7 @@ function bossBits(boss) {
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
 function spawnBoss(wy) {
   const d = G.level;
-  const hp = Math.round(42 + d * 46 + (par(G.dist) * 0.6 + G.soldiers * 0.4) * 1.5 * (1 + G.dist / 1400));
+  const hp = Math.round((42 + d * 46 + (par(G.dist) * 0.6 + G.soldiers * 0.4) * 1.5 * (1 + G.dist / 1400)) * 0.75);
   const bx = (road.x0 + road.x1) / 2 + rnd(-60, 60);
     const boss = mkEnemy('boss', bx, wy, hp);
   boss.roar = 1;
@@ -2582,7 +2582,7 @@ function gameOver() {
   shareBlob = null;
   if (shareBtn) shareBtn.classList.toggle('brag', isBest && d > 0);
   setTimeout(() => { if (G.mode === 'over') shareCard().then((b) => { shareBlob = b; }); }, 1200);
-  maybeOfferInstall();
+  if (META.runs >= 3 || (isBest && META.runs >= 2)) maybeOfferInstall(); else if (installCard) installCard.style.display = 'none';
   vib(30);
 }
 function beginDeath() {
@@ -3045,6 +3045,8 @@ if (window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover:
 
 /* ---------------- update ---------------- */
 function hurt(e, dmg) {
+  /* a boss shrugs off shots until it makes its entrance: the fight happens up close, not on the horizon */
+  if (e.boss && !e.introduced) return;
   if (e.boss && G.skills.execution) dmg *= 1 + G.skills.execution * 0.4;
   e.hp -= dmg;
   /* flash in short pulses so a monster under constant fire keeps its color */
@@ -3663,7 +3665,7 @@ function update(dt) {
       parts.push(mkPart(e.x + rnd(-8, 8), e.wy + rnd(-6, 6), '#ffd75d'));
     if (e.roar) e.roar -= dt * 1.4;
     /* boss entrance: name card, roar, a jolt, the moment it comes into view */
-    if (e.boss && !e.introduced && e.wy - G.camY < 980) {
+    if (e.boss && !e.introduced && e.wy - G.camY < 820) {
       e.introduced = true; e.roar = 1;
       bannerFlash(e.shooter ? 'GUNNER BOSS!' : e.splitter ? 'SPLITTER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
@@ -4663,7 +4665,7 @@ function draw(now) {
   if (bossBar) {
     let bo = null;
     if (G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused')
-      for (const e of enemies) if (e.boss && e.hp > 0 && e.wy - G.camY < 1150 && (!bo || e.wy < bo.wy)) bo = e;
+      for (const e of enemies) if (e.boss && e.introduced && e.hp > 0 && (!bo || e.wy < bo.wy)) bo = e;
     bossBar.classList.toggle('on', !!bo);
     if (bo) {
       if (bossName) bossName.textContent = bo.shooter ? 'GUNNER BOSS' : bo.splitter ? 'SPLITTER BOSS' : 'BRUTE BOSS';
