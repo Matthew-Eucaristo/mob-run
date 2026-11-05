@@ -2,6 +2,20 @@
    Chase-camera crowd runner: steer, stretch the squad, pick gates, shoot mobs. */
 import * as THREE from './vendor/three.module.min.js';
 import { icon, drawIcon } from './icons.js';
+/* older Android WebViews / iOS < 16 lack canvas roundRect, which the gates, badges and
+   signs are drawn with: fall back to a plain rounded path */
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(typeof r === 'number' ? r : 0, w / 2, h / 2));
+    this.moveTo(x + rr, y);
+    this.arcTo(x + w, y, x + w, y + h, rr);
+    this.arcTo(x + w, y + h, x, y + h, rr);
+    this.arcTo(x, y + h, x, y, rr);
+    this.arcTo(x, y, x + w, y, rr);
+    this.closePath();
+    return this;
+  };
+}
 const COIN = '<span class="coin"></span>';
 /* language: Bahasa Indonesia for Indonesian devices, English otherwise; switchable in SETTINGS */
 const LANG = (() => {
