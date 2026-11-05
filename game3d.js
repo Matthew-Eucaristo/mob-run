@@ -298,11 +298,11 @@ function coinLadder() {
 
 /* ---------------- zones ---------------- */
 const ZONES = [
-  { bg: '#24305e', ground: '#17213f', road: '#2e3a66', post: '#4a5c92', dash: '#7d93cc', sky: 0xb4c4ff },
-  { bg: '#0f1f10', ground: '#0a160a', road: '#1d3319', post: '#35572b', dash: '#4a7240', sky: 0xa8ffb0 },
-  { bg: '#241209', ground: '#160b04', road: '#3d2214', post: '#5f3a28', dash: '#7a5238', sky: 0xffc89d },
-  { bg: '#161410', ground: '#100e0c', road: '#2c281f', post: '#4a4336', dash: '#6b5e45', sky: 0xf0d2a4 },
-  { bg: '#0a1c22', ground: '#051014', road: '#143240', post: '#235063', dash: '#38647a', sky: 0x9de8ff },
+  { bg: '#2c3a72', ground: '#1d2a52', road: '#3e4c84', post: '#6a7fc4', dash: '#a9bcff', sky: 0xc4d0ff },
+  { bg: '#1b3a1a', ground: '#14301a', road: '#38552a', post: '#8fd13a', dash: '#c8f55a', sky: 0xc6ff9a },
+  { bg: '#4a1f12', ground: '#2e1209', road: '#6b3420', post: '#ff7a3d', dash: '#ffb36b', sky: 0xffb98a },
+  { bg: '#8d8270', ground: '#6e6455', road: '#ada38b', post: '#efe5cf', dash: '#fff7e6', sky: 0xfff0d4 },
+  { bg: '#0d3340', ground: '#0a2530', road: '#1e5468', post: '#3fb6d8', dash: '#7fe6ff', sky: 0xa8f0ff },
 ];
 const ZONE_NAMES = ['NIGHTFALL', 'TOXIC FLATS', 'EMBER RIDGE', 'SALT FLATS', 'DEEP RUN'];
 const colCache = {};
