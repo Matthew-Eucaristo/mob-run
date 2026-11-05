@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="description" content="Grow the mob, pick the gates, crush the rest. A 3D crowd-runner you can play with one thumb.">
+<meta name="description" content="Pick the right gate, swell your crowd, and outnumber everything on the road. A 3D crowd runner for one thumb.">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1b1430">
 <meta property="og:type" content="website">
 <meta property="og:title" content="MOB RUN">
-<meta property="og:description" content="Grow the mob, pick the gates, crush the rest. A 3D crowd-runner you can play with one thumb.">
+<meta property="og:description" content="Pick the right gate, swell your crowd, and outnumber everything on the road. A 3D crowd runner for one thumb.">
 <meta property="og:url" content="https://mob-run.pages.dev/">
 <meta property="og:image" content="https://mob-run.pages.dev/og-image.jpg">
 <meta property="og:image:width" content="1200">
@@ -114,6 +114,7 @@
     letter-spacing:2px; color:#fff; opacity:0; z-index:5; text-shadow:var(--ol-drop); pointer-events:none; transition:opacity .45s;
     white-space:nowrap; }
   #zoneBanner.go { animation:bannerIn .5s cubic-bezier(.2,1.6,.4,1); }
+  #zoneBanner small { display:block; margin:4px auto 0; text-align:center; font-family:'Nunito', sans-serif; font-weight:800; font-size:15px; letter-spacing:.2px; color:#fff4dc; white-space:normal; max-width:84vw; }
   #hint { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
     font-size:13px; color:var(--ink); background:var(--cream); border:2px solid var(--ink); border-radius:999px; padding:5px 14px;
     box-shadow:0 3px 0 var(--ink); z-index:5; pointer-events:none; opacity:0; transition:opacity .6s; text-align:center;
@@ -446,7 +447,7 @@
 
 <div class="overlay" id="startOverlay">
   <div class="logo"><span>MOB</span><span>RUN</span></div>
-  <div class="ribbon">GROW THE MOB · CRUSH THE REST</div>
+  <div class="ribbon">MORE OF US · FEWER OF THEM</div>
   <div id="menuTop"><div id="bestLine"></div></div>
   <div id="rankLine"></div>
   <button type="button" class="btn gold dailyBtn" id="dailyBtn"></button>

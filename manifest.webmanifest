@@ -1,7 +1,7 @@
 {
   "name": "MOB RUN",
   "short_name": "MOB RUN",
-  "description": "Grow the mob, pick the gates, crush the rest. A 3D crowd-runner you can play with one thumb.",
+  "description": "Pick the right gate, swell your crowd, and outnumber everything on the road. A 3D crowd runner for one thumb.",
   "categories": ["games"],
   "start_url": "./",
   "scope": "./",

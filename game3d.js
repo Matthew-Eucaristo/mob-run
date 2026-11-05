@@ -338,26 +338,26 @@ const G = {
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
-  { id: 'pierce', name: 'PIERCE', icon: 'arrow', col: '#4aa3ff', desc: L('Bullets punch through one more monster.', 'Peluru tembus satu monster lagi.'), max: 3 },
-  { id: 'split', name: 'FAN FIRE', icon: 'fan', col: '#4aa3ff', desc: L('One more pellet in every shot.', 'Tambah satu peluru di tiap tembakan.'), max: 3 },
-  { id: 'rate', name: 'TRIGGER', icon: 'bolt', col: '#ff9f1c', desc: L('Everybody shoots faster.', 'Semua menembak lebih cepat.'), max: 4 },
-  { id: 'dmg', name: 'HOLLOW POINT', icon: 'bullet', col: '#ff4d5e', desc: L('+1 damage on every bullet.', '+1 damage di setiap peluru.'), max: 5 },
+  { id: 'pierce', name: L('SKEWER', 'TUSUK SATE'), icon: 'arrow', col: '#4aa3ff', desc: L('Bullets punch through one more monster.', 'Peluru tembus satu monster lagi.'), max: 3 },
+  { id: 'split', name: L('FAN FIRE', 'TEMBAK KIPAS'), icon: 'fan', col: '#4aa3ff', desc: L('One more pellet in every shot.', 'Tambah satu peluru di tiap tembakan.'), max: 3 },
+  { id: 'rate', name: L('HAIR TRIGGER', 'JARI GATAL'), icon: 'bolt', col: '#ff9f1c', desc: L('Everybody shoots faster.', 'Semua menembak lebih cepat.'), max: 4 },
+  { id: 'dmg', name: L('HOLLOW POINT', 'PELURU TAJAM'), icon: 'bullet', col: '#ff4d5e', desc: L('+1 damage on every bullet.', '+1 damage di setiap peluru.'), max: 5 },
   { id: 'rally', name: 'RALLY', icon: 'flag', col: '#5bd44a', desc: L('Level-ups bring more recruits.', 'Naik level dapat lebih banyak rekrutan.'), max: 3 },
-  { id: 'shield', name: 'WARD', icon: 'shield', col: '#7a8cff', desc: L('Shrug off the next hit. Stacks.', 'Tahan satu serangan berikutnya. Bisa ditumpuk.'), max: 3 },
+  { id: 'shield', name: L('LUCKY CHARM', 'JIMAT'), icon: 'shield', col: '#7a8cff', desc: L('Shrug off the next hit. Stacks.', 'Tahan satu serangan berikutnya. Bisa ditumpuk.'), max: 3 },
   { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff4d5e', desc: L('Coins and loot fly to you.', 'Koin dan hadiah terbang ke arahmu.'), max: 2 },
   { id: 'bulwark', name: 'BULWARK', icon: 'wall', col: '#8b6cff', desc: L('Lava, saws and walls bite less.', 'Lava, gergaji, dan tembok tak terlalu sakit.'), max: 3 },
-  { id: 'chain', name: 'CHAIN', icon: 'chain', col: '#ff9f1c', desc: L('Kills zap the monsters next door.', 'Monster yang mati menyetrum tetangganya.'), max: 2 },
-  { id: 'crit', name: 'CRIT', icon: 'star', col: '#ffb400', desc: L('Some shots hit double.', 'Sebagian tembakan berdamage ganda.'), max: 3 },
+  { id: 'chain', name: L('ZAPPER', 'SETRUM'), icon: 'chain', col: '#ff9f1c', desc: L('Kills zap the monsters next door.', 'Monster yang mati menyetrum tetangganya.'), max: 2 },
+  { id: 'crit', name: L('LUCKY SHOT', 'TEMBAKAN HOKI'), icon: 'star', col: '#ffb400', desc: L('Some shots hit double.', 'Sebagian tembakan berdamage ganda.'), max: 3 },
   { id: 'steady', name: 'ANCHOR', icon: 'anchor', col: '#4aa3ff', desc: L('Fewer soldiers slip off the edge.', 'Lebih sedikit prajurit jatuh dari tepi.'), max: 2 },
-  { id: 'overdrive', name: 'OVERDRIVE', icon: 'chevrons', col: '#ff9f1c', desc: L('Good gates spin up your guns for a bit.', 'Gerbang bagus bikin senjata ngebut sebentar.'), max: 2 },
-  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: L('Coins are worth 25% more.', 'Koin bernilai 25% lebih.'), max: 3 },
+  { id: 'overdrive', name: L('SECOND GEAR', 'GIGI DUA'), icon: 'chevrons', col: '#ff9f1c', desc: L('Good gates spin up your guns for a bit.', 'Gerbang bagus bikin senjata ngebut sebentar.'), max: 2 },
+  { id: 'greed', name: L('STICKY FINGERS', 'TANGAN LENGKET'), icon: 'bag', col: '#ffb400', desc: L('Coins are worth 25% more.', 'Koin bernilai 25% lebih.'), max: 3 },
   { id: 'fortune', name: 'FORTUNE', icon: 'sparkle', col: '#ffb400', desc: L('Bigger distance payout at the end.', 'Bonus jarak di akhir lebih besar.'), max: 2 },
-  { id: 'execution', name: 'EXECUTION', icon: 'skull', col: '#ff4d5e', desc: L('Bosses take way more damage.', 'Bos menerima damage jauh lebih besar.'), max: 3 },
-  { id: 'iron', name: 'IRON', icon: 'shield', col: '#8b6cff', desc: L('Lose fewer soldiers to everything.', 'Kehilangan lebih sedikit prajurit.'), max: 3 },
+  { id: 'execution', name: L('GIANT SLAYER', 'PEMBURU RAKSASA'), icon: 'skull', col: '#ff4d5e', desc: L('Bosses take way more damage.', 'Bos menerima damage jauh lebih besar.'), max: 3 },
+  { id: 'iron', name: L('THICK SKIN', 'KULIT BADAK'), icon: 'shield', col: '#8b6cff', desc: L('Lose fewer soldiers to everything.', 'Kehilangan lebih sedikit prajurit.'), max: 3 },
   { id: 'focus', name: 'FOCUS', icon: 'crosshair', col: '#ff4d5e', desc: L('Tighter, deadlier volleys.', 'Tembakan lebih rapat dan mematikan.'), max: 3 },
-  { id: 'warcry', name: 'WARCRY', icon: 'megaphone', col: '#5bd44a', desc: L('Good gates bring extra recruits.', 'Gerbang bagus menambah rekrutan.'), max: 3 },
+  { id: 'warcry', name: L('BATTLE CRY', 'PEKIK PERANG'), icon: 'megaphone', col: '#5bd44a', desc: L('Good gates bring extra recruits.', 'Gerbang bagus menambah rekrutan.'), max: 3 },
   { id: 'scavenge', name: 'SCAVENGE', icon: 'bag', col: '#ffb400', desc: L('Monsters drop coins sometimes.', 'Monster kadang menjatuhkan koin.'), max: 3 },
-  { id: 'laststand', name: 'LAST STAND', icon: 'heart', col: '#ff4d5e', desc: L('Under 18 soldiers? Hit harder.', 'Di bawah 18 prajurit? Pukul lebih keras.'), max: 2 },
+  { id: 'laststand', name: L('BACKS TO THE WALL', 'TERSUDUT'), icon: 'heart', col: '#ff4d5e', desc: L('Under 18 soldiers? Hit harder.', 'Di bawah 18 prajurit? Pukul lebih keras.'), max: 2 },
   { id: 'quickstep', name: 'QUICKSTEP', icon: 'chevrons', col: '#5bd44a', desc: L('Switch formation faster.', 'Ganti formasi lebih cepat.'), max: 2 },
   { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: L('Grab coins from farther out.', 'Ambil koin dari lebih jauh.'), max: 2 },
 ];
@@ -1979,7 +1979,6 @@ function spawnMob(wy, scale, band) {
   mobs.push(m);
   /* one banner at a time: if something else is being announced, the band's own label does the job */
   if (band && performance.now() > bannerUntil) bannerFlash(L('WAR BAND AHEAD', 'PASUKAN PERANG!'), '#ff5d6a');
-  if (!META.seenMob) { META.seenMob = true; showHint(L('RED MOB AHEAD · shoot it down, then outnumber it on contact', 'GEROMBOLAN MERAH · tembak dulu, lalu kalahkan jumlahnya'), 4.5); }
   return m;
 }
 function mobVisible(m) { return Math.max(1, Math.min(m.units.length, Math.ceil(m.units.length * m.count / m.start))); }
@@ -2046,7 +2045,20 @@ function bossBits(boss) {
   return g;
 }
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
-function bossTitle(e) { return e.shooter ? L('GUNNER BOSS', 'BOS PENEMBAK') : e.splitter ? L('SPLITTER BOSS', 'BOS PEMBELAH') : L('BRUTE BOSS', 'BOS RAKSASA'); }
+/* three recurring rivals, each with a name and a mouth on them */
+const BOSSES = {
+  brute: { name: L('MURGO THE WALL', 'MURGO SI TEMBOK'), taunts: L(
+    ["Murgo doesn't move. You do.", 'He ate the last squad.', 'Big, slow, and very, very rude.'],
+    ['Murgo tak bergeser. Kamu yang minggir.', 'Dia memakan pasukan terakhir.', 'Besar, lambat, dan sangat tidak sopan.']) },
+  gunner: { name: L('AUNTIE BOOM', 'BIBI BOOM'), taunts: L(
+    ["She brought snacks. They're on fire.", 'Duck. No, the other way.', 'Every orb is a hug.'],
+    ['Dia bawa camilan. Camilannya terbakar.', 'Menunduk! Bukan, ke arah lain.', 'Setiap bola api adalah pelukan.']) },
+  splitter: { name: L('THE GRUBB TWINS', 'SI KEMBAR GRUBB'), taunts: L(
+    ['Hit one, meet the other.', 'Twice the ugly.', 'They share everything. Even you.'],
+    ['Pukul satu, kenalan sama yang lain.', 'Jeleknya dua kali lipat.', 'Mereka berbagi segalanya. Termasuk kamu.']) },
+};
+const bossKind = (e) => (e.shooter ? 'gunner' : e.splitter ? 'splitter' : 'brute');
+function bossTitle(e) { return BOSSES[bossKind(e)].name; }
 function spawnBoss(wy) {
   bossIntro = true;   /* whichever boss comes first is the intro: never two in a row */
   const d = G.level;
@@ -2348,16 +2360,18 @@ function loseSoldiers(n, cause) {
   addSoldiers(G.soldiers - n);
 }
 
-function bannerFlash(text, color) {
+function bannerFlash(text, color, sub) {
   zoneBanner.textContent = text;
+  if (sub) { const sm = document.createElement('small'); sm.textContent = sub; zoneBanner.appendChild(sm); }
   zoneBanner.style.color = color || '';
   zoneBanner.classList.remove('go');
   void zoneBanner.offsetWidth;
   zoneBanner.classList.add('go');
   zoneBanner.style.opacity = '1';
   clearTimeout(bannerT);
-  bannerT = setTimeout(() => { zoneBanner.style.opacity = '0'; }, 1500);
-  bannerUntil = performance.now() + 1700;
+  /* a banner with a second line stays up long enough to read it */
+  bannerT = setTimeout(() => { zoneBanner.style.opacity = '0'; }, sub ? 2400 : 1500);
+  bannerUntil = performance.now() + (sub ? 2600 : 1700);
   /* one message at a time in the middle of the screen */
   if (toastEl && toastEl.classList.contains('on')) toastEl.classList.add('hush');
 }
@@ -3918,7 +3932,8 @@ function update(dt) {
     /* boss entrance: name card, roar, a jolt, the moment it comes into view */
     if (e.boss && !e.introduced && e.wy - G.camY < 540) {
       e.introduced = true; e.roar = 1; e.fightT = 0; e.budget = 0;
-      bannerFlash(bossTitle(e) + '!', '#ff5d4a');
+      const bt = BOSSES[bossKind(e)].taunts;
+      bannerFlash(bossTitle(e) + '!', '#ff5d4a', bt[ri(0, bt.length - 1)]);
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
     }
     /* the showdown: once in view the boss keeps its distance, then closes in.
@@ -3976,6 +3991,8 @@ function update(dt) {
     m.hw = mobHalfW(m);
     const ahead = m.wy - m.hd - G.camY;
     if (m.band && !m.hinted && ahead < 760) { m.hinted = true; tutorialHint('band'); }
+    /* the first mob ever: explain it once it is actually in view, and not over a tip still being read */
+    if (!META.seenMob && ahead < 700 && hintT < 0.6) { META.seenMob = true; showHint(L('RED MOB AHEAD · shoot it down, then outnumber it on contact', 'GEROMBOLAN MERAH · tembak dulu, lalu kalahkan jumlahnya'), 4.5); }
     if (!m.clash) {
       m.wy -= 34 * dt;
       if (ahead < 620) {
@@ -4630,6 +4647,7 @@ function draw(now) {
   }
   /* rival mobs */
   let mu = 0;
+  const bossUp = enemies.find((e) => e.boss && e.introduced && e.hp > 0);
   for (const m of mobs) {
     if (m.dead) continue;
     const zP0 = wz(m.wy);
@@ -4664,7 +4682,9 @@ function draw(now) {
       dummy.updateMatrix();
       shadowMesh.setMatrixAt(shI++, dummy.matrix);
     }
-    setLabel(m.label, wx(m.x), 2.0, wz(m.wy - m.hd), fmtNum(m.count));
+    /* a mob standing behind a fighting boss would pin its count on the boss's body */
+    if (bossUp && m.wy > bossUp.wy && Math.abs(m.x - bossUp.x) < 95) m.label.style.display = 'none';
+    else setLabel(m.label, wx(m.x), 2.0, wz(m.wy - m.hd), fmtNum(m.count));
     m.label.classList.toggle('big', m.count > G.soldiers);
     m.label.classList.toggle('band', m.band);
   }
@@ -5049,7 +5069,7 @@ if (/[?&]debug\b/.test(location.search)) {
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
 if (LANG === 'id') {
   const setT = (sel, txt) => { const el = document.querySelector(sel); if (el) el.firstChild ? (el.firstChild.nodeValue = txt) : (el.textContent = txt); };
-  setT('.ribbon', 'BESARKAN PASUKAN · HANCURKAN SEMUA');
+  setT('.ribbon', 'KITA BERTAMBAH · MEREKA TUMBANG');
   setT('#playBtn', 'MAIN');
   setT('#shopBtn', 'GUDANG');
   setT('#shopBtnOver', 'GUDANG');
