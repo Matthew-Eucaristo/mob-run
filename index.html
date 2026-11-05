@@ -65,6 +65,9 @@
     border-radius:999px; background:var(--ink); border:2px solid var(--yellow); color:#fff; transform-origin:right center; }
   #hudCoins.pop { animation:numPop .28s cubic-bezier(.2,.8,.2,1); }
   #hudDist { font-family:var(--disp); font-size:24px; text-shadow:var(--ol-drop); }
+  #bestIn { display:none; font-family:var(--disp); font-size:13px; letter-spacing:.5px; padding:1px 8px; border-radius:8px;
+    background:var(--yellow); color:var(--ink); border:2px solid var(--ink); margin-top:-2px; }
+  #bestIn.on { display:block; animation:throb 1s ease-in-out infinite; }
   #hudLevel { top:calc(9px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     font-family:var(--disp); font-size:15px; letter-spacing:1px; text-shadow:var(--ol); }
   #lvlBar { top:calc(31px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
@@ -115,11 +118,11 @@
   #formFill { position:absolute; top:-2px; width:12px; height:12px; border-radius:50%; background:var(--yellow);
     border:2px solid var(--ink); transition:left .08s linear; }
   #formBtns { display:none !important; }
-  #pauseBtn { position:fixed; z-index:7; top:calc(84px + env(safe-area-inset-top)); right:12px; width:40px; height:40px;
+  #pauseBtn { position:fixed; z-index:7; top:calc(102px + env(safe-area-inset-top)); right:12px; width:40px; height:40px;
     border-radius:12px; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:0 3px 0 var(--ink);
     display:none; font-size:16px; line-height:0; }
   #pauseBtn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
-  #combo { top:calc(132px + env(safe-area-inset-top)); right:12px; text-align:right; font-family:var(--disp);
+  #combo { top:calc(150px + env(safe-area-inset-top)); right:12px; text-align:right; font-family:var(--disp);
     font-size:17px; color:var(--yellow); opacity:0; transition:opacity .2s; text-shadow:var(--ol-drop); white-space:nowrap; }
   #bossBar { top:calc(48px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(60vw, 330px);
     text-align:center; opacity:0; transition:opacity .25s; }
@@ -390,7 +393,7 @@
 <div id="labels"></div>
 <div id="floats"></div>
 <div class="hud" id="hudL"><div class="t">ARMY</div><div id="hudArmy">10</div><div id="hudWeapon">PISTOL</div><div id="hudSkills"></div></div>
-<div class="hud" id="hudR"><div id="hudCoins"><span class="coin"></span>0</div><div id="hudDist">0m</div></div>
+<div class="hud" id="hudR"><div id="hudCoins"><span class="coin"></span>0</div><div id="hudDist">0m</div><div id="bestIn"></div></div>
 <div class="hud" id="hudLevel"></div>
 <div class="hud" id="lvlBar"><div id="lvlFill"></div></div>
 <div id="zoneBanner"></div>

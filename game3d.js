@@ -56,6 +56,7 @@ if (muteBtn) muteBtn.innerHTML = icon('gear');
 const upGrid = document.getElementById('upGrid');
 const toastEl = document.getElementById('toast');
 const comboEl = document.getElementById('combo');
+const bestInEl = document.getElementById('bestIn');
 const bossBar = document.getElementById('bossBar');
 const bossName = document.getElementById('bossName');
 const bossFill = document.getElementById('bossFill');
@@ -4649,6 +4650,13 @@ function draw(now) {
     hudWeapon.style.color = WT[G.tier].col;
   }
   hudDist.textContent = Math.floor(G.dist) + 'm';
+  /* closing in on the record: count it down */
+  if (bestInEl) {
+    const left = Math.ceil(G.best - G.dist);
+    const on = (G.mode === 'run' || G.mode === 'paused') && G.best > 0 && left > 0 && left <= 150;
+    bestInEl.classList.toggle('on', on);
+    if (on) bestInEl.textContent = L('BEST IN ', 'REKOR ') + left + 'm';
+  }
   if (hudCoins) {
     if (shownCoins !== G.coins) {
       if (shownCoins >= 0) { hudCoins.classList.remove('pop'); requestAnimationFrame(() => hudCoins.classList.add('pop')); }
