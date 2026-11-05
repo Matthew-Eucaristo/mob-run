@@ -135,16 +135,20 @@ window.addEventListener('resize', resize);
    Everything goes through one bus: a compressor glues the mix and keeps a
    busy fight from clipping, and a short synthetic room adds a tail to the
    big moments. Noise comes from one shared buffer. */
-let AC = null, muted = false, BUS = null, VERB = null, NOISE = null;
+let AC = null, muted = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
 function audio() {
   if (!AC) {
     try {
       AC = new (window.AudioContext || window.webkitAudioContext)();
       const comp = AC.createDynamicsCompressor();
-      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5;
-      comp.attack.value = 0.003; comp.release.value = 0.18;
-      const master = AC.createGain(); master.gain.value = 0.9;
-      comp.connect(master); master.connect(AC.destination);
+      comp.threshold.value = -22; comp.knee.value = 10; comp.ratio.value = 4;
+      comp.attack.value = 0.004; comp.release.value = 0.2;
+      /* makeup gain into a brickwall-ish limiter: loud like a phone game, never clipping */
+      const master = AC.createGain(); master.gain.value = 2.6;
+      const lim = AC.createDynamicsCompressor();
+      lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12;
+      comp.connect(master); master.connect(lim); lim.connect(AC.destination);
+      MASTER = lim;
       BUS = comp;
       /* room: exponentially decaying stereo noise impulse */
       const len = Math.floor(AC.sampleRate * 1.1);
@@ -637,6 +641,16 @@ function tintProps() {
   }
 }
 
+/* round particles with a bright core: square GL points read as placeholder art */
+const dotTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.95)');
+  gr.addColorStop(0.7, 'rgba(255,255,255,0.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 31, 0, Math.PI * 2); g.fill();
+  return new THREE.CanvasTexture(c);
+})();
 /* stars + motes */
 const NSTARS = 260;
 const starGeo = new THREE.BufferGeometry();
@@ -647,7 +661,7 @@ const starGeo = new THREE.BufferGeometry();
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
 }
-const starMat = new THREE.PointsMaterial({ size: 0.55, color: 0xcfe0ff, transparent: true, opacity: 0.9, sizeAttenuation: true, depthWrite: false });
+const starMat = new THREE.PointsMaterial({ map: dotTex, size: 0.7, color: 0xcfe0ff, transparent: true, opacity: 0.9, sizeAttenuation: true, depthWrite: false });
 const stars = new THREE.Points(starGeo, starMat);
 scene.add(stars);
 const ZONE_STARS = [0.9, 0.3, 0.15, 0.85, 0.45];
@@ -661,7 +675,7 @@ const moteGeo = new THREE.BufferGeometry();
   }
   moteGeo.setAttribute('position', new THREE.BufferAttribute(mp, 3));
 }
-const moteMat = new THREE.PointsMaterial({ size: 0.18, color: 0x9db8ff, transparent: true, opacity: 0.28, depthWrite: false });
+const moteMat = new THREE.PointsMaterial({ map: dotTex, size: 0.24, color: 0x9db8ff, transparent: true, opacity: 0.28, depthWrite: false });
 const motes = new THREE.Points(moteGeo, moteMat);
 motes.visible = !Q.low && !Q.phone;
 scene.add(motes);
@@ -1025,8 +1039,8 @@ const partCol = new Float32Array(MAXP * 3);
 partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
 partGeo.setAttribute('color', new THREE.BufferAttribute(partCol, 3));
 const partMesh = new THREE.Points(partGeo, new THREE.PointsMaterial({
-  size: 0.3, vertexColors: true, transparent: true, opacity: 0.95,
-  depthWrite: false, sizeAttenuation: true,
+  size: 0.42, map: dotTex, vertexColors: true, transparent: true, opacity: 1,
+  depthWrite: false, sizeAttenuation: true, alphaTest: 0.02,
 }));
 scene.add(partMesh);
 
@@ -1828,30 +1842,57 @@ function dmgFlash() {
   }, 70);
 }
 
-/* --- music: tiny bassline sequencer --- */
-let musTimer = null, musStep = 0, musicHeat = 0;
-const BASS_PAT = [0, 0, 3, 0, 5, 0, 3, 2];
-const BASS_FREQ = [55, 61.74, 65.41, 73.42, 82.41, 87.31, 98, 110];
+/* --- music ---
+   A 4-bar loop in A minor (Am F C G), shifted up a step per zone.
+   Notes are scheduled on the audio clock a little ahead of time, so the
+   groove doesn't wobble with frame hitches the way setInterval does.
+   Layers: kick + clap + hats, a moving bassline, a soft chord stab, and
+   an arpeggio that only plays when a mob or boss is close. */
+let musTimer = null, musStep = 0, musNext = 0, musicHeat = 0;
+const STEP = 60 / 116 / 4;                    // 16th notes at 116 bpm
+const CHORDS = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];   // Am F C G as semitones from A
+const BASSLINE = [0, null, 0, 12, null, 0, 7, null, 0, null, 12, 0, null, 7, 5, 3];
+const ZONE_KEY = [0, 2, -2, 3, 5];
+const hz = (semi) => 110 * Math.pow(2, semi / 12);
+function musicStep(step, at) {
+  const s16 = step % 16, bar = Math.floor(step / 16) % 4;
+  const key = ZONE_KEY[Math.max(0, zoneIdx) % ZONE_KEY.length];
+  const ch = CHORDS[bar];
+  const o = { at };
+  /* drums */
+  if (s16 % 4 === 0) { voice(150, 0.11, 'sine', 0.16, 42, o); }
+  if (s16 === 4 || s16 === 12) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
+  if (s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
+  /* bass: root of the bar's chord, sidestepping on the off-beats */
+  const b = BASSLINE[s16];
+  if (b !== null) {
+    const f = hz(key + ch[0] + b - 24);
+    voice(f, STEP * 1.6, 'triangle', 0.075, 0, o);
+    voice(f, STEP * 1.2, 'sawtooth', 0.012, 0, o);
+  }
+  /* chord stab on the "and" of beat 2 and 4 */
+  if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012 });
+  /* tension arpeggio */
+  if (musicHeat > 0.5) {
+    const n = ch[s16 % 3] + (s16 % 6 > 2 ? 24 : 12);
+    voice(hz(key + n + 12), 0.08, 'square', 0.01 + 0.006 * musicHeat, 0, o);
+  }
+}
 function musicStart() {
   if (musTimer || !AC) return;
   musStep = 0;
+  musNext = AC.currentTime + 0.06;
   musTimer = setInterval(() => {
-    if (!AC || muted || G.mode !== 'run' || document.hidden) { musStep++; return; }
-    const s = musStep % 8;
-    const zi = Math.max(0, zoneIdx);
-    if (s === 0 || s === 4) tone(58, 0.1, 'sine', 0.11, 38);
-    if (s === 2 || s === 6) noise(0.03, 0.014);
-    const deg = BASS_PAT[s] + zi;
-    tone(BASS_FREQ[deg % BASS_FREQ.length], 0.13, 'sawtooth', 0.026);
-    if (s === 7) tone(BASS_FREQ[(deg + 2) % BASS_FREQ.length] * 2, 0.09, 'triangle', 0.02);
-    /* tension layer: arpeggio when a mob or boss is close, hats when the army is big */
-    if (musicHeat > 0.5) {
-      const arp = [0, 2, 4, 7][musStep % 4];
-      tone(BASS_FREQ[(deg + arp) % BASS_FREQ.length] * 4, 0.06, 'square', 0.012 + 0.008 * musicHeat);
+    if (!AC) return;
+    if (muted || G.mode !== 'run' || document.hidden) { musNext = AC.currentTime + 0.06; return; }
+    const ahead = AC.currentTime + 0.14;
+    if (musNext < AC.currentTime - 0.2) musNext = AC.currentTime + 0.02;
+    while (musNext < ahead) {
+      musicStep(musStep, Math.max(0, musNext - AC.currentTime));
+      musNext += STEP;
+      musStep++;
     }
-    if (G.soldiers > 120 && s % 2 === 1) noise(0.02, 0.01);
-    musStep++;
-  }, 132);
+  }, 40);
 }
 function musicStop() { clearInterval(musTimer); musTimer = null; }
 
@@ -4021,7 +4062,7 @@ if (/[?&]debug\b/.test(location.search)) {
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
     setAim(x, f) { aimX = clampAim(x); if (f !== undefined) aimForm = f; },
-    sfx, coinLadder, sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); },
+    sfx, coinLadder, get audioOut() { return { AC, MASTER }; }, sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); },
   };
 }
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
