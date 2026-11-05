@@ -1195,15 +1195,46 @@ function makeWallMesh(w) {
 
 /* --- hazards: lava pools + sweeping sawblades (dodge, can't be shot) --- */
 const lavaGeo = new THREE.PlaneGeometry(1, 1);
-const sawGeo = mergeParts([
-  { geo: new THREE.CylinderGeometry(1, 1, 0.15, 11), m: M4(0, 0.15, 0), c: '#9fb0d8' },
-  { geo: new THREE.CylinderGeometry(0.3, 0.3, 0.26, 10), m: M4(0, 0.15, 0), c: '#2e3c58' },
-]);
-const sawRimGeo = new THREE.TorusGeometry(1.0, 0.08, 6, 26);
-const sawTrackGeo = new THREE.BoxGeometry(ROADW + 1.4, 0.1, 0.5);
-const sawTrackMat = new THREE.MeshLambertMaterial({ color: 0x27314d });
-const sawMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.55 });
-const sawRimMat = new THREE.MeshBasicMaterial({ color: 0xff5d6a });
+/* sawblade: a toothed steel disc standing upright, facing the player, so it
+   reads as a saw from the chase cam instead of a flat ellipse on the road */
+const sawGeo = (() => {
+  const shape = new THREE.Shape();
+  const teeth = 14, R = 1, r = 0.8;
+  for (let k = 0; k < teeth; k++) {
+    const a0 = (k / teeth) * Math.PI * 2, a1 = ((k + 0.62) / teeth) * Math.PI * 2, a2 = ((k + 1) / teeth) * Math.PI * 2;
+    const f = k === 0 ? 'moveTo' : 'lineTo';
+    shape[f](Math.cos(a0) * r, Math.sin(a0) * r);
+    shape.lineTo(Math.cos(a1) * R, Math.sin(a1) * R);
+    shape.lineTo(Math.cos(a2) * r, Math.sin(a2) * r);
+  }
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, 0.16, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const blade = new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
+  blade.translate(0, 0, -0.04);
+  return mergeParts([
+    { geo: blade, m: M4(0, 0, 0), c: '#dfe6f2' },
+    { geo: new THREE.CylinderGeometry(0.62, 0.62, 0.1, 24), m: M4(0, 0, 0, Math.PI / 2, 0, 0), c: '#9aa6bd' },
+    { geo: new THREE.CylinderGeometry(0.3, 0.3, 0.16, 16), m: M4(0, 0, 0, Math.PI / 2, 0, 0), c: '#ff4d5e' },
+  ]);
+})();
+const sawRimGeo = new THREE.TorusGeometry(0.62, 0.05, 6, 24);
+/* rail with black and yellow hazard stripes */
+const stripeTex = (() => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 32;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1b1430'; g.fillRect(0, 0, 128, 32);
+  g.fillStyle = '#ffcc33';
+  for (let x = -32; x < 160; x += 32) { g.beginPath(); g.moveTo(x, 32); g.lineTo(x + 16, 0); g.lineTo(x + 32, 0); g.lineTo(x + 16, 32); g.fill(); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping; t.repeat.set(10, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+const sawTrackGeo = new THREE.BoxGeometry(ROADW + 1.4, 0.1, 0.55);
+const sawTrackMat = new THREE.MeshLambertMaterial({ map: stripeTex });
+const sawMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.6, emissive: 0x222833, emissiveIntensity: 0.6 });
+const sawRimMat = new THREE.MeshBasicMaterial({ color: 0xff4d5e });
 
 function sawX(h) {
   return h.mid + Math.sin(G.time * 1000 * h.speed + h.phase) * h.amp;
@@ -1278,10 +1309,11 @@ function spawnHazard(wy) {
     grp.children[0].position.y = 0.05;
     const blade = new THREE.Group();
     const disc = new THREE.Mesh(sawGeo, sawMat);
-    disc.scale.setScalar(1.25);
+    disc.scale.setScalar(1.35);
     const rim = new THREE.Mesh(sawRimGeo, sawRimMat);
-    rim.rotation.x = Math.PI / 2; rim.position.y = 0.15; rim.scale.setScalar(1.25);
+    rim.scale.setScalar(1.35); rim.position.z = 0.09;
     blade.add(disc, rim);
+    blade.position.y = 0.95;
     grp.add(blade);
     const warn = makeSprite('warn'); warn.position.set(0, 3.1, -2.2);
     grp.add(warn);
@@ -1325,7 +1357,8 @@ function spawnHazard(wy) {
     const hole = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0x070910, transparent: true, opacity: 0.92, depthWrite: false }));
     hole.rotation.x = -Math.PI / 2; hole.position.y = 0.05;
     hole.scale.set(wpx * K, len * K, 1);
-    const lip = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.55, depthWrite: false }));
+    const lipTex = stripeTex.clone(); lipTex.needsUpdate = true; lipTex.repeat.set(4, 4);
+    const lip = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ map: lipTex, transparent: true, opacity: 0.95, depthWrite: false }));
     lip.rotation.x = -Math.PI / 2; lip.position.y = 0.055;
     lip.scale.set(wpx * K * 1.12, len * K * 1.08, 1);
     const warn = makeSprite('warn'); warn.position.set(0, 2.4, -len * K * 0.5 - 1);
@@ -1391,7 +1424,7 @@ function spawnCoinLine(wy) {
   for (let i = 0; i < n && coins.length < MAXCOIN; i++) {
     const u = n === 1 ? 0.5 : i / (n - 1);
     const x = clamp(x0 + drift * (u - 0.5) + (arc ? Math.sin(u * Math.PI) * 42 : 0), road.x0 + 22, road.x1 - 22);
-    coins.push({ x, wy: wy + i * Math.max(26, 0.85 / K), spin: i * 0.5 });
+    coins.push({ x, wy: wy + i * Math.max(30, 1.3 / K), spin: i * 0.5 });
   }
 }
 
@@ -3863,7 +3896,7 @@ function draw(now) {
     h.grp.visible = zP < 14;
     if (h.kind === 'saw') {
       h.blade.position.x = wx(sawX(h));
-      h.blade.rotation.y = t * 11 + h.phase;
+      h.blade.rotation.z = -(t * 12 + h.phase);
       if (h.grp.children[0]) h.grp.children[0].scale.x = Math.max(0.25, (roadHalf * 2 + 0.5) / (ROADW + 1.4));
     } else if (h.kind === 'meteor') {
       if (h.dead) {
@@ -3922,7 +3955,7 @@ function draw(now) {
     const lift = c.fly !== undefined && c.fly > 0 ? Math.sin(Math.min(1, c.fly * 3) * Math.PI) * 1.6 + 0.6 : 0;
     dummy.position.set(wx(c.x), 1.05 + lift + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
     dummy.rotation.set(0, t * 3.4 + c.spin, 0);
-    const sc = 1.25 + Math.min(0.75, Math.max(0, -zP) * 0.025);
+    const sc = 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
     dummy.scale.set(sc, sc, sc);
     dummy.updateMatrix();
     if (coinI < MAXCOIN) coinMesh.setMatrixAt(coinI++, dummy.matrix);
@@ -4088,7 +4121,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss,
+    G, SIM, META, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels,
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
