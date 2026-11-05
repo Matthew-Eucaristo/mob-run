@@ -432,7 +432,7 @@ function checkMissions() {
         const rr = rankReward(rk);
         G.coins += rr; G.missionCoins += rr;
         missionToast(L('You made ', 'Kamu naik jadi ') + RANKS[rk] + '!', rr, L('RANK UP', 'NAIK PANGKAT'));
-        setTimeout(() => sfx.fanfare(), 2700);
+        setTimeout(() => { sfx.fanfare(); vib([30, 50, 30, 50, 90]); }, 2700);
       }
       saveSave();
     }
@@ -2510,7 +2510,7 @@ function gameOver() {
     const en = document.getElementById('earnN');
     if (en) en.textContent = Math.floor(earned * ease);
     if (k < 1 && G.mode === 'over') requestAnimationFrame(tick);
-    else if (isBest && d > 0 && G.mode === 'over') { sfx.fanfare(); vib(40); confetti(90); }
+    else if (isBest && d > 0 && G.mode === 'over') { sfx.fanfare(); vib([40, 60, 40, 60, 120]); confetti(90); }
   };
   requestAnimationFrame(tick);
   if (reviveBtn) {
@@ -2852,6 +2852,8 @@ function loadSave() {
     const st = JSON.parse(localStorage.getItem('mobrun_settings') || 'null');
     if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; shakeOff = st.shake === false; }
     else if (localStorage.getItem('mobrun_mute') === '1') { muted = true; musicOff = true; }
+    /* players who asked their device for less motion start with screen shake off */
+    if (!st && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) shakeOff = true;
   } catch (e) { }
   /* finished-but-unrolled missions (tab closed mid-run) roll now */
   rollMissions();
@@ -3002,7 +3004,7 @@ function hurt(e, dmg) {
       if (n >= 3) tone(660 + n * 80, 0.12, 'square', 0.04);
     }
     if (e.boss) {
-      sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
+      sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib([70, 40, 120]); G.bossKills += 1;
       /* a splitter bursts into three brutes that each carry a quarter of its health */
       if (e.splitter) {
         for (let k = -1; k <= 1; k++) {
