@@ -3,8 +3,9 @@
 The game from those fake mobile ads — for real, in 3D. A crowd-runner × multiplier-gates shooter built with Three.js: steer your army left/right, pick the best gates (+N, ×N, −N, ÷N, gun upgrades), shoot barrels for loot, and survive mobs, walls and bosses across 5 zones.
 
 - **Enemy mobs** march in with a count. Shoot them down on approach, then whatever is left trades 1:1 with your squad on contact. They scale with distance, your army and your firepower, so every run ends eventually.
-- **Armory**: coins buy permanent upgrades (bigger starting squad, starting gun, body armor, coin value) and skins.
-- **Missions**: three at a time, they pay out the moment you finish them and get harder each time.
+- **War bands** every ~350m: a road-wide mob sized to your army. Build up, get tested, build up again.
+- **Armory**: coins buy permanent upgrades (bigger starting squad, starting gun, body armor, magnet, lucky golden gates, coin value) and skins. The results screen offers the cheapest upgrade you can afford as a one-tap buy.
+- **Missions and ranks**: three missions at a time, paid the moment you finish them and harder each time; every three missions promotes you a rank (+5% coins each).
 - **Daily gift** with a 7-day streak, a **personal-best finish line** on the road, and a coin-priced revive.
 - Pause with the **II** button, P or Esc; the game also pauses itself when you switch apps.
 
