@@ -720,8 +720,11 @@ function mergeParts(parts) {
   out.setAttribute('color', new THREE.Float32BufferAttribute(colA, 3));
   return out;
 }
-const CAP = (r, l, s) => new THREE.CapsuleGeometry(r, l, s || 3, s ? 10 : 8);
-const SPH = (r, s) => new THREE.SphereGeometry(r, s || 10, s || 10);
+/* geometry detail per quality tier: at phone size the extra segments are invisible but cost
+   thousands of triangles once a crowd of 90 soldiers and a mob are on screen */
+const LOD = Q.low ? 0.55 : Q.phone ? 0.72 : 1;
+const CAP = (r, l, s) => new THREE.CapsuleGeometry(r, l, Math.max(2, Math.round((s || 3) * LOD)), Math.max(5, Math.round((s ? 10 : 8) * LOD)));
+const SPH = (r, s) => new THREE.SphereGeometry(r, Math.max(5, Math.round((s || 10) * LOD)), Math.max(4, Math.round((s || 10) * LOD)));
 const CONE = (r, h) => new THREE.ConeGeometry(r, h, 6);
 const BOX = (a, b, c) => new THREE.BoxGeometry(a, b, c);
 
@@ -4290,13 +4293,13 @@ function draw(now) {
   labelsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
   floatsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
 
-  renderer.render(scene, camera);
+  if (!SIM.noRender) renderer.render(scene, camera);
 }
 
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
