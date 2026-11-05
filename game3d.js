@@ -45,7 +45,7 @@ const dailyBtn = document.getElementById('dailyBtn');
 const againBtn = document.getElementById('againBtn');
 const muteBtn = document.getElementById('muteBtn');
 const playBtn = document.getElementById('playBtn');
-if (muteBtn) muteBtn.innerHTML = icon('sound');
+if (muteBtn) muteBtn.innerHTML = icon('gear');
 const upGrid = document.getElementById('upGrid');
 const toastEl = document.getElementById('toast');
 const comboEl = document.getElementById('combo');
@@ -138,7 +138,7 @@ window.addEventListener('resize', resize);
    Everything goes through one bus: a compressor glues the mix and keeps a
    busy fight from clipping, and a short synthetic room adds a tail to the
    big moments. Noise comes from one shared buffer. */
-let AC = null, muted = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
+let AC = null, muted = false, musicOff = false, vibOff = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
 function audio() {
   if (!AC) {
     try {
@@ -173,7 +173,7 @@ function audio() {
 }
 /* oscillator voice: pitch glide, attack, exponential decay, optional reverb send */
 function voice(f, d, type, v, slide, opt) {
-  if (!AC || muted || !BUS) return;
+  if (!AC || !BUS || (opt && opt.mus ? musicOff : muted)) return;
   const t = AC.currentTime + ((opt && opt.at) || 0);
   const o = AC.createOscillator(), g = AC.createGain();
   o.type = type || 'square';
@@ -191,7 +191,7 @@ function voice(f, d, type, v, slide, opt) {
 function tone(f, d, type, v, slide) { voice(f, d, type, v, slide); }
 /* filtered noise with a cutoff sweep: hits, whooshes, crunches */
 function hiss(d, v, kind, f0, f1, q, opt) {
-  if (!AC || muted || !BUS) return;
+  if (!AC || !BUS || (opt && opt.mus ? musicOff : muted)) return;
   const t = AC.currentTime + ((opt && opt.at) || 0);
   const src = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
   src.buffer = NOISE;
@@ -354,7 +354,7 @@ const MISSION_DEFS = {
 };
 const META = {
   up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0, fire: 0 },
-  mlv: {}, missions: [], done: 0, seenMob: false, seen: {},
+  mlv: {}, missions: [], done: 0, seenMob: false, seen: {}, hist: [],
   daily: { last: '', streak: 0 },
   runs: 0,
 };
@@ -1973,7 +1973,7 @@ function coinToHud(x, wy) {
     hudCoins.classList.remove('pop'); void hudCoins.offsetWidth; hudCoins.classList.add('pop');
   }, 420);
 }
-function vib(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { } }
+function vib(ms) { if (vibOff) return; try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { } }
 const vigEl = document.getElementById('vignette');
 let vigT = null, lastDanger = false;
 function dmgFlash() {
@@ -2003,7 +2003,7 @@ function musicStep(step, at) {
   const s16 = step % 16, bar = Math.floor(step / 16) % 4;
   const key = ZONE_KEY[Math.max(0, zoneIdx) % ZONE_KEY.length];
   const ch = CHORDS[bar];
-  const o = { at };
+  const o = { at, mus: true };
   /* drums */
   if (s16 % 4 === 0) { voice(150, 0.11, 'sine', 0.16, 42, o); }
   if (s16 === 4 || s16 === 12) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
@@ -2016,7 +2016,7 @@ function musicStep(step, at) {
     voice(f, STEP * 1.2, 'sawtooth', 0.012, 0, o);
   }
   /* chord stab on the "and" of beat 2 and 4 */
-  if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012 });
+  if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012, mus: true });
   /* tension arpeggio */
   if (musicHeat > 0.5) {
     const n = ch[s16 % 3] + (s16 % 6 > 2 ? 24 : 12);
@@ -2029,7 +2029,7 @@ function musicStart() {
   musNext = AC.currentTime + 0.06;
   musTimer = setInterval(() => {
     if (!AC) return;
-    if (muted || G.mode !== 'run' || document.hidden) { musNext = AC.currentTime + 0.06; return; }
+    if (musicOff || G.mode !== 'run' || document.hidden) { musNext = AC.currentTime + 0.06; return; }
     const ahead = AC.currentTime + 0.14;
     if (musNext < AC.currentTime - 0.2) musNext = AC.currentTime + 0.02;
     while (musNext < ahead) {
@@ -2231,10 +2231,15 @@ function gameOver() {
     : gap <= 120 ? `<b class="close">So close! ${gap}m short of your best</b>`
     : `<span class="chip">${icon('crown')}best ${G.best}m</span>`;
   const earned = G.coinsRun + G.missionCoins;
+  if (!revived || META.hist.length === 0) META.hist.push(d); else META.hist[META.hist.length - 1] = d;
+  while (META.hist.length > 10) META.hist.shift();
+  const hmax = Math.max(1, ...META.hist);
+  const histHTML = META.hist.length > 1 ? `<div class="hist">${META.hist.map((v, k) =>
+    `<i class="${k === META.hist.length - 1 ? 'now' : v === G.best ? 'top' : ''}" style="height:${Math.max(8, Math.round(100 * v / hmax))}%"></i>`).join('')}</div>` : '';
   overStats.innerHTML =
     `<div id="overDist">0m</div>${sub}` +
     `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} peak</span>` +
-    `<span class="chip">${icon('skull')}${G.mobsBeaten} mobs</span><span class="chip">${icon('crown')}${G.bossKills} bosses</span></div>` +
+    `<span class="chip">${icon('skull')}${G.mobsBeaten} mobs</span><span class="chip">${icon('crown')}${G.bossKills} bosses</span></div>` + histHTML +
     `<div class="earn">+${earned}${COIN}<small>${G.coinsPickedVal} grabbed · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''}</small></div>`;
   if (overMissions) overMissions.innerHTML = missionHTML(false);
   saveSave();
@@ -2360,12 +2365,39 @@ if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
   renderQuickBuy();
   if (reviveBtn) reviveBtn.disabled = G.coins < reviveCost();
 });
-function toggleMute() {
-  muted = !muted;
-  if (muteBtn) muteBtn.innerHTML = icon(muted ? 'mute' : 'sound');
-  try { localStorage.setItem('mobrun_mute', muted ? '1' : '0'); } catch (e) { }
+function saveSettings() {
+  try { localStorage.setItem('mobrun_settings', JSON.stringify({ sfx: !muted, music: !musicOff, vib: !vibOff })); } catch (e) { }
 }
-if (muteBtn) muteBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); toggleMute(); });
+function toggleMute() {
+  const off = !(muted && musicOff);
+  muted = off; musicOff = off;
+  saveSettings(); renderSettings();
+}
+const setOv = document.getElementById('settingsOverlay');
+function renderSettings() {
+  if (!setOv) return;
+  const rows = [['sfx', 'sound', 'SOUND EFFECTS', !muted], ['music', 'music', 'MUSIC', !musicOff], ['vib', 'phone', 'VIBRATION', !vibOff]];
+  const list = document.getElementById('setList');
+  if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
+    `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('');
+}
+if (setOv) {
+  setOv.addEventListener('pointerdown', (e) => {
+    e.stopPropagation(); e.preventDefault();
+    const row = e.target.closest && e.target.closest('.setRow');
+    if (row) {
+      const k = row.dataset.k;
+      if (k === 'sfx') muted = !muted;
+      if (k === 'music') musicOff = !musicOff;
+      if (k === 'vib') { vibOff = !vibOff; vib(30); }
+      audio(); if (!muted) sfx.power();
+      saveSettings(); renderSettings();
+      return;
+    }
+    if (e.target.closest && e.target.closest('#setClose')) setOv.style.display = 'none';
+  });
+}
+if (muteBtn) muteBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); renderSettings(); if (setOv) setOv.style.display = 'flex'; });
 if (dailyBtn) dailyBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
   if (!dailyReady()) return;
@@ -2469,14 +2501,16 @@ function loadSave() {
           .map((m) => ({ type: m.type, done: !!m.done, isNew: false }));
       if (s && s.daily && typeof s.daily.last === 'string') META.daily = { last: s.daily.last, streak: s.daily.streak | 0 };
       if (s && typeof s.done === 'number') META.done = s.done | 0;
+      if (s && Array.isArray(s.hist)) META.hist = s.hist.filter((v) => typeof v === 'number').slice(-10);
       if (s && typeof s.runs === 'number') META.runs = s.runs | 0;
       if (s && s.seenMob) META.seenMob = true;
       if (s && s.seen && typeof s.seen === 'object') for (const k in s.seen) META.seen[k] = !!s.seen[k];
     }
     const legacy = parseInt(localStorage.getItem('mobrun_best') || '0', 10) || 0;
     if (legacy > G.best) G.best = legacy;
-    muted = localStorage.getItem('mobrun_mute') === '1';
-    if (muteBtn) muteBtn.innerHTML = icon(muted ? 'mute' : 'sound');
+    const st = JSON.parse(localStorage.getItem('mobrun_settings') || 'null');
+    if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; }
+    else if (localStorage.getItem('mobrun_mute') === '1') { muted = true; musicOff = true; }
   } catch (e) { }
   /* finished-but-unrolled missions (tab closed mid-run) roll now */
   rollMissions();
@@ -2487,7 +2521,7 @@ function saveSave() {
   try {
     localStorage.setItem('mobrun_save', JSON.stringify({
       bank: G.coins | 0, skin: G.skin, owned: G.owned, best: G.best | 0,
-      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob, seen: META.seen,
+      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob, seen: META.seen, hist: META.hist,
       missions: META.missions.map((m) => ({ type: m.type, done: m.done })),
     }));
     localStorage.setItem('mobrun_best', String(G.best | 0));

@@ -294,6 +294,23 @@
   #shopClose { margin:18px 0 6px; }
 
   #pauseOverlay { z-index:11; }
+  #settingsOverlay { z-index:13; background:radial-gradient(ellipse at 50% 0%, #3a2d62, #1b1430 70%); }
+  #settingsOverlay .head { color:var(--cream); }
+  .setRow { pointer-events:auto; width:100%; display:flex; align-items:center; gap:12px; padding:10px 4px; background:none; border:0;
+    border-top:2px dashed rgba(27,20,48,.14); color:var(--ink); text-align:left; }
+  .setRow:first-child { border-top:0; }
+  .setRow i { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px;
+    background:var(--ink2); color:var(--yellow); border:2px solid var(--ink); font-style:normal; }
+  .setRow b { flex:1; font-family:var(--disp); font-weight:400; font-size:18px; letter-spacing:.5px; }
+  .tog { width:58px; height:32px; border-radius:16px; background:#c9bcd6; border:3px solid var(--ink); position:relative; transition:background .15s; }
+  .tog u { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid var(--ink); transition:left .15s; }
+  .tog.on { background:var(--green); }
+  .tog.on u { left:28px; }
+  .hist { display:flex; align-items:flex-end; gap:4px; height:38px; width:min(260px, 70vw); margin:10px auto 0; padding:0 2px;
+    border-bottom:2px solid rgba(255,255,255,.25); }
+  .hist i { flex:1; border-radius:4px 4px 0 0; background:rgba(255,255,255,.28); }
+  .hist i.top { background:var(--yellow); }
+  .hist i.now { background:var(--green); box-shadow:0 0 0 2px var(--ink); }
   #pauseOverlay .head { color:#fff; }
 
   body.menu .hud, body.menu #hudForm, body.menu #pauseBtn { opacity:0 !important; }
@@ -325,7 +342,7 @@
   }
   @media (orientation: landscape) and (max-height: 480px) {
     #hudForm { display:none; }
-    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys { display:none; }
+    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys, .hist { display:none; }
     .logo span { font-size:58px; display:inline; }
     .logo span + span { margin-left:.2em; }
     #overOverlay h1 { font-size:40px; }
@@ -414,6 +431,12 @@
   <div class="shopHead">SQUAD COLORS</div>
   <div id="shopGrid"></div>
   <button class="btn cream" id="shopClose" type="button">BACK</button>
+</div>
+
+<div class="overlay" id="settingsOverlay" style="display:none">
+  <div class="head">SETTINGS</div>
+  <div class="panel" id="setList"></div>
+  <button type="button" class="btn cream" id="setClose" style="margin-top:18px">DONE</button>
 </div>
 
 <div class="overlay" id="pauseOverlay" style="display:none">
