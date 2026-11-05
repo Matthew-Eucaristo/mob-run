@@ -1,7 +1,8 @@
 {
   "name": "MOB RUN",
   "short_name": "MOB RUN",
-  "description": "Steer a squad, pick the gates, grab the coins.",
+  "description": "Grow the mob, pick the gates, crush the rest. A 3D crowd-runner you can play with one thumb.",
+  "categories": ["games"],
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,6 +11,7 @@
   "theme_color": "#1b1430",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
