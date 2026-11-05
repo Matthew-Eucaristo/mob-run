@@ -436,7 +436,7 @@ const MILES = [100, 250, 500, 1000, 2000, 4000];
 
 let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [], cages = [];
 let bullets = [], parts = [], floats = [], rewards = [], ebullets = [], coins = [], mobs = [];
-let firstMob = false, nextBand = 320;
+let firstMob = false, nextBand = 320, skillDelay = 0;
 let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0;
 let fireAcc = 0, drainAcc = 0, shootSfxAcc = 0, fallAcc = 0, edgeWarn = 0;
 let hintT = 0, zoneIdx = -1, fovKick = 0, muzzleGlow = 0, distMark = 0, revived = false, lastLevel = 1;
@@ -2269,7 +2269,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -3231,7 +3231,6 @@ function update(dt) {
     const bonus = Math.max(5, Math.round(Math.ceil(G.soldiers * 0.1) * rally)) * steps;
     addSoldiers(G.soldiers + bonus);
     floatText(G.armyX, G.camY + 30, 'LEVEL UP +' + bonus, '#e2b657', 26, 3.8);
-    sfx.great();
     wantSkill = true;
   }
   G.shake = Math.max(0, G.shake - dt * 22);
@@ -3772,7 +3771,9 @@ function update(dt) {
     if (enemies[i]._dead) { enemies[i].label.remove(); if (enemies[i].aura) scene.remove(enemies[i].aura); enemies.splice(i, 1); }
   }
   checkMissions();
-  if (wantSkill && G.mode === 'run') offerSkills();
+  /* level up: a beat of slow motion and a ring before the cards come up */
+  if (wantSkill) { skillDelay = 0.55; hitstop(0.5); ringT = 0; ringMat.color.set('#ffcc33'); sfx.fanfare(); }
+  if (skillDelay > 0) { skillDelay -= dt; if (skillDelay <= 0 && G.mode === 'run') offerSkills(); }
 }
 
 /* ---------------- draw ---------------- */
