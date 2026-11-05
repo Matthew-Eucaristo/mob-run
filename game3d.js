@@ -147,7 +147,7 @@ function resize() {
   const keysEl = document.querySelector('#startOverlay .keys');
   if (keysEl) keysEl.textContent = document.body.classList.contains('touch')
     ? 'one thumb · swipe sideways to steer · up for a column, down to spread'
-    : 'arrows or WASD · up / down stretches the squad · M mute';
+    : 'mouse or arrows to steer · scroll or up/down to stretch · P pause · M mute';
 }
 window.addEventListener('resize', resize);
 
@@ -375,6 +375,7 @@ const MISSION_DEFS = {
 const META = {
   up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0, fire: 0 },
   mlv: {}, missions: [], done: 0, seenMob: false, seen: {}, hist: [],
+  life: { kills: 0, bosses: 0, mobs: 0, coins: 0, peak: 0, freed: 0, meters: 0 },
   daily: { last: '', streak: 0 },
   runs: 0,
 };
@@ -2287,7 +2288,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
@@ -2425,6 +2426,13 @@ function gameOver() {
     : gap <= 120 ? `<b class="close">So close! ${gap}m short of your best</b>`
     : `<span class="chip">${icon('crown')}best ${G.best}m</span>`;
   const earned = G.coinsRun + G.missionCoins;
+  {
+    const L = META.life, prev = G.lifeBanked || { kills: 0, bosses: 0, mobs: 0, coins: 0, freed: 0, meters: 0 };
+    const now = { kills: G.kills, bosses: G.bossKills, mobs: G.mobsBeaten, coins: earned, freed: G.rescued, meters: d };
+    for (const k in now) L[k] += Math.max(0, now[k] - prev[k]);
+    L.peak = Math.max(L.peak, G.peak);
+    G.lifeBanked = now;
+  }
   if (!revived || META.hist.length === 0) META.hist.push(d); else META.hist[META.hist.length - 1] = d;
   while (META.hist.length > 10) META.hist.shift();
   const hmax = Math.max(1, ...META.hist);
@@ -2626,6 +2634,15 @@ const setOv = document.getElementById('settingsOverlay');
 function renderSettings() {
   if (!setOv) return;
   const rows = [['sfx', 'sound', 'SOUND EFFECTS', !muted], ['music', 'music', 'MUSIC', !musicOff], ['vib', 'phone', 'VIBRATION', !vibOff], ['shake', 'crosshair', 'SCREEN SHAKE', !shakeOff]];
+  const rec = document.getElementById('records');
+  if (rec) {
+    const L = META.life;
+    const row = (ic, k, v) => `<div class="recRow"><i>${icon(ic)}</i><span>${k}</span><b>${v}</b></div>`;
+    rec.innerHTML = '<h3>YOUR RECORDS</h3>' + row('run', 'Runs', META.runs) + row('crown', 'Best distance', G.best + 'm') +
+      row('flag', 'Biggest army', fmtNum(L.peak)) + row('skull', 'Monsters beaten', fmtNum(L.kills)) +
+      row('crown', 'Bosses beaten', L.bosses) + row('lock', 'Prisoners freed', fmtNum(L.freed)) +
+      row('star', 'Coins earned', fmtNum(L.coins)) + row('run', 'Total distance', fmtNum(L.meters) + 'm');
+  }
   const list = document.getElementById('setList');
   if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
     `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('');
@@ -2751,6 +2768,7 @@ function loadSave() {
           .map((m) => ({ type: m.type, done: !!m.done, isNew: false }));
       if (s && s.daily && typeof s.daily.last === 'string') META.daily = { last: s.daily.last, streak: s.daily.streak | 0 };
       if (s && typeof s.done === 'number') META.done = s.done | 0;
+      if (s && s.life && typeof s.life === 'object') for (const k in META.life) META.life[k] = Math.max(0, +s.life[k] || 0);
       if (s && Array.isArray(s.hist)) META.hist = s.hist.filter((v) => typeof v === 'number').slice(-10);
       if (s && typeof s.runs === 'number') META.runs = s.runs | 0;
       if (s && s.seenMob) META.seenMob = true;
@@ -2773,7 +2791,7 @@ function saveSave() {
   try {
     localStorage.setItem('mobrun_save', JSON.stringify({
       bank: G.coins | 0, skin: G.skin, owned: G.owned, best: G.best | 0,
-      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob, seen: META.seen, hist: META.hist,
+      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob, seen: META.seen, hist: META.hist, life: META.life,
       missions: META.missions.map((m) => ({ type: m.type, done: m.done })),
     }));
     localStorage.setItem('mobrun_best', String(G.best | 0));
