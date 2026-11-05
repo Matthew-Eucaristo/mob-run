@@ -131,46 +131,105 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-/* ---------------- audio ---------------- */
-let AC = null, muted = false;
+/* ---------------- audio ----------------
+   Everything goes through one bus: a compressor glues the mix and keeps a
+   busy fight from clipping, and a short synthetic room adds a tail to the
+   big moments. Noise comes from one shared buffer. */
+let AC = null, muted = false, BUS = null, VERB = null, NOISE = null;
 function audio() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = AC.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5;
+      comp.attack.value = 0.003; comp.release.value = 0.18;
+      const master = AC.createGain(); master.gain.value = 0.9;
+      comp.connect(master); master.connect(AC.destination);
+      BUS = comp;
+      /* room: exponentially decaying stereo noise impulse */
+      const len = Math.floor(AC.sampleRate * 1.1);
+      const ir = AC.createBuffer(2, len, AC.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        const d = ir.getChannelData(c);
+        for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / len, 3.2);
+      }
+      const conv = AC.createConvolver(); conv.buffer = ir;
+      const wet = AC.createGain(); wet.gain.value = 0.32;
+      conv.connect(wet); wet.connect(BUS);
+      VERB = conv;
+      NOISE = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+      const nd = NOISE.getChannelData(0);
+      for (let k = 0; k < nd.length; k++) nd[k] = Math.random() * 2 - 1;
+    } catch (e) { AC = null; }
+  }
   if (AC && AC.state === 'suspended') AC.resume();
 }
-function tone(f, d, type, v, slide) {
-  if (!AC || muted) return;
-  const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
-  o.type = type || 'square'; o.frequency.setValueAtTime(f, t);
+/* oscillator voice: pitch glide, attack, exponential decay, optional reverb send */
+function voice(f, d, type, v, slide, opt) {
+  if (!AC || muted || !BUS) return;
+  const t = AC.currentTime + ((opt && opt.at) || 0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(f, t);
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t + d);
-  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + 0.02);
+  if (opt && opt.detune) o.detune.value = opt.detune;
+  const a = (opt && opt.attack) || 0.004;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+  o.connect(g); g.connect(BUS);
+  if (opt && opt.verb && VERB) g.connect(VERB);
+  o.start(t); o.stop(t + a + d + 0.03);
 }
-function noise(d, v) {
-  if (!AC || muted) return;
-  const n = AC.createBuffer(1, AC.sampleRate * d, AC.sampleRate);
-  const ch = n.getChannelData(0);
-  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
-  const s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter(), t = AC.currentTime;
-  s.buffer = n; f.type = 'lowpass'; f.frequency.value = 900;
-  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  s.connect(f); f.connect(g); g.connect(AC.destination); s.start(t);
+function tone(f, d, type, v, slide) { voice(f, d, type, v, slide); }
+/* filtered noise with a cutoff sweep: hits, whooshes, crunches */
+function hiss(d, v, kind, f0, f1, q, opt) {
+  if (!AC || muted || !BUS) return;
+  const t = AC.currentTime + ((opt && opt.at) || 0);
+  const src = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = NOISE;
+  fl.type = kind || 'lowpass'; fl.Q.value = q || 0.8;
+  fl.frequency.setValueAtTime(f0 || 900, t);
+  if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + d);
+  g.gain.setValueAtTime(v, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  src.connect(fl); fl.connect(g); g.connect(BUS);
+  if (opt && opt.verb && VERB) g.connect(VERB);
+  src.start(t, Math.random() * 0.8); src.stop(t + d + 0.02);
 }
+function noise(d, v) { hiss(d, v, 'lowpass', 900); }
 const sfx = {
-  shoot: () => tone(880 + Math.random() * 220, 0.05, 'square', 0.02),
-  good: () => { tone(620, 0.09, 'sine', 0.09); setTimeout(() => tone(930, 0.12, 'sine', 0.09), 60); },
-  great: () => { tone(520, 0.09, 'sine', 0.1); setTimeout(() => tone(780, 0.09, 'sine', 0.1), 55); setTimeout(() => tone(1170, 0.16, 'sine', 0.11), 110); },
-  bad: () => tone(160, 0.25, 'sawtooth', 0.1, 90),
-  kill: () => tone(340 + Math.random() * 120, 0.06, 'triangle', 0.045, 120),
-  hurt: () => tone(120, 0.12, 'sawtooth', 0.07, 70),
-  boss: () => { tone(90, 0.5, 'sawtooth', 0.12, 45); noise(0.35, 0.12); },
-  power: () => { tone(500, 0.08, 'square', 0.08); setTimeout(() => tone(1000, 0.14, 'square', 0.08), 70); },
-  boom: () => { noise(0.5, 0.22); tone(70, 0.4, 'sine', 0.15, 35); },
-  barrel: () => { noise(0.15, 0.1); tone(300, 0.12, 'triangle', 0.08, 80); },
-  coin: () => tone(1280, 0.035, 'square', 0.028),
-  /* big moments: a rising major arpeggio with a low thump */
+  /* a muffled crack, darker for heavier guns */
+  shoot: () => {
+    const heavy = G.tier / 5;
+    hiss(0.045, 0.05, 'bandpass', 2600 - heavy * 1300, 900, 1.2);
+    voice(170 - heavy * 50, 0.05, 'sine', 0.05, 60);
+  },
+  good: () => {
+    hiss(0.22, 0.06, 'bandpass', 500, 3800, 0.9);
+    voice(659, 0.12, 'triangle', 0.09); voice(988, 0.16, 'triangle', 0.08, 0, { at: 0.06 });
+  },
+  great: () => {
+    hiss(0.26, 0.07, 'bandpass', 400, 4200, 0.9);
+    [523, 659, 784, 1047].forEach((f, k) => voice(f, 0.16, 'triangle', 0.09, 0, { at: k * 0.05, verb: k === 3 }));
+  },
+  bad: () => { voice(220, 0.28, 'sawtooth', 0.08, 70); hiss(0.2, 0.08, 'lowpass', 700, 120); },
+  /* a little "pop": falling sine plus a click */
+  kill: () => { voice(520 + Math.random() * 160, 0.07, 'sine', 0.06, 140); hiss(0.025, 0.04, 'highpass', 3000); },
+  hurt: () => { voice(130, 0.12, 'sine', 0.1, 55); hiss(0.08, 0.06, 'lowpass', 600); },
+  boss: () => { voice(80, 0.6, 'sawtooth', 0.1, 38, { verb: true }); hiss(0.5, 0.12, 'lowpass', 1400, 90, 0.7, { verb: true }); },
+  power: () => { voice(587, 0.09, 'square', 0.05); voice(1175, 0.15, 'square', 0.05, 0, { at: 0.07, verb: true }); },
+  boom: () => { hiss(0.7, 0.24, 'lowpass', 2400, 60, 0.7, { verb: true }); voice(65, 0.45, 'sine', 0.2, 30); },
+  barrel: () => { hiss(0.16, 0.12, 'bandpass', 1800, 400, 1.4); voice(260, 0.12, 'triangle', 0.08, 90); },
+  coin: () => { voice(1568, 0.08, 'sine', 0.05); voice(1568 * 2.76, 0.05, 'sine', 0.015); },
+  /* big moments: a rising major arpeggio over a thump, into the room */
   fanfare: () => {
-    tone(70, 0.3, 'sine', 0.14, 40);
-    [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => { tone(f, 0.16, 'square', 0.045); tone(f / 2, 0.16, 'triangle', 0.05); }, i * 70));
+    voice(70, 0.32, 'sine', 0.16, 40);
+    hiss(0.3, 0.06, 'bandpass', 600, 5000, 0.8);
+    [523, 659, 784, 1047, 1319].forEach((f, k) => {
+      voice(f, 0.2, 'square', 0.035, 0, { at: k * 0.07, verb: true });
+      voice(f / 2, 0.2, 'triangle', 0.05, 0, { at: k * 0.07 });
+    });
   },
 };
 /* coins climb a pentatonic ladder while you keep scooping them */
@@ -181,9 +240,11 @@ function coinLadder() {
   ladderT = 0.6;
   if (coinSfx > 0) return;
   coinSfx = 0.03;
-  const f = 880 * Math.pow(2, LADDER[ladder] / 12);
-  tone(f, 0.06, 'square', 0.026);
-  tone(f * 2, 0.05, 'sine', 0.018);
+  const f = 1046 * Math.pow(2, LADDER[ladder] / 12);
+  /* bell: a fundamental plus the inharmonic partial a struck coin has */
+  voice(f, 0.09, 'sine', 0.05);
+  voice(f * 2.76, 0.05, 'sine', 0.014);
+  voice(f * 2, 0.03, 'square', 0.008);
 }
 
 /* ---------------- zones ---------------- */
@@ -3960,7 +4021,7 @@ if (/[?&]debug\b/.test(location.search)) {
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
     setAim(x, f) { aimX = clampAim(x); if (f !== undefined) aimForm = f; },
-    sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); },
+    sfx, coinLadder, sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); },
   };
 }
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
