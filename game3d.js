@@ -305,7 +305,7 @@ const SKILLS = [
   { id: 'crit', name: 'CRIT', icon: 'star', col: '#ffb400', desc: 'Some shots hit double.', max: 3 },
   { id: 'steady', name: 'ANCHOR', icon: 'anchor', col: '#4aa3ff', desc: 'Fewer soldiers slip off the edge.', max: 2 },
   { id: 'overdrive', name: 'OVERDRIVE', icon: 'chevrons', col: '#ff9f1c', desc: 'Good gates spin up your guns for a bit.', max: 2 },
-  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: '+1 on every coin you grab.', max: 3 },
+  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: 'Coins are worth 25% more.', max: 3 },
   { id: 'fortune', name: 'FORTUNE', icon: 'sparkle', col: '#ffb400', desc: 'Bigger distance payout at the end.', max: 2 },
   { id: 'execution', name: 'EXECUTION', icon: 'skull', col: '#ff4d5e', desc: 'Bosses take way more damage.', max: 3 },
   { id: 'iron', name: 'IRON', icon: 'shield', col: '#8b6cff', desc: 'Lose fewer soldiers to everything.', max: 3 },
@@ -318,22 +318,26 @@ const SKILLS = [
 ];
 const SKINS = [
   { id: 'recruit', name: 'RECRUIT', price: 0, body: '#6ea2ff', lead: '#ffd75d' },
-  { id: 'vanguard', name: 'VANGUARD', price: 40, body: '#5ee0ff', lead: '#f4fbff' },
-  { id: 'ember', name: 'EMBER', price: 80, body: '#ff6a2a', lead: '#ffd27a' },
-  { id: 'toxic', name: 'TOXIC', price: 140, body: '#3dff7a', lead: '#e8ff8a' },
-  { id: 'royal', name: 'OXBLOOD', price: 220, body: '#8c3a2f', lead: '#f2d48a' },
-  { id: 'void', name: 'ASH', price: 360, body: '#4a453c', lead: '#f4efe4' },
+  { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#5ee0ff', lead: '#f4fbff' },
+  { id: 'ember', name: 'EMBER', price: 400, body: '#ff6a2a', lead: '#ffd27a' },
+  { id: 'toxic', name: 'TOXIC', price: 900, body: '#3dff7a', lead: '#e8ff8a' },
+  { id: 'royal', name: 'OXBLOOD', price: 1600, body: '#8c3a2f', lead: '#f2d48a' },
+  { id: 'void', name: 'ASH', price: 3000, body: '#4a453c', lead: '#f4efe4' },
+  { id: 'camo', name: 'JUNGLE', price: 5000, body: '#5f8a3a', lead: '#e6d38a' },
+  { id: 'neon', name: 'NEON', price: 8000, body: '#ff3df2', lead: '#3dfff0' },
+  { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffcc33', lead: '#fff6d0' },
 ];
 /* ---------------- meta progression (persists between runs) ----------------
    Upgrades make the next run go further, missions give a reason to try a
    different route, and the daily gift brings people back. */
 const UPGRADES = [
-  { id: 'army', name: 'BIGGER SQUAD', icon: 'flag', col: '#5bd44a', max: 10, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(30 * Math.pow(1.5, l)) },
-  { id: 'gun', name: 'STARTING GUN', icon: 'gun', col: '#ff4d5e', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [150, 450, 1100][l] },
-  { id: 'armor', name: 'BODY ARMOR', icon: 'shield', col: '#8b6cff', max: 6, desc: 'Fewer soldiers lost to every hit', val: (l) => l ? '-' + l * 5 + '%' : 'none', cost: (l) => Math.round(60 * Math.pow(1.6, l)) },
-  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(80 * Math.pow(1.7, l)) },
-  { id: 'lucky', name: 'LUCKY GATES', icon: 'sparkle', col: '#ffb400', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l ? l * 6 + '%' : 'none', cost: (l) => Math.round(100 * Math.pow(1.65, l)) },
-  { id: 'coin', name: 'COIN VALUE', icon: 'star', col: '#ff9f1c', max: 8, desc: 'Every coin is worth more', val: (l) => l ? '+' + l * 15 + '%' : 'normal', cost: (l) => Math.round(45 * Math.pow(1.55, l)) },
+  { id: 'army', name: 'BIGGER SQUAD', icon: 'flag', col: '#5bd44a', max: 15, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(60 * Math.pow(1.35, l)) },
+  { id: 'gun', name: 'STARTING GUN', icon: 'gun', col: '#ff4d5e', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [600, 1800, 4500][l] },
+  { id: 'armor', name: 'BODY ARMOR', icon: 'shield', col: '#8b6cff', max: 8, desc: 'Fewer soldiers lost to every hit', val: (l) => l ? '-' + l * 5 + '%' : 'none', cost: (l) => Math.round(150 * Math.pow(1.45, l)) },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(200 * Math.pow(1.7, l)) },
+  { id: 'lucky', name: 'LUCKY GATES', icon: 'sparkle', col: '#ffb400', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l ? l * 6 + '%' : 'none', cost: (l) => Math.round(250 * Math.pow(1.6, l)) },
+  { id: 'fire', name: 'FIREPOWER', icon: 'bullet', col: '#ff6b3d', max: 50, desc: 'Every bullet hits harder. Keeps going', val: (l) => l ? '+' + l * 4 + '%' : 'normal', cost: (l) => Math.round(300 * Math.pow(1.12, l)) },
+  { id: 'coin', name: 'COIN VALUE', icon: 'star', col: '#ff9f1c', max: 8, desc: 'Every coin is worth more', val: (l) => l ? '+' + l * 15 + '%' : 'normal', cost: (l) => Math.round(120 * Math.pow(1.5, l)) },
 ];
 const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt' };
 const MISSION_DEFS = {
@@ -347,7 +351,7 @@ const MISSION_DEFS = {
   streak: { steps: [4, 6, 8, 11, 15], text: (n) => `Take ${n} good gates in a row` },
 };
 const META = {
-  up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0 },
+  up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0, fire: 0 },
   mlv: {}, missions: [], done: 0, seenMob: false, seen: {},
   daily: { last: '', streak: 0 },
   runs: 0,
@@ -355,9 +359,9 @@ const META = {
 /* rank: every 3 missions done promotes you; each rank pays out and adds +5% coins */
 const RANKS = ['RECRUIT', 'PRIVATE', 'CORPORAL', 'SERGEANT', 'LIEUTENANT', 'CAPTAIN', 'MAJOR', 'COLONEL', 'GENERAL', 'WARLORD'];
 function rankOf(done) { return Math.min(RANKS.length - 1, Math.floor(done / 3)); }
-function rankReward(r) { return 60 + r * 40; }
+function rankReward(r) { return 150 + r * 100; }
 function missionGoal(m) { const d = MISSION_DEFS[m.type]; return d.steps[Math.min(d.steps.length - 1, META.mlv[m.type] || 0)]; }
-function missionReward(m) { return 40 + (META.mlv[m.type] || 0) * 30; }
+function missionReward(m) { return 80 + (META.mlv[m.type] || 0) * 60; }
 function missionValue(type) {
   if (type === 'dist') return Math.floor(G.dist);
   if (type === 'army') return G.peak;
@@ -415,7 +419,7 @@ function dailyAmount() {
   const y = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1);
   const yk = y.getFullYear() + '-' + (y.getMonth() + 1) + '-' + y.getDate();
   const streak = META.daily.last === yk ? META.daily.streak + 1 : 1;
-  return { streak, coins: 25 * Math.min(7, streak) + (streak >= 7 ? 50 : 0) };
+  return { streak, coins: 60 * Math.min(7, streak) + (streak >= 7 ? 200 : 0) };
 }
 const SPEED_BASE = 148;
 const SPEED_CAP = 288;
@@ -2420,7 +2424,8 @@ function renderShop() {
       card.type = 'button';
       card.className = 'upCard' + (maxed ? ' maxed' : G.coins >= cost ? ' can' : ' broke');
       let pips = '';
-      for (let k = 0; k < u.max; k++) pips += `<u class="${k < l ? 'f' : ''}"></u>`;
+      if (u.max > 15) pips = `<em class="lv">LV ${l}</em>`;
+      else for (let k = 0; k < u.max; k++) pips += `<u class="${k < l ? 'f' : ''}"></u>`;
       card.style.setProperty('--uc', u.col);
       card.innerHTML = `<i>${icon(u.icon)}</i><div class="mid"><b>${u.name}</b><span>${u.desc}<br><b class="v">${u.val(l)}</b>${maxed ? '' : ' → <b class="v nx">' + u.val(l + 1) + '</b>'}</span><div class="pips">${pips}</div></div>` +
         `<div class="price">${maxed ? 'MAX' : cost + COIN}</div>`;
@@ -2894,7 +2899,7 @@ function update(dt) {
   const wt = WT[G.tier];
   const shooters = Math.min(G.soldiers, Q.low ? 22 : Q.phone ? 32 : 60);
   const stand = (G.soldiers < 18 && G.skills.laststand) ? (1 + 0.22 * G.skills.laststand) : 1;
-  const dmgPerBullet = (wt.dmg + G.upDmg) * Math.max(1, Math.ceil(G.soldiers / Math.max(1, shooters))) * stand;
+  const dmgPerBullet = (wt.dmg + G.upDmg) * Math.max(1, Math.ceil(G.soldiers / Math.max(1, shooters))) * stand * (1 + (META.up.fire || 0) * 0.04);
   let rate = Math.max(0.04, wt.rate - G.upRate);
   rate *= 1 - Math.min(0.4, (G.skills.rate || 0) * 0.1);
   if (stand > 1) rate *= 1 - 0.1 * (G.skills.laststand || 0);
@@ -3323,7 +3328,7 @@ function update(dt) {
       if (c.wy - G.camY > 36) c.wy += (G.camY + 24 - c.wy) * pull * 0.55;
     }
     if ((c.fly === undefined || c.fly < 0) && c.wy - G.camY < reachY && c.wy - G.camY > -28 && Math.abs(c.x - G.armyX) < reachX) {
-      G.coinFrac += (1 + (G.skills.greed || 0)) * coinMult();
+      G.coinFrac += (1 + (G.skills.greed || 0) * 0.25) * coinMult();
       const gain = Math.floor(G.coinFrac);
       G.coinFrac -= gain;
       G.coins += gain; G.coinsRun += gain; G.coinsPicked += 1; G.coinsPickedVal += gain; touchSave();
@@ -4121,7 +4126,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels,
+    G, SIM, META, UPGRADES, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels,
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
