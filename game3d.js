@@ -286,7 +286,7 @@ const WT = [
 /* ---------------- state ---------------- */
 const G = {
   mode: 'menu',
-  camY: 0, speed: 148,
+  camY: 0, speed: 162,
   armyX: 0, soldiers: 10,
   kills: 0, dist: 0, level: 1,   peak: 10, best: 0,
   coins: 0, coinsRun: 0, skin: 'recruit', owned: { recruit: true },
@@ -430,7 +430,7 @@ function dailyAmount() {
   const streak = META.daily.last === yk ? META.daily.streak + 1 : 1;
   return { streak, coins: 60 * Math.min(7, streak) + (streak >= 7 ? 200 : 0) };
 }
-const SPEED_BASE = 148;
+const SPEED_BASE = 162;
 const SPEED_CAP = 288;
 const MILES = [100, 250, 500, 1000, 2000, 4000];
 
@@ -1570,7 +1570,7 @@ function schedule() {
   const heat = clamp((G.dist - 220) / 1900, 0, 1);
   while (nextY < G.camY + LH * 3.2) {
     const roll = Math.random();
-    const gateP = 0.46 - heat * 0.06;
+    const gateP = 0.46 - heat * 0.06 + clamp(1 - G.dist / 300, 0, 1) * 0.14;
     const packP = gateP + 0.2;
     const barrelP = packP + 0.1;
     const hordeP = barrelP + heat * 0.1;
@@ -1591,7 +1591,9 @@ function schedule() {
     if (chance(0.12)) spawnPickup(nextY + rnd(-150, 150));
     if (gatesSpawned <= 3 || chance(0.7)) spawnCoinLine(nextY + rnd(70, 200));
     if (G.dist > 380 && chance(0.08 + heat * 0.1)) spawnMeteor(nextY + rnd(-120, 240));
-    nextY += rnd(640, 940) - heat * 210;
+    /* something every few seconds: tighter early, when the player has the least going on */
+    const early = clamp(1 - G.dist / 400, 0, 1);
+    nextY += rnd(600, 860) - heat * 200 - early * 150;
     bossCounter += 1;
     if (bossCounter >= (G.dist < 450 ? 10 : 6)) { bossCounter = 0; spawnBoss(nextY + 140); nextY += 900; }
   }
@@ -1831,7 +1833,7 @@ function spawnBoss(wy) {
 function spawnBarrels(wy) {
   const d = G.level;
   const n = ri(1, 3);
-  const kinds = ['weapon', 'heal', 'bomb', 'gold', 'upgrade'];
+  const kinds = ['weapon', 'heal', 'heal', 'bomb', 'gold', 'gold', 'upgrade'];
   for (let i = 0; i < n; i++) {
     const kind = kinds[ri(0, kinds.length - 1)];
     const b = {
@@ -2213,13 +2215,16 @@ function musicStart() {
 }
 function musicStop() { clearInterval(musTimer); musTimer = null; }
 
+/* gun tiers unlock along the run (about every 220 m past your starting gun), so the
+   arsenal grows across the whole run instead of maxing out in the first minute */
+function tierCap() { return Math.min(WT.length - 1, (META.up.gun || 0) + 1 + Math.floor(G.dist / 220)); }
 function weaponUp() {
   G.gunUps += 1;
-  if (G.tier < WT.length - 1) {
+  if (G.tier < tierCap()) {
     G.tier += 1;
     floatText(G.armyX, G.camY, WT[G.tier].name + '!', WT[G.tier].col, 28, 4);
     sfx.great();
-  } else { G.upDmg += 2; floatText(G.armyX, G.camY, 'DMG +2', '#ffd75d', 24, 4); }
+  } else { G.upDmg += 1; floatText(G.armyX, G.camY, 'GUN DMG +1', '#ffd75d', 24, 4); sfx.power(); }
 }
 
 function mkPart(x, wy, color) {
