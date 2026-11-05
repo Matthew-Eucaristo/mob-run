@@ -12,3 +12,5 @@ The game from those fake mobile ads — for real, in 3D. A crowd-runner × multi
 Play: **https://mob-run.pages.dev** — or run locally: serve the folder (`python3 -m http.server 8787` → http://localhost:8787) and open `index.html`. The 2D fallback is at `classic.html` (also live at `mob-run.pages.dev/classic`).
 
 Testing hook: open `index.html?debug` and the page exposes `window.__mob` (state, `update`, `startGame`, ...) so a headless browser can drive and fast-forward runs.
+
+Assets: fonts are Lilita One and Nunito (SIL Open Font License 1.1, licences in `fonts/`). Icons (`icons.js`), sounds and music are generated in code; there are no image or audio files besides the app icons.
