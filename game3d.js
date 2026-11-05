@@ -3368,7 +3368,9 @@ function update(dt) {
   if (zi !== zoneIdx) {
     zoneIdx = zi;
     tintProps();
-    if (G.dist > 5) bannerFlash(ZONE_NAMES[zi], '');
+    /* the zones loop every five levels; later laps say so */
+    const lap = Math.floor((G.level - 1) / ZONES.length);
+    if (G.dist > 5) bannerFlash(ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : ''), lap ? '#ffcc33' : '');
   }
 
   schedule();
