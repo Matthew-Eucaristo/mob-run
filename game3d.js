@@ -82,11 +82,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 /* ---------------- sizes / coords ---------------- */
 let W = 0, H = 0, DPR = 1;
+/* Gameplay runs in a fixed logical space the size of a phone, whatever the
+   window is. Before, px -> world scale followed the window width, so a wide
+   desktop packed gates and mobs 3x tighter in the 3D world than a phone did. */
+const LW = 400, LH = 820;
 const road = { x0: 0, x1: 0 };
 const ROADW = 13;                 // world units across the road at the start
-let K = 0.014;                    // px -> world units (locked to the FULL road, never the narrowed one)
+let K = ROADW / (LW * 0.84);                    // px -> world units (locked to the FULL road, never the narrowed one)
 let roadHalf = ROADW / 2;         // current asphalt half-width in world units
-const wx = (x) => (x - W / 2) * K;
+const wx = (x) => (x - LW / 2) * K;
 const wz = (wy) => (G.camY - wy) * K;   // ahead = negative z
 
 /* ---------------- three setup ---------------- */
@@ -121,9 +125,8 @@ function resize() {
   renderer.setSize(W, H);
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
-  K = ROADW / (W * 0.84);
   syncRoad();
-  if (G.mode !== 'run') { G.armyX = W / 2; aimX = W / 2; }
+  if (G.mode !== 'run') { G.armyX = LW / 2; aimX = LW / 2; }
   const keysEl = document.querySelector('#startOverlay .keys');
   if (keysEl) keysEl.textContent = document.body.classList.contains('touch')
     ? 'one thumb · swipe sideways to steer · up for a column, down to spread'
@@ -441,7 +444,7 @@ const chance = (p) => Math.random() < p;
 let dragging = false, lastPX = 0, lastPY = 0, prevArmyX = 0, bank = 0, dragAxis = 0;
 let aimX = 0, aimForm = 0;
 const keys = { left: false, right: false, up: false, down: false };
-function latMax() { return Math.max(560, W * 1.7); }
+function latMax() { return Math.max(560, LW * 1.7); }
 /* Steering alone never drops anyone: the squad's own width stays on the
    asphalt. Only a formation spread wider than the road hangs over. */
 function clampAim(x) {
@@ -476,9 +479,9 @@ function release() { dragging = false; dragAxis = 0; }
 function syncRoad() {
   const t = clamp((G.dist || 0) / 2600, 0, 1);
   const narrow = t * t * (3 - 2 * t);
-  const halfPx = (W * 0.42) * (1 - 0.5 * narrow);
-  road.x0 = W * 0.5 - halfPx;
-  road.x1 = W * 0.5 + halfPx;
+  const halfPx = (LW * 0.42) * (1 - 0.5 * narrow);
+  road.x0 = LW * 0.5 - halfPx;
+  road.x1 = LW * 0.5 + halfPx;
   roadHalf = halfPx * K;
 }
 cv.addEventListener('pointerdown', e => press(e.clientX, e.clientY));
@@ -1383,7 +1386,7 @@ function spawnCoinLine(wy) {
   const early = gatesSpawned <= 3;
   const arc = !early && Math.random() < 0.4;
   const n = ri(6, 9);
-  const x0 = early ? W / 2 + rnd(-24, 24) : rnd(road.x0 + 36, road.x1 - 36);
+  const x0 = early ? LW / 2 + rnd(-24, 24) : rnd(road.x0 + 36, road.x1 - 36);
   const drift = arc ? rnd(-80, 80) : rnd(-16, 16);
   for (let i = 0; i < n && coins.length < MAXCOIN; i++) {
     const u = n === 1 ? 0.5 : i / (n - 1);
@@ -1394,7 +1397,7 @@ function spawnCoinLine(wy) {
 
 function schedule() {
   const heat = clamp((G.dist - 220) / 1900, 0, 1);
-  while (nextY < G.camY + H * 3.2) {
+  while (nextY < G.camY + LH * 3.2) {
     const roll = Math.random();
     const gateP = 0.46 - heat * 0.06;
     const packP = gateP + 0.2;
@@ -1943,7 +1946,7 @@ let edgeDanger = 0;
 /* ---------------- game flow ---------------- */
 function startGame() {
   G.mode = 'run'; G.camY = 0; G.speed = SPEED_BASE; shownArmy = -1;
-  G.armyX = W / 2; aimX = W / 2; aimForm = 0; G.form = 0; formKey = ''; bodyN = 0; dragAxis = 0;
+  G.armyX = LW / 2; aimX = LW / 2; aimForm = 0; G.form = 0; formKey = ''; bodyN = 0; dragAxis = 0;
   G.soldiers = 10 + META.up.army * 5; G.kills = 0; G.dist = 0; G.level = 1; G.peak = G.soldiers;
   G.tier = META.up.gun; G.upDmg = 0; G.upRate = 0; G.upSpread = 0;
   G.streak = 0; G.killChain = 0; G.killChainT = 0; G.mileIdx = 0;
@@ -1952,7 +1955,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = H * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = META.runs < 3 ? 4.5 : 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -1966,7 +1969,7 @@ function startGame() {
   META.runs += 1;
   bestFlagPassed = G.best <= 0;
   camIntro = 1;
-  floatText(W / 2, H * 0.3, 'GO!', '#f3ecdf', 46, 2.2);
+  floatText(LW / 2, LH * 0.3, 'GO!', '#f3ecdf', 46, 2.2);
   sfx.power();
   musicStart();
 }
@@ -2530,7 +2533,7 @@ function hitBarrel(bar, dmg) {
     if (bar.kind === 'bomb') {
       sfx.boom(); G.shake = 12;
       for (const e of enemies) {
-        if (e.wy - G.camY > -40 && e.wy - G.camY < H * 1.4) hurt(e, 60);
+        if (e.wy - G.camY > -40 && e.wy - G.camY < LH * 1.4) hurt(e, 60);
       }
       for (let i = 0; i < 30; i++) parts.push(mkPart(bar.x + rnd(-60, 60), bar.wy + rnd(-40, 40), '#ff9d5d'));
       floatText(bar.x, bar.wy, 'BOOM', '#ff9d5d', 28, 3);
@@ -2798,7 +2801,7 @@ function update(dt) {
       parts.push(mkPart(G.armyX + rnd(-120, 120), G.camY + rnd(0, 80), ['#ffd75d', '#7dff9b', '#7de8ff', '#ff8d98'][i % 4]));
   }
   const dm = Math.floor(G.dist / 100);
-  if (dm > distMark) { distMark = dm; floatText(W / 2, G.camY + 46, dm * 100 + 'm!', '#e2b657', 22, 3.4); }
+  if (dm > distMark) { distMark = dm; floatText(LW / 2, G.camY + 46, dm * 100 + 'm!', '#e2b657', 22, 3.4); }
   let wantSkill = false;
   if (G.level > lastLevel) {
     const steps = G.level - lastLevel;
@@ -2832,7 +2835,7 @@ function update(dt) {
   schedule();
   if (!bossIntro && G.dist > 170) {
     bossIntro = true;
-    spawnBoss(G.camY + Math.max(460, H * 0.7));
+    spawnBoss(G.camY + Math.max(460, LH * 0.7));
   }
 
   /* squad firing */
@@ -2916,7 +2919,7 @@ function update(dt) {
     const prevWy = b.wy;
     b.x += b.vx * dt; b.wy += b.vwy * dt;
     if (b.pulse) b.pulse = Math.max(0, b.pulse - dt * 3.4);
-    if (b.wy < G.camY - 60 || b.wy > G.camY + 1500 || b.x < -40 || b.x > W + 40) { bullets.splice(i, 1); continue; }
+    if (b.wy < G.camY - 60 || b.wy > G.camY + 1500 || b.x < -40 || b.x > LW + 40) { bullets.splice(i, 1); continue; }
     /* crossing a gate really multiplies or deletes bullets — damage is per bullet */
     for (const g of gates) {
       if (g.id === b.lastGate || !(prevWy < g.wy && b.wy >= g.wy)) continue;
