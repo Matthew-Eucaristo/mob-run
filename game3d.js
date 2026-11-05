@@ -323,15 +323,15 @@ const SKILLS = [
   { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: 'Grab coins from farther out.', max: 2 },
 ];
 const SKINS = [
-  { id: 'recruit', name: 'RECRUIT', price: 0, body: '#6ea2ff', lead: '#ffd75d' },
-  { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#5ee0ff', lead: '#f4fbff' },
-  { id: 'ember', name: 'EMBER', price: 400, body: '#ff6a2a', lead: '#ffd27a' },
-  { id: 'toxic', name: 'TOXIC', price: 900, body: '#3dff7a', lead: '#e8ff8a' },
-  { id: 'royal', name: 'OXBLOOD', price: 1600, body: '#8c3a2f', lead: '#f2d48a' },
+  { id: 'recruit', name: 'RECRUIT', price: 0, body: '#3d7bff', lead: '#ffd75d' },
+  { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#1fc8f5', lead: '#f4fbff' },
+  { id: 'ember', name: 'EMBER', price: 400, body: '#ff5418', lead: '#ffd27a' },
+  { id: 'toxic', name: 'TOXIC', price: 900, body: '#22dd60', lead: '#e8ff8a' },
+  { id: 'royal', name: 'OXBLOOD', price: 1600, body: '#a82c26', lead: '#f2d48a' },
   { id: 'void', name: 'ASH', price: 3000, body: '#4a453c', lead: '#f4efe4' },
   { id: 'camo', name: 'JUNGLE', price: 5000, body: '#5f8a3a', lead: '#e6d38a' },
   { id: 'neon', name: 'NEON', price: 8000, body: '#ff3df2', lead: '#3dfff0' },
-  { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffcc33', lead: '#fff6d0' },
+  { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffb81a', lead: '#fff6d0' },
 ];
 /* ---------------- meta progression (persists between runs) ----------------
    Upgrades make the next run go further, missions give a reason to try a
@@ -588,7 +588,38 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.set(0, 0, -60);
 scene.add(ground);
 
-const roadMat = new THREE.MeshLambertMaterial({ color: ZONES[0].road });
+/* asphalt: a light-grey grain/crack/patch texture, tinted by the zone colour and
+   scrolled with the run so the ground visibly rushes past */
+const roadTex = (() => {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 2600; i++) {
+    const v = 170 + Math.floor(Math.random() * 85);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.fillRect(Math.random() * 256, Math.random() * 512, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  g.globalAlpha = 0.5;
+  for (let i = 0; i < 6; i++) {                       // darker repair patches
+    g.fillStyle = '#b4b4b4';
+    g.beginPath(); g.roundRect(Math.random() * 200, Math.random() * 480, 30 + Math.random() * 50, 18 + Math.random() * 40, 6); g.fill();
+  }
+  g.globalAlpha = 0.55; g.strokeStyle = '#9a9a9a'; g.lineWidth = 1.5;
+  for (let i = 0; i < 7; i++) {                       // hairline cracks
+    let x = Math.random() * 256, y = Math.random() * 512;
+    g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (Math.random() - 0.5) * 30; y += Math.random() * 22; g.lineTo(x, y); }
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 22);
+  t.anisotropy = Q.phone ? 2 : 4;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+const roadMat = new THREE.MeshLambertMaterial({ color: ZONES[0].road, map: roadTex });
 const roadMesh = new THREE.Mesh(new THREE.PlaneGeometry(ROADW + 1.6, 300), roadMat);
 roadMesh.rotation.x = -Math.PI / 2;
 roadMesh.position.set(0, 0.025, -60);
@@ -3701,6 +3732,8 @@ function update(dt) {
 /* ---------------- draw ---------------- */
 const dummy = new THREE.Object3D();
 const tmpCol = new THREE.Color();
+/* wrap into [0, L) for any sign; scenery z = wrapZ(base + scroll, L) - L + near grows as you run */
+const wrapZ = (v, L) => ((v % L) + L) % L;
 let soldierOffsets = [];
 let soldierBirth = [];
 
@@ -3790,9 +3823,10 @@ function draw(now) {
 
   /* scroll the road markings */
   const scroll = G.camY * K;
+  roadTex.offset.y = (scroll / 300) * 22 % 1;
   let pi = 0;
   for (let i = 0; i < NPOST; i++) {
-    const zPos = -((i * POST_GAP + scroll) % (NPOST * POST_GAP)) + 8;
+    const zPos = wrapZ(i * POST_GAP + scroll, NPOST * POST_GAP) - NPOST * POST_GAP + 8;
     for (const sx of [-1, 1]) {
       dummy.position.set(sx * (roadHalf + 0.55), 0.55, zPos);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
@@ -3802,7 +3836,7 @@ function draw(now) {
   }
   postMesh.instanceMatrix.needsUpdate = true;
   for (let i = 0; i < NDASH; i++) {
-    const zPos = -((i * DASH_GAP + scroll) % (NDASH * DASH_GAP)) + 6;
+    const zPos = wrapZ(i * DASH_GAP + scroll, NDASH * DASH_GAP) - NDASH * DASH_GAP + 6;
     dummy.position.set(0, 0.07, zPos);
     dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -3830,7 +3864,7 @@ function draw(now) {
     speedLineMesh.material.opacity += (target - speedLineMesh.material.opacity) * 0.05;
     for (let i = 0; i < NSL; i++) {
       const sl = slSeed[i];
-      const zPos = -(((sl.off + scroll * 2.4) % 120) - 10);
+      const zPos = wrapZ(sl.off + scroll * 2.4, 120) - 110;
       dummy.position.set(sl.x, sl.h, zPos);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
@@ -3841,7 +3875,7 @@ function draw(now) {
 
   /* chevrons */
   for (let i = 0; i < NCHEV; i++) {
-    const zPos = -((i * CHEV_GAP + scroll * 1.15) % (NCHEV * CHEV_GAP)) + 5;
+    const zPos = wrapZ(i * CHEV_GAP + scroll, NCHEV * CHEV_GAP) - NCHEV * CHEV_GAP + 5;
     dummy.position.set(0, 0.065, zPos);
     dummy.rotation.set(-Math.PI / 2, 0, 0); dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -3856,7 +3890,7 @@ function draw(now) {
   for (let pi = 0; pi < propLimit; pi++) {
     const p = propSeed[pi];
     const span = PROP_RANGE;
-    const zPos = -(((p.x > 0 ? 1 : -1) * 7 + p.ry * 31 + scroll) % span) - 20;
+    const zPos = wrapZ((p.x > 0 ? 1 : -1) * 7 + p.ry * 31 + scroll, span) - span - 20;
     dummy.position.set(p.x, p.kind === 0 ? p.s * 0.5 : p.kind === 1 ? p.s * 1.8 : p.s * 0.85, zPos);
     dummy.rotation.set(0, p.ry + (p.kind === 2 ? t * 0.15 : 0), p.kind === 0 ? p.ry * 0.3 : 0);
     dummy.scale.set(p.s, p.kind === 2 ? p.s * 1.7 : p.s, p.s);
@@ -3876,7 +3910,7 @@ function draw(now) {
   const ruinN = Q.low ? 6 : Q.phone ? 10 : NRUIN;
   for (let i = 0; i < treeN; i++) {
     const p = treeSeed[i];
-    const zPos = -(((p.off + scroll) % spanL));
+    const zPos = wrapZ(p.off + scroll, spanL) - spanL;
     const x = p.side * (roadHalf + p.spread);
     dummy.position.set(x, 0.55 * p.s, zPos);
     dummy.rotation.set(0, p.ry, 0);
@@ -3894,7 +3928,7 @@ function draw(now) {
   crownMesh.instanceMatrix.needsUpdate = true;
   for (let i = 0; i < grassN; i++) {
     const p = grassSeed[i];
-    const zPos = -(((p.off + scroll * 1.05) % spanL));
+    const zPos = wrapZ(p.off + scroll, spanL) - spanL;
     dummy.position.set(p.side * (roadHalf + 0.55 + p.spread), 0.22 * p.s, zPos);
     dummy.rotation.set(0, p.ry, 0);
     dummy.scale.set(p.s, p.s, p.s);
@@ -3905,7 +3939,7 @@ function draw(now) {
   grassMesh.instanceMatrix.needsUpdate = true;
   for (let i = 0; i < lampN; i++) {
     const side = i % 2 ? 1 : -1;
-    const zPos = -(((i * 7.5 + scroll) % (NLAMP * 7.5)));
+    const zPos = wrapZ(i * 7.5 + scroll, NLAMP * 7.5) - NLAMP * 7.5;
     const x = side * (roadHalf + 1.25);
     dummy.position.set(x, 1.15, zPos);
     dummy.rotation.set(0, 0, 0);
@@ -3924,7 +3958,7 @@ function draw(now) {
   lampBulb.material.color.set(z.sky).lerp(col3('#fff6d4'), 0.55);
   for (let i = 0; i < ruinN; i++) {
     const p = ruinSeed[i];
-    const zPos = -(((p.off + scroll * 0.8) % 180));
+    const zPos = wrapZ(p.off + scroll, 180) - 180;
     dummy.position.set(p.side * (ROADW * 0.5 + p.spread), p.h * 0.45, zPos);
     dummy.rotation.set(0.08, p.ry, p.side * 0.12);
     dummy.scale.set(p.s, p.h, p.s * 0.8);
@@ -3939,7 +3973,7 @@ function draw(now) {
   const patchN = Q.low ? 12 : Q.phone ? 16 : patchSeed.length;
   for (const p of patchSeed) {
     if (pi2 >= patchN) break;
-    const zPos = -(((p.x > 0 ? 1 : -1) * 11 + p.ry * 29 + scroll) % PROP_RANGE) - 20;
+    const zPos = wrapZ((p.x > 0 ? 1 : -1) * 11 + p.ry * 29 + scroll, PROP_RANGE) - PROP_RANGE - 20;
     dummy.position.set(p.x, 0.012, zPos);
     dummy.rotation.set(-Math.PI / 2, 0, p.ry);
     dummy.scale.set(p.s * 1.5, p.s, 1);
@@ -4463,7 +4497,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
