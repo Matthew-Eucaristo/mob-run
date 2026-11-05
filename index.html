@@ -79,6 +79,17 @@
   .skillCard b { display:block; font-size:18px; letter-spacing:.5px; margin:4px 0 6px; }
   .skillCard i { font-style:normal; font-size:22px; color:#e2b657; }
   .skillCard span { display:block; color:#d2c4ae; font-size:13px; line-height:1.4; font-weight:600; }
+  .skillCard { position:relative; }
+  .skillCard i { display:inline-flex !important; width:38px; height:38px; align-items:center; justify-content:center;
+    border-radius:50%; background:rgba(226,182,87,.14); box-shadow:inset 0 0 0 1px rgba(226,182,87,.35); font-size:19px !important; line-height:1; }
+  .skillCard kbd { position:absolute; top:12px; right:14px; font:inherit; font-size:11px; font-weight:900; color:#8a7d68;
+    border:1px solid #3a3428; border-radius:6px; padding:1px 6px; }
+  body.touch .skillCard kbd { display:none; }
+  .skillCard .pips { display:flex; gap:4px; margin-top:6px; }
+  .skillCard .pips u { width:16px; height:5px; border-radius:3px; background:rgba(255,255,255,.14); }
+  .skillCard .pips u.f { background:#e2b657; }
+  .skillCard .pips u.n { background:#7dff9b; animation:pulse 1s ease-in-out infinite; }
+  .skillCard:hover { border-color:#ffd75d; box-shadow:0 10px 30px rgba(226,182,87,.25); }
   .skillCard em { display:block; margin-top:8px; color:#e2b657; font-size:11px; font-style:normal; letter-spacing:1px; }
 
   #hudR { right:12px; }
@@ -301,7 +312,7 @@
   <div class="keys">arrows or WASD · M mute · skills every level</div>
 </div>
 <div class="overlay" id="skillOverlay" style="display:none">
-  <h2 style="letter-spacing:3px; color:#f3ecdf; font-size:22px;">CHOOSE A SKILL</h2>
+  <h2 id="skillHead" style="letter-spacing:3px; color:#f3ecdf; font-size:22px;">CHOOSE A SKILL</h2>
   <p style="margin-top:6px;">Stack them. The run gets mean later — this is how you keep up.</p>
   <div id="skillCards"></div>
 </div>
@@ -314,7 +325,10 @@
     <button type="button" class="bigbtn gold" id="reviveBtn">REVIVE</button>
     <button type="button" class="bigbtn" id="againBtn">RUN AGAIN</button>
   </div>
-  <button class="textbtn" id="shopBtnOver" type="button">ARMORY<span class="badge" id="shopBadgeOver">!</span></button>
+  <div class="btnRow">
+    <button class="textbtn" id="shopBtnOver" type="button">ARMORY<span class="badge" id="shopBadgeOver">!</span></button>
+    <button class="textbtn dim" id="shareBtn" type="button">SHARE</button>
+  </div>
   <div id="installCard">
     <b>ADD MOB RUN</b>
     <p id="installHint">Keep it on your home screen. It opens full screen, like an app.</p>

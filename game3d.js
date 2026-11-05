@@ -159,6 +159,11 @@ const sfx = {
   boom: () => { noise(0.5, 0.22); tone(70, 0.4, 'sine', 0.15, 35); },
   barrel: () => { noise(0.15, 0.1); tone(300, 0.12, 'triangle', 0.08, 80); },
   coin: () => tone(1280, 0.035, 'square', 0.028),
+  /* big moments: a rising major arpeggio with a low thump */
+  fanfare: () => {
+    tone(70, 0.3, 'sine', 0.14, 40);
+    [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => { tone(f, 0.16, 'square', 0.045); tone(f / 2, 0.16, 'triangle', 0.05); }, i * 70));
+  },
 };
 /* coins climb a pentatonic ladder while you keep scooping them */
 const LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
@@ -312,6 +317,7 @@ function checkMissions() {
         const rr = rankReward(rk);
         G.coins += rr; G.missionCoins += rr;
         missionToast('You are now a ' + RANKS[rk], rr, '▲ RANK UP');
+        setTimeout(() => sfx.fanfare(), 2700);
       }
       saveSave();
     }
@@ -365,7 +371,7 @@ function clampAim(x) {
   const m = Math.min(halfPxCache + 8, (road.x1 - road.x0) * 0.5);
   return clamp(x, road.x0 + m, road.x1 - m);
 }
-let overAt = 0;
+let overAt = 0, skillIds = [];
 function press(x, y) {
   audio();
   if (G.mode === 'menu') { startGame(); return; }
@@ -439,6 +445,7 @@ document.addEventListener('touchmove', (e) => {
   e.preventDefault();
 }, { passive: false });
 document.addEventListener('keydown', e => {
+  if (G.mode === 'pick' && e.key >= '1' && e.key <= '3' && skillIds[+e.key - 1]) { chooseSkill(skillIds[+e.key - 1]); return; }
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
   else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
   else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
@@ -1472,7 +1479,7 @@ function killMob(m, how) {
   }
   while (deadEnemies.length > 30) deadEnemies.shift();
   addScorch(m.x, m.wy, 3);
-  sfx.great(); G.shake = Math.max(G.shake, how === 'shot' ? 6 : 10);
+  (m.band ? sfx.fanfare : sfx.great)(); G.shake = Math.max(G.shake, m.band ? 12 : how === 'shot' ? 6 : 10);
   if (how !== 'shot') hitstop(0.09);
   vib(how === 'shot' ? 15 : 35);
 }
@@ -1828,15 +1835,22 @@ function offerSkills() {
     btn.type = 'button';
     btn.className = 'skillCard';
     const st = G.skills[s.id] || 0;
-    btn.innerHTML = `<i>${s.icon}</i><b>${s.name}</b><span>${s.desc}</span><em>RANK ${st} / ${s.max}</em>`;
+    let pips = '';
+    for (let k = 0; k < s.max; k++) pips += `<u class="${k < st ? 'f' : k === st ? 'n' : ''}"></u>`;
+    btn.innerHTML = `<i>${s.icon}</i><kbd>${picks.indexOf(s) + 1}</kbd><b>${s.name}</b><span>${s.desc}</span>` +
+      `<em>${st ? 'UPGRADE · RANK ' + (st + 1) : 'NEW'}</em><div class="pips">${pips}</div>`;
     btn.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       chooseSkill(s.id);
     });
     skillCards.appendChild(btn);
   }
+  const head = document.getElementById('skillHead');
+  if (head) head.textContent = 'LEVEL ' + G.level + ' · CHOOSE A SKILL';
   skillOv.style.display = 'flex';
   G.mode = 'pick';
+  skillIds = picks.map((p) => p.id);
+  sfx.power();
 }
 function chooseSkill(id) {
   if (G.mode !== 'pick') return;
@@ -1988,6 +2002,19 @@ if (reviveBtn) reviveBtn.addEventListener('pointerdown', (e) => {
 if (againBtn) againBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
   if (G.mode === 'over' && performance.now() - overAt > 350) startGame();
+});
+const shareBtn = document.getElementById('shareBtn');
+if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
+  e.stopPropagation(); e.preventDefault();
+  const d = Math.floor(G.dist);
+  const text = `I ran ${d}m in MOB RUN with a peak army of ${G.peak}. Beat that:`;
+  const url = location.origin + location.pathname.replace(/index\.html$/, '');
+  try {
+    if (navigator.share) { await navigator.share({ title: 'MOB RUN', text, url }); return; }
+    await navigator.clipboard.writeText(text + ' ' + url);
+    shareBtn.textContent = 'COPIED!';
+    setTimeout(() => { shareBtn.textContent = 'SHARE'; }, 1500);
+  } catch (err) { }
 });
 function toggleMute() {
   muted = !muted;
@@ -2245,7 +2272,7 @@ function hurt(e, dmg) {
     if (G.killChain === 8 || G.killChain === 15 || G.killChain === 25)
       floatText(e.x, e.wy, 'RAMPAGE ×' + G.killChain, '#e2b657', 26, 3);
     if (e.boss) {
-      sfx.boss(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
+      sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
       const reward = 25 + G.level * 10;
       floatText(e.x, e.wy, 'BOSS DOWN +' + reward, '#ffd75d', 30, 4);
       for (let i = 0; i < 16 && coins.length < MAXCOIN; i++)
@@ -2486,6 +2513,8 @@ function frame(now) {
     draw(now);
     return;
   }
+  /* attract mode: the road keeps rolling behind the menu */
+  if (G.mode === 'menu') G.camY += 70 * dt;
   if (G.mode !== 'run') { draw(now); return; }
   if (G.slow > 0) { G.slow -= dt; dt *= 0.35; }
   update(dt);
@@ -2557,7 +2586,7 @@ function update(dt) {
   if (!bestFlagPassed && G.best > 0 && G.dist > G.best) {
     bestFlagPassed = true;
     floatText(G.armyX, G.camY + 40, 'NEW BEST!', '#ffd75d', 40, 4.6);
-    sfx.great(); setTimeout(() => sfx.great(), 160);
+    sfx.fanfare();
     G.shake = Math.max(G.shake, 9); vib(60); fovKick = 10;
     for (let i = 0; i < 50 && parts.length < MAXP - 4; i++)
       parts.push(mkPart(G.armyX + rnd(-120, 120), G.camY + rnd(0, 80), ['#ffd75d', '#7dff9b', '#7de8ff', '#ff8d98'][i % 4]));
