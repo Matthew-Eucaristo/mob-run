@@ -141,7 +141,7 @@
   .btnRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:6px; }
   .textbtn { position:relative; }
   .textbtn.dim { border-color:rgba(182,170,150,.5); color:#b6aa96; }
-  .badge { position:absolute; top:-6px; right:-6px; min-width:20px; height:20px; border-radius:10px; background:#e25a32;
+  .badge { position:absolute; top:-10px; right:-10px; min-width:20px; height:20px; border-radius:10px; background:#e25a32;
     color:#fff; font-size:12px; line-height:20px; padding:0 5px; display:none; animation:pulse 1.1s ease-in-out infinite; }
   .badge.on { display:block; }
   .dailyBtn { pointer-events:auto; display:none; margin:2px 0 10px; border:0; border-radius:14px; cursor:pointer;
@@ -189,6 +189,10 @@
   #overOverlay h1 { font-size:clamp(38px, 12vw, 72px); white-space:nowrap; }
   .upCard span b.v { color:#f3ecdf; }
   .upCard span b.nx { color:#7dff9b; }
+  #pauseBtn { position:fixed; z-index:7; top:calc(64px + env(safe-area-inset-top)); right:12px; width:40px; height:40px;
+    border-radius:12px; border:2px solid rgba(243,236,223,.35); background:rgba(16,14,10,.5); color:#f3ecdf;
+    font:inherit; font-weight:900; font-size:13px; letter-spacing:1px; display:none; cursor:pointer; }
+  #pauseOverlay { z-index:11; background:rgba(12,11,9,.72); }
   #toast { position:fixed; z-index:9; top:calc(64px + env(safe-area-inset-top)); left:50%; transform:translate(-50%,-30px);
     opacity:0; pointer-events:none; background:rgba(28,48,30,.95); border:2px solid #7dff9b; color:#eaffef;
     border-radius:14px; padding:8px 14px; font-weight:800; font-size:13px; text-align:center; max-width:88vw;
@@ -253,6 +257,11 @@
 <div class="hud" id="lvlBar"><div id="lvlFill"></div></div>
 <div id="zoneBanner"></div>
 <div id="toast"></div>
+<button type="button" id="pauseBtn" aria-label="Pause">II</button>
+<div class="overlay" id="pauseOverlay" style="display:none">
+  <h2 style="letter-spacing:4px; color:#f3ecdf; font-size:28px;">PAUSED</h2>
+  <div class="tap">TAP TO RESUME</div>
+</div>
 <div class="hud" id="combo"></div>
 <div id="vignette"></div>
 <div id="hint">swipe sideways to steer · up for a column · down to spread wide</div>

@@ -42,6 +42,10 @@ const muteBtn = document.getElementById('muteBtn');
 const upGrid = document.getElementById('upGrid');
 const toastEl = document.getElementById('toast');
 const comboEl = document.getElementById('combo');
+const pauseOv = document.getElementById('pauseOverlay');
+const pauseBtn = document.getElementById('pauseBtn');
+if (pauseBtn) pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); setPause(true); });
+if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); setPause(false); });
 
 /* Phones drop MSAA and cap the pixel ratio. Truly weak devices also
    cut instance counts. Missing deviceMemory (iPhone) counts as fine. */
@@ -427,7 +431,8 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
   else if (e.key === 'm' || e.key === 'M') toggleMute();
   else if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && shopOv && shopOv.style.display === 'flex') closeShop();
-  else if (e.key === ' ' || e.key === 'Enter') press();
+  else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') setPause(G.mode === 'run');
+  else if (e.key === ' ' || e.key === 'Enter') { if (G.mode === 'paused') setPause(false); else press(); }
 });
 document.addEventListener('keyup', e => {
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
@@ -1378,7 +1383,11 @@ function spawnWall(wy) {
    so a fat squad still has to fight for it, and every run eventually ends.
    Shooting a mob down before contact is how you keep your soldiers. */
 function threatBase(d) { return 6 * Math.pow(1.00205, d); }
-function threatRatio(d) { const t = clamp(d / 2800, 0, 1); return 0.24 + 0.62 * t * t * (3 - 2 * t); }
+function threatRatio(d) {
+  const t = clamp(d / 2800, 0, 1);
+  /* past ~1400m the mobs keep swelling until they outnumber any army: outgun them or die */
+  return 0.24 + 0.62 * t * t * (3 - 2 * t) + Math.max(0, (d - 1400) / 1500) * 0.5;
+}
 /* firepower per soldier relative to a bare pistol squad */
 function firepower() {
   const wt = WT[G.tier];
@@ -1429,9 +1438,8 @@ function killMob(m, how) {
   G.mobsBeaten += 1;
   G.kills += m.start;
   const loot = Math.max(2, Math.round(Math.sqrt(m.start) * 0.9));
-  const greed = 1 + (G.skills.greed || 0);
   for (let i = 0; i < Math.min(loot, 14) && coins.length < MAXCOIN; i++)
-    coins.push({ x: clamp(m.x + rnd(-m.hw, m.hw), road.x0 + 20, road.x1 - 20), wy: G.camY + 60 + i * 16 + rnd(-8, 8), spin: rnd(0, 6) });
+    coins.push({ x: clamp(m.x + rnd(-m.hw, m.hw), road.x0 + 20, road.x1 - 20), wy: m.wy + rnd(-m.hd, m.hd), spin: rnd(0, 6), fly: 0.25 + i * 0.04 });
   floatText(m.x, m.wy, how === 'shot' ? 'WIPED OUT!' : 'CRUSHED!', '#ffd75d', how === 'shot' ? 26 : 30, 3.4);
   for (let i = 0; i < 28 && parts.length < MAXP - 30; i++) parts.push(mkPart(m.x + rnd(-m.hw, m.hw), m.wy + rnd(-m.hd, m.hd), i % 3 ? '#ff5d6a' : '#ffd75d'));
   for (let i = 0; i < Math.min(10, mobVisible(m)); i++) {
@@ -1444,7 +1452,6 @@ function killMob(m, how) {
   sfx.great(); G.shake = Math.max(G.shake, how === 'shot' ? 6 : 10);
   if (how !== 'shot') hitstop(0.09);
   vib(how === 'shot' ? 15 : 35);
-  void greed;
 }
 function hurtMob(m, dmg) {
   if (m.dead) return;
@@ -2188,6 +2195,8 @@ function hurt(e, dmg) {
       sfx.boss(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
       const reward = 25 + G.level * 10;
       floatText(e.x, e.wy, 'BOSS DOWN +' + reward, '#ffd75d', 30, 4);
+      for (let i = 0; i < 16 && coins.length < MAXCOIN; i++)
+        coins.push({ x: e.x + rnd(-50, 50), wy: e.wy + rnd(-30, 30), spin: rnd(0, 6), fly: 0.3 + i * 0.035 });
       addSoldiers(G.soldiers + reward);
       for (let i = 0; i < 30; i++) parts.push(mkPart(e.x + rnd(-40, 40), e.wy + rnd(-40, 40), '#ffd75d'));
     } else {
@@ -2395,6 +2404,20 @@ let squadNow = [{ x: 0, y: 0 }];
 /* ---------------- frame ---------------- */
 let last = performance.now();
 const SIM = { on: false };
+function setPause(on) {
+  if (on && G.mode === 'run') {
+    G.mode = 'paused';
+    if (pauseOv) pauseOv.style.display = 'flex';
+    musicStop();
+  } else if (!on && G.mode === 'paused') {
+    G.mode = 'run';
+    if (pauseOv) pauseOv.style.display = 'none';
+    last = performance.now();
+    musicStart();
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
+window.addEventListener('blur', () => setPause(true));
 function frame(now) {
   requestAnimationFrame(frame);
   if (document.hidden) { last = now; return; }
@@ -2936,12 +2959,20 @@ function update(dt) {
   const reachY = 26 + mag * 40 + hoard * 12;
   for (let i = coins.length - 1; i >= 0; i--) {
     const c = coins[i];
-    if (mag && c.wy - G.camY < 320 && c.wy > G.camY - 30) {
+    if (c.fly !== undefined) {
+      /* loot coins pop up, hang for a beat, then home in on the squad */
+      c.fly -= dt;
+      if (c.fly < 0) {
+        const k = Math.min(1, dt * (6 - Math.max(-0.5, c.fly) * 8));
+        c.x += (G.armyX - c.x) * k;
+        c.wy += (G.camY + 10 - c.wy) * k;
+      }
+    } else if (mag && c.wy - G.camY < 320 && c.wy > G.camY - 30) {
       const pull = Math.min(1, dt * (2.1 + mag * 2.4));
       c.x += (G.armyX - c.x) * pull;
       if (c.wy - G.camY > 36) c.wy += (G.camY + 24 - c.wy) * pull * 0.55;
     }
-    if (c.wy - G.camY < reachY && c.wy - G.camY > -28 && Math.abs(c.x - G.armyX) < reachX) {
+    if ((c.fly === undefined || c.fly < 0) && c.wy - G.camY < reachY && c.wy - G.camY > -28 && Math.abs(c.x - G.armyX) < reachX) {
       G.coinFrac += (1 + (G.skills.greed || 0)) * coinMult();
       const gain = Math.floor(G.coinFrac);
       G.coinFrac -= gain;
@@ -2951,7 +2982,7 @@ function update(dt) {
       coins.splice(i, 1);
       continue;
     }
-    if (c.wy < G.camY - 90) coins.splice(i, 1);
+    if (c.wy < G.camY - 90 && c.fly === undefined) coins.splice(i, 1);
   }
   for (let i = rewards.length - 1; i >= 0; i--) {
     const r = rewards[i];
@@ -3556,7 +3587,8 @@ function draw(now) {
   for (const c of coins) {
     const zP = wz(c.wy);
     if (zP > 6 || zP < -85) continue;
-    dummy.position.set(wx(c.x), 1.05 + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
+    const lift = c.fly !== undefined && c.fly > 0 ? Math.sin(Math.min(1, c.fly * 3) * Math.PI) * 1.6 + 0.6 : 0;
+    dummy.position.set(wx(c.x), 1.05 + lift + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
     dummy.rotation.set(1.15, t * 2.6 + c.spin, 0);
     const sc = 1.15 + Math.min(0.85, Math.max(0, -zP) * 0.03);
     dummy.scale.set(sc, sc * 0.28, sc);
@@ -3691,6 +3723,7 @@ function draw(now) {
     btnCol.classList.toggle('on', G.form < -0.34);
     btnWide.classList.toggle('on', G.form > 0.34);
   }
+  if (pauseBtn) pauseBtn.style.display = G.mode === 'run' ? 'block' : 'none';
   const formHud = document.getElementById('hudForm');
   if (formHud) formHud.style.opacity = (G.mode === 'run' || G.mode === 'pick') ? '1' : '0';
   hintEl.style.opacity = hintT > 0 && G.mode === 'run' ? '0.9' : '0';
