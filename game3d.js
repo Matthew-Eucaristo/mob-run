@@ -3150,6 +3150,7 @@ function renderShop() {
       card.addEventListener('click', (ev) => {
         /* click, not pointerdown: a swipe that starts on a card scrolls the list instead of buying */
         ev.stopPropagation(); ev.preventDefault();
+        if (shopFresh()) return;
         audio();
         if (maxed) return;
         if (G.coins < cost) { sfx.bad(); card.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], { duration: 180 }); return; }
@@ -3174,6 +3175,7 @@ function renderShop() {
     card.innerHTML = `${por ? `<img class="por" src="${por}" alt="">` : `<i style="color:${sk.body}">${icon('run')}</i>`}<b>${sk.name}</b><small>${sk.hat || L('Standard kit', 'Seragam biasa')}</small><span>${act}</span>`;
     card.addEventListener('click', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
+      if (shopFresh()) return;
       audio();
       if (on) return;
       if (!owned) {
@@ -3190,11 +3192,16 @@ function renderShop() {
     shopGrid.appendChild(card);
   }
 }
+/* the tap that opens the shop fires its click on whatever card lands under the finger:
+   cards ignore clicks for a moment after opening */
+let shopOpenAt = 0;
+const shopFresh = () => performance.now() - shopOpenAt < 450;
 function openShop(e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   audio();
   renderShop();
   if (shopOv) shopOv.style.display = 'flex';
+  shopOpenAt = performance.now();
 }
 function closeShop(e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }

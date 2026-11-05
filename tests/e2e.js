@@ -24,6 +24,10 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   assert(await p.isVisible('#shopOverlay'), 'armory opens');
   await p.evaluate(() => { window.__mob.G.coins = 500; });
   await p.tap('#shopClose'); await p.tap('#shopBtn');
+  /* the opening tap's own click must not buy whatever card lands under the finger */
+  const ghost = await p.evaluate(() => { const c = document.querySelector('.upCard'); c.click(); return window.__mob.G.coins; });
+  assert(ghost === 500, 'opening the armory does not buy the card under the finger (' + ghost + ')');
+  await p.waitForTimeout(500);
   const cards = await p.$$('.upCard');
   assert(cards.length === 7, '7 upgrade cards');
   await cards[0].tap();
