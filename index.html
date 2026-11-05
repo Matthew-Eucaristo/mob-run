@@ -181,6 +181,12 @@
   .bigbtn.gold small { display:block; font-size:11px; letter-spacing:.5px; opacity:.8; }
   .bigbtn:disabled { opacity:.35; }
   .bigbtn:active { transform:scale(.97); }
+  #quickBuy { pointer-events:auto; display:none; margin:10px 0 2px; border:2px solid #7dff9b; border-radius:14px; cursor:pointer;
+    background:rgba(28,48,30,.92); color:#eaffef; font:inherit; font-weight:800; font-size:13px; padding:9px 14px;
+    letter-spacing:.5px; animation:cardIn .45s .3s both; }
+  #quickBuy.on { display:inline-block; }
+  #quickBuy b { color:#7dff9b; }
+  #quickBuy small { display:block; font-size:10px; letter-spacing:1.5px; color:#9fd8a8; }
   .shopHead { font-size:11px; letter-spacing:2px; color:#9d917c; font-weight:800; margin:10px 0 8px; }
   #upGrid { display:grid; grid-template-columns:1fr; gap:8px; width:min(520px, 94vw); }
   .upCard { pointer-events:auto; display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer; color:#f3ecdf; font:inherit;
@@ -266,6 +272,9 @@
   @media (orientation: landscape) and (max-height: 480px) {
     #hudForm { display:none; }
     #startOverlay p, #startOverlay .missions, #overOverlay .missions { display:none; }
+    #quickBuy.on { display:none; }
+    #overOverlay h1 { font-size:40px; }
+    #overOverlay .stats { margin-top:2px; line-height:1.45; }
     #skillCards { flex-wrap:nowrap; }
     .skillCard { width:30vw; padding:10px 10px 8px; }
     .skillCard span { font-size:12px; }
@@ -320,6 +329,7 @@
   <h1>WIPED OUT</h1>
   <div id="overCause"></div>
   <div class="stats" id="overStats"></div>
+  <button type="button" id="quickBuy"></button>
   <div class="missions" id="overMissions"></div>
   <div class="btnRow">
     <button type="button" class="bigbtn gold" id="reviveBtn">REVIVE</button>

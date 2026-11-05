@@ -1947,6 +1947,7 @@ function gameOver() {
     reviveBtn.innerHTML = `REVIVE<small>${c}★ · keep half your peak</small>`;
   }
   refreshBadges();
+  renderQuickBuy();
   maybeOfferInstall();
   vib(30);
 }
@@ -2016,6 +2017,36 @@ if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
     setTimeout(() => { shareBtn.textContent = 'SHARE'; }, 1500);
   } catch (err) { }
 });
+/* results screen: offer the cheapest upgrade you can afford, one tap to buy */
+const quickBuy = document.getElementById('quickBuy');
+function bestBuy() {
+  let pick = null;
+  for (const u of UPGRADES) {
+    const l = META.up[u.id] || 0;
+    if (l >= u.max) continue;
+    const c = u.cost(l);
+    if (c <= G.coins && (!pick || c < pick.c)) pick = { u, l, c };
+  }
+  return pick;
+}
+function renderQuickBuy() {
+  if (!quickBuy) return;
+  const b = bestBuy();
+  quickBuy.classList.toggle('on', !!b);
+  if (b) quickBuy.innerHTML = `<small>UPGRADE READY · TAP TO BUY</small>${b.u.name} → <b>${b.u.val(b.l + 1)}</b> · ${b.c}★`;
+}
+if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); e.preventDefault(); audio();
+  const b = bestBuy();
+  if (!b) return;
+  G.coins -= b.c;
+  META.up[b.u.id] = b.l + 1;
+  saveSave();
+  sfx.great(); vib(25);
+  burstCoinsUI(quickBuy, -b.c);
+  renderQuickBuy();
+  if (reviveBtn) reviveBtn.disabled = G.coins < reviveCost();
+});
 function toggleMute() {
   muted = !muted;
   if (muteBtn) muteBtn.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
@@ -2056,7 +2087,7 @@ function burstCoinsUI(fromEl, amount) {
   const r = fromEl.getBoundingClientRect();
   const el = document.createElement('div');
   el.className = 'fl';
-  el.textContent = '+' + amount + '★';
+  el.textContent = (amount > 0 ? '+' : '') + amount + '★';
   el.style.cssText = `left:${r.left + r.width / 2}px;top:${r.top}px;color:#ffd75d;font-size:30px;z-index:20;position:fixed;transition:transform .9s cubic-bezier(.16,.84,.28,1),opacity .9s;`;
   document.body.appendChild(el);
   requestAnimationFrame(() => { el.style.transform = 'translate(-50%,-90px) scale(1.2)'; el.style.opacity = '0'; });
@@ -2223,6 +2254,7 @@ function closeShop(e) {
   if (G.mode === 'menu') renderMenu();
   else refreshMeta();
   if (G.mode === 'over' && reviveBtn) reviveBtn.disabled = G.coins < reviveCost();
+  if (G.mode === 'over') renderQuickBuy();
 }
 function maybeOfferInstall() {
   if (!installCard) return;
@@ -2269,8 +2301,14 @@ function hurt(e, dmg) {
     G.killChain += 1; G.killChainT = 1.4;
     if ((G.skills.scavenge || 0) > 0 && Math.random() < 0.1 * G.skills.scavenge && coins.length < MAXCOIN)
       coins.push({ x: e.x + rnd(-10, 10), wy: e.wy, spin: rnd(0, 6) });
-    if (G.killChain === 8 || G.killChain === 15 || G.killChain === 25)
-      floatText(e.x, e.wy, 'RAMPAGE ×' + G.killChain, '#e2b657', 26, 3);
+    /* combos pay: every 10 kills in a chain throws coins at the squad */
+    if (G.killChain % 10 === 0) {
+      const n = Math.min(6, G.killChain / 10);
+      floatText(e.x, e.wy, 'RAMPAGE ×' + G.killChain, '#e2b657', 22 + Math.min(10, n * 2), 3);
+      for (let i = 0; i < n && coins.length < MAXCOIN; i++)
+        coins.push({ x: e.x + rnd(-20, 20), wy: e.wy + rnd(-10, 10), spin: rnd(0, 6), fly: 0.15 + i * 0.05 });
+      if (n >= 3) tone(660 + n * 80, 0.12, 'square', 0.04);
+    }
     if (e.boss) {
       sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
       const reward = 25 + G.level * 10;
@@ -3784,7 +3822,11 @@ function draw(now) {
   if (comboEl) {
     const on = G.killChain >= 5 && G.mode === 'run';
     comboEl.style.opacity = on ? '1' : '0';
-    if (on) comboEl.textContent = '×' + G.killChain + ' COMBO';
+    if (on) {
+      comboEl.textContent = '×' + G.killChain + ' COMBO';
+      comboEl.style.fontSize = (15 + Math.min(9, G.killChain / 6)) + 'px';
+      comboEl.style.color = G.killChain >= 30 ? '#ff8d6a' : '#ffd75d';
+    }
   }
 
   /* HUD: the army number rolls toward the real count, green up / red down */
