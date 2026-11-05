@@ -1,6 +1,11 @@
 /* MOB RUN 3D — the game from those ads, in Three.js.
    Chase-camera crowd runner: steer, stretch the squad, pick gates, shoot mobs. */
 import * as THREE from './vendor/three.module.min.js';
+import { icon, drawIcon } from './icons.js';
+const COIN = '<span class="coin"></span>';
+const INK = '#1b1430';
+/* canvas text waits for the display font so gate numbers never flash in a fallback face */
+if (document.fonts) document.fonts.load('64px "Lilita One"').catch(() => {});
 
 const cv = document.getElementById('game');
 const startOv = document.getElementById('startOverlay');
@@ -39,6 +44,8 @@ const menuMissions = document.getElementById('menuMissions');
 const dailyBtn = document.getElementById('dailyBtn');
 const againBtn = document.getElementById('againBtn');
 const muteBtn = document.getElementById('muteBtn');
+const playBtn = document.getElementById('playBtn');
+if (muteBtn) muteBtn.innerHTML = icon('sound');
 const upGrid = document.getElementById('upGrid');
 const toastEl = document.getElementById('toast');
 const comboEl = document.getElementById('combo');
@@ -47,6 +54,7 @@ const bossName = document.getElementById('bossName');
 const bossFill = document.getElementById('bossFill');
 const pauseOv = document.getElementById('pauseOverlay');
 const pauseBtn = document.getElementById('pauseBtn');
+if (pauseBtn) pauseBtn.innerHTML = icon('pause');
 if (pauseBtn) pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); setPause(true); });
 if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); setPause(false); });
 
@@ -217,28 +225,28 @@ const G = {
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
-  { id: 'pierce', name: 'PIERCE', icon: '➶', desc: 'Each bullet punches through one more target.', max: 3 },
-  { id: 'split', name: 'FAN FIRE', icon: '✦', desc: 'Every shot throws an extra pellet.', max: 3 },
-  { id: 'rate', name: 'TRIGGER', icon: '⚡', desc: 'The squad fires faster.', max: 4 },
-  { id: 'dmg', name: 'HOLLOW POINT', icon: '◉', desc: '+1 damage on every bullet.', max: 5 },
-  { id: 'rally', name: 'RALLY', icon: '⚑', desc: 'Level-ups recruit a bigger crowd.', max: 3 },
-  { id: 'shield', name: 'WARD', icon: '✚', desc: 'Ignore the next hit. Stacks as charges.', max: 3 },
-  { id: 'magnet', name: 'MAGNET', icon: '◎', desc: 'Coins and loot snap in from much farther.', max: 2 },
-  { id: 'bulwark', name: 'BULWARK', icon: '▬', desc: 'Lava, saws and walls hurt less.', max: 3 },
-  { id: 'chain', name: 'CHAIN', icon: '⌁', desc: 'Kills splash into nearby mobs.', max: 2 },
-  { id: 'crit', name: 'CRIT', icon: '★', desc: 'Shots sometimes hit twice as hard.', max: 3 },
-  { id: 'steady', name: 'ANCHOR', icon: '⚓', desc: 'Soldiers cling longer at the edge.', max: 2 },
-  { id: 'overdrive', name: 'OVERDRIVE', icon: '▲', desc: 'A good gate kicks fire rate for a few seconds.', max: 2 },
-  { id: 'greed', name: 'GREED', icon: '◆', desc: 'Every coin is worth one more.', max: 3 },
-  { id: 'fortune', name: 'FORTUNE', icon: '☀', desc: 'The distance bonus at the end pays more.', max: 2 },
-  { id: 'execution', name: 'EXECUTION', icon: '⚔', desc: 'Bosses take much harder hits.', max: 3 },
-  { id: 'iron', name: 'IRON', icon: '▣', desc: 'Every loss of soldiers is smaller.', max: 3 },
-  { id: 'focus', name: 'FOCUS', icon: '⌖', desc: 'The volley spreads less.', max: 3 },
-  { id: 'warcry', name: 'WARCRY', icon: '!', desc: 'A good gate recruits extra bodies.', max: 3 },
-  { id: 'scavenge', name: 'SCAVENGE', icon: '★', desc: 'Kills sometimes drop a coin.', max: 3 },
-  { id: 'laststand', name: 'LAST STAND', icon: '♥', desc: 'A small army hits harder and faster.', max: 2 },
-  { id: 'quickstep', name: 'QUICKSTEP', icon: '»', desc: 'The formation stretches faster.', max: 2 },
-  { id: 'hoard', name: 'HOARD', icon: '◉', desc: 'The squad scoops coins from farther out.', max: 2 },
+  { id: 'pierce', name: 'PIERCE', icon: 'arrow', col: '#4aa3ff', desc: 'Bullets punch through one more monster.', max: 3 },
+  { id: 'split', name: 'FAN FIRE', icon: 'fan', col: '#4aa3ff', desc: 'One more pellet in every shot.', max: 3 },
+  { id: 'rate', name: 'TRIGGER', icon: 'bolt', col: '#ff9f1c', desc: 'Everybody shoots faster.', max: 4 },
+  { id: 'dmg', name: 'HOLLOW POINT', icon: 'bullet', col: '#ff4d5e', desc: '+1 damage on every bullet.', max: 5 },
+  { id: 'rally', name: 'RALLY', icon: 'flag', col: '#5bd44a', desc: 'Level-ups bring more recruits.', max: 3 },
+  { id: 'shield', name: 'WARD', icon: 'shield', col: '#7a8cff', desc: 'Shrug off the next hit. Stacks.', max: 3 },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff4d5e', desc: 'Coins and loot fly to you.', max: 2 },
+  { id: 'bulwark', name: 'BULWARK', icon: 'wall', col: '#8b6cff', desc: 'Lava, saws and walls bite less.', max: 3 },
+  { id: 'chain', name: 'CHAIN', icon: 'chain', col: '#ff9f1c', desc: 'Kills zap the monsters next door.', max: 2 },
+  { id: 'crit', name: 'CRIT', icon: 'star', col: '#ffb400', desc: 'Some shots hit double.', max: 3 },
+  { id: 'steady', name: 'ANCHOR', icon: 'anchor', col: '#4aa3ff', desc: 'Fewer soldiers slip off the edge.', max: 2 },
+  { id: 'overdrive', name: 'OVERDRIVE', icon: 'chevrons', col: '#ff9f1c', desc: 'Good gates spin up your guns for a bit.', max: 2 },
+  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: '+1 on every coin you grab.', max: 3 },
+  { id: 'fortune', name: 'FORTUNE', icon: 'sparkle', col: '#ffb400', desc: 'Bigger distance payout at the end.', max: 2 },
+  { id: 'execution', name: 'EXECUTION', icon: 'skull', col: '#ff4d5e', desc: 'Bosses take way more damage.', max: 3 },
+  { id: 'iron', name: 'IRON', icon: 'shield', col: '#8b6cff', desc: 'Lose fewer soldiers to everything.', max: 3 },
+  { id: 'focus', name: 'FOCUS', icon: 'crosshair', col: '#ff4d5e', desc: 'Tighter, deadlier volleys.', max: 3 },
+  { id: 'warcry', name: 'WARCRY', icon: 'megaphone', col: '#5bd44a', desc: 'Good gates bring extra recruits.', max: 3 },
+  { id: 'scavenge', name: 'SCAVENGE', icon: 'bag', col: '#ffb400', desc: 'Monsters drop coins sometimes.', max: 3 },
+  { id: 'laststand', name: 'LAST STAND', icon: 'heart', col: '#ff4d5e', desc: 'Under 18 soldiers? Hit harder.', max: 2 },
+  { id: 'quickstep', name: 'QUICKSTEP', icon: 'chevrons', col: '#5bd44a', desc: 'Switch formation faster.', max: 2 },
+  { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: 'Grab coins from farther out.', max: 2 },
 ];
 const SKINS = [
   { id: 'recruit', name: 'RECRUIT', price: 0, body: '#6ea2ff', lead: '#ffd75d' },
@@ -252,13 +260,14 @@ const SKINS = [
    Upgrades make the next run go further, missions give a reason to try a
    different route, and the daily gift brings people back. */
 const UPGRADES = [
-  { id: 'army', name: 'BIGGER SQUAD', icon: '⚑', max: 10, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(30 * Math.pow(1.5, l)) },
-  { id: 'gun', name: 'STARTING GUN', icon: '➹', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [150, 450, 1100][l] },
-  { id: 'armor', name: 'BODY ARMOR', icon: '▣', max: 6, desc: 'Fewer soldiers lost to every hit', val: (l) => '-' + l * 5 + '%', cost: (l) => Math.round(60 * Math.pow(1.6, l)) },
-  { id: 'magnet', name: 'MAGNET', icon: '◎', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(80 * Math.pow(1.7, l)) },
-  { id: 'lucky', name: 'LUCKY GATES', icon: '✦', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l * 6 + '%', cost: (l) => Math.round(100 * Math.pow(1.65, l)) },
-  { id: 'coin', name: 'COIN VALUE', icon: '★', max: 8, desc: 'Every coin is worth more', val: (l) => '+' + l * 15 + '%', cost: (l) => Math.round(45 * Math.pow(1.55, l)) },
+  { id: 'army', name: 'BIGGER SQUAD', icon: 'flag', col: '#5bd44a', max: 10, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(30 * Math.pow(1.5, l)) },
+  { id: 'gun', name: 'STARTING GUN', icon: 'gun', col: '#ff4d5e', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [150, 450, 1100][l] },
+  { id: 'armor', name: 'BODY ARMOR', icon: 'shield', col: '#8b6cff', max: 6, desc: 'Fewer soldiers lost to every hit', val: (l) => l ? '-' + l * 5 + '%' : 'none', cost: (l) => Math.round(60 * Math.pow(1.6, l)) },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(80 * Math.pow(1.7, l)) },
+  { id: 'lucky', name: 'LUCKY GATES', icon: 'sparkle', col: '#ffb400', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l ? l * 6 + '%' : 'none', cost: (l) => Math.round(100 * Math.pow(1.65, l)) },
+  { id: 'coin', name: 'COIN VALUE', icon: 'star', col: '#ff9f1c', max: 8, desc: 'Every coin is worth more', val: (l) => l ? '+' + l * 15 + '%' : 'normal', cost: (l) => Math.round(45 * Math.pow(1.55, l)) },
 ];
+const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt' };
 const MISSION_DEFS = {
   dist: { steps: [300, 500, 800, 1200, 1600, 2200, 3000, 4000], text: (n) => `Run ${n}m in one run` },
   army: { steps: [100, 250, 600, 1500, 4000, 10000, 20000], text: (n) => `Grow your army to ${n}` },
@@ -318,7 +327,7 @@ function checkMissions() {
       if (rk > rankOf(META.done - 1)) {
         const rr = rankReward(rk);
         G.coins += rr; G.missionCoins += rr;
-        missionToast('You are now a ' + RANKS[rk], rr, '▲ RANK UP');
+        missionToast('You made ' + RANKS[rk] + '!', rr, 'RANK UP');
         setTimeout(() => sfx.fanfare(), 2700);
       }
       saveSave();
@@ -350,6 +359,7 @@ let firstMob = false, nextBand = 320;
 let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0;
 let fireAcc = 0, drainAcc = 0, shootSfxAcc = 0, fallAcc = 0, edgeWarn = 0;
 let hintT = 0, zoneIdx = -1, fovKick = 0, muzzleGlow = 0, distMark = 0, revived = false, lastLevel = 1;
+let shownTier = -1, shownSkills = null;
 let bossIntro = false, deathT = 0, shownCoins = -1, shownArmy = -1, armyRoll = 10, armyFlash = 0, armyFlashT = 0;
 const fmtNum = (n) => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'K' : String(n);
 let halfPxCache = 28, coinSfx = 0, saveT = 0, paintedSkin = '';
@@ -936,9 +946,13 @@ const ebulletMesh = new THREE.InstancedMesh(
 ebulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(ebulletMesh);
 const MAXCOIN = 72;
+/* coins: a chunky gold disc with a darker rim, spinning on its edge like every coin in every runner */
 const coinMesh = new THREE.InstancedMesh(
-  new THREE.CylinderGeometry(0.22, 0.22, 0.07, 8),
-  new THREE.MeshBasicMaterial({ color: 0xffd24a }), MAXCOIN);
+  mergeParts([
+    { geo: new THREE.CylinderGeometry(0.24, 0.24, 0.08, 16), m: M4(0, 0, 0, Math.PI / 2, 0, 0), c: '#e09a12' },
+    { geo: new THREE.CylinderGeometry(0.17, 0.17, 0.1, 16), m: M4(0, 0, 0, Math.PI / 2, 0, 0), c: '#ffd84a' },
+  ]),
+  new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0x6a3c00, emissiveIntensity: 0.55, metalness: 0.35, roughness: 0.35 }), MAXCOIN);
 coinMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(coinMesh);
 
@@ -962,60 +976,90 @@ const PICKUP_COL = { rate: 0xe2b657, dmg: 0xffd75d, spread: 0xd7e2c3, heal: 0xd7
 
 /* --- barrels: group per barrel --- */
 const BAR_COL = { weapon: '#ff9d5d', heal: '#7dff9b', bomb: '#ff5d6a', gold: '#ffd75d', upgrade: '#7de8ff' };
-const BAR_ICON = { weapon: '🔫', heal: '💚', bomb: '💣', gold: '⭐', upgrade: '⚡' };
+const BAR_ICON = { weapon: 'gun', heal: 'plus', bomb: 'bomb', gold: 'star', upgrade: 'bolt' };
 const barrelGeoC = new THREE.CylinderGeometry(0.5, 0.55, 1.15, 12);
 const barrelRing = new THREE.CylinderGeometry(0.56, 0.56, 0.14, 12);
 
 /* --- emoji sprite texture cache --- */
 const emojiTex = {};
-function makeEmojiTex(ch) {
-  if (emojiTex[ch]) return emojiTex[ch];
-  const c = document.createElement('canvas'); c.width = c.height = 96;
+function makeIconTex(name, fill) {
+  const key = name + fill;
+  if (emojiTex[key]) return emojiTex[key];
+  const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
-  g.font = '72px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(ch, 48, 54);
+  /* round badge, ink rim, icon in the middle */
+  g.fillStyle = INK; g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff4dc'; g.beginPath(); g.arc(64, 64, 50, 0, Math.PI * 2); g.fill();
+  drawIcon(g, name, 64, 66, 64, fill);
   const t = new THREE.CanvasTexture(c);
-  emojiTex[ch] = t;
+  t.colorSpace = THREE.SRGBColorSpace;
+  emojiTex[key] = t;
   return t;
 }
-function makeSprite(ch) {
-  const m = new THREE.SpriteMaterial({ map: makeEmojiTex(ch), transparent: true, depthWrite: false });
-  const s = new THREE.Sprite(m);
-  s.scale.set(1.5, 1.5, 1);
-  return s;
+function makeWarnTex() {
+  if (emojiTex.__warn) return emojiTex.__warn;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const tri = (inset) => { g.beginPath(); g.moveTo(64, 10 + inset); g.lineTo(118 - inset * 1.2, 112 - inset * 0.6); g.lineTo(10 + inset * 1.2, 112 - inset * 0.6); g.closePath(); };
+  g.lineJoin = 'round';
+  g.fillStyle = INK; tri(0); g.fill(); g.lineWidth = 10; g.strokeStyle = INK; g.stroke();
+  g.fillStyle = '#ffcc33'; tri(12); g.fill();
+  g.fillStyle = INK; g.beginPath(); g.roundRect(56, 42, 16, 38, 6); g.fill();
+  g.beginPath(); g.arc(64, 93, 8, 0, Math.PI * 2); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  emojiTex.__warn = t;
+  return t;
+}
+function makeSprite(name, fill) {
+  const map = name === 'warn' ? makeWarnTex() : makeIconTex(name, fill || '#ff4d5e');
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false }));
+  sp.scale.set(1.5, 1.5, 1);
+  return sp;
 }
 
 /* --- gate panels --- */
 const PANEL_STYLE = {
-  add: { bg: 'rgba(38,140,82,0.72)', edge: '#7dff9b' },
-  mul: { bg: 'rgba(30,170,90,0.75)', edge: '#7dff9b' },
-  gun: { bg: 'rgba(20,150,160,0.75)', edge: '#7de8ff' },
-  sub: { bg: 'rgba(170,44,60,0.72)', edge: '#ff5d6a' },
-  div: { bg: 'rgba(150,40,80,0.75)', edge: '#ff5d6a' },
+  add: { bg: 'rgba(60,180,70,0.78)', edge: '#a6f59a' },
+  mul: { bg: 'rgba(40,170,80,0.82)', edge: '#c4ffb0' },
+  gun: { bg: 'rgba(40,130,220,0.8)', edge: '#a8dcff' },
+  sub: { bg: 'rgba(220,50,70,0.78)', edge: '#ffb0b8' },
+  div: { bg: 'rgba(170,40,90,0.82)', edge: '#ffb0d0' },
 };
 function gateLabel(p) {
   if (p.t === 'add') return '+' + p.v;
   if (p.t === 'sub') return '-' + p.v;
   if (p.t === 'mul') return '×' + p.v;
-  if (p.t === 'gun') return '🔫UP';
+  if (p.t === 'gun') return 'GUN UP';
   return '÷' + p.v;
 }
 function gateGood(p) { return p.t === 'add' || p.t === 'mul' || p.t === 'gun'; }
 function panelTex(p) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 160;
   const g = c.getContext('2d');
-  const st = p.gold ? { bg: 'rgba(170,120,20,0.82)', edge: '#ffd75d' } : PANEL_STYLE[p.t];
+  const st = p.gold ? { bg: 'rgba(214,150,20,0.86)', edge: '#ffe27a' } : PANEL_STYLE[p.t];
   g.fillStyle = st.bg;
-  g.beginPath(); g.roundRect(6, 6, 244, 148, 18); g.fill();
-  g.strokeStyle = st.edge; g.lineWidth = 6; g.stroke();
-  g.font = '900 84px Avenir Next, sans-serif';
+  g.beginPath(); g.roundRect(8, 8, 240, 144, 22); g.fill();
+  g.lineWidth = 8; g.strokeStyle = INK; g.stroke();
+  g.lineWidth = 4; g.strokeStyle = st.edge;
+  g.beginPath(); g.roundRect(16, 16, 224, 128, 15); g.stroke();
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillStyle = '#fff';
-  g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 8;
-  const lab = gateLabel(p);
-  g.font = lab.length > 3 ? '900 64px Avenir Next, sans-serif' : '900 92px Avenir Next, sans-serif';
-  g.fillText(lab, 128, 84);
-  return new THREE.CanvasTexture(c);
+  g.lineJoin = 'round';
+  const text = (str, x, size) => {
+    g.font = `${size}px "Lilita One", "Avenir Next", sans-serif`;
+    g.lineWidth = size * 0.2; g.strokeStyle = INK;
+    g.strokeText(str, x, 86); g.fillStyle = '#fff'; g.fillText(str, x, 84);
+  };
+  if (p.t === 'gun') {
+    drawIcon(g, 'gun', 84, 82, 74, '#ffcc33');
+    text('UP', 172, 72);
+  } else {
+    const lab = gateLabel(p);
+    text(lab, 128, lab.length > 4 ? 64 : lab.length > 3 ? 76 : 92);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 const panelGeo = new THREE.PlaneGeometry(1, 4.6);
 function makeGateMeshes(g) {
@@ -1106,7 +1150,7 @@ function spawnMeteor(wy) {
   ring.rotation.x = -Math.PI / 2; ring.position.set(wx(h.x), 0.05, 0);
   const rock = new THREE.Mesh(meteorGeo, meteorMat);
   rock.position.set(wx(h.x), 30, 0); rock.visible = false;
-  const warn = makeSprite('⚠'); warn.position.set(wx(h.x), 3.4, 0); warn.visible = false;
+  const warn = makeSprite('warn'); warn.position.set(wx(h.x), 3.4, 0); warn.visible = false;
   grp.add(ring, rock, warn);
   grp.position.z = wz(wy);
   scene.add(grp);
@@ -1135,7 +1179,7 @@ function spawnHazard(wy) {
       const inner = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0xffb03d, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
       inner.rotation.x = -Math.PI / 2; inner.position.y = 0.06;
       inner.scale.set(wpx * K * 0.8, len * K * 0.8, 1);
-      const warn = makeSprite('⚠'); warn.position.set(0, 2.8, -len * K * 0.5 - 1.4);
+      const warn = makeSprite('warn'); warn.position.set(0, 2.8, -len * K * 0.5 - 1.4);
       grp.add(outer, inner, warn);
       grp.position.set(wx(x), 0, wz(ly));
       scene.add(grp);
@@ -1161,7 +1205,7 @@ function spawnHazard(wy) {
     rim.rotation.x = Math.PI / 2; rim.position.y = 0.15; rim.scale.setScalar(1.25);
     blade.add(disc, rim);
     grp.add(blade);
-    const warn = makeSprite('⚠'); warn.position.set(0, 3.1, -2.2);
+    const warn = makeSprite('warn'); warn.position.set(0, 3.1, -2.2);
     grp.add(warn);
     grp.position.set(0, 0, wz(wy));
     scene.add(grp);
@@ -1187,7 +1231,7 @@ function spawnHazard(wy) {
       edge.position.set(wx(seg[0] === road.x0 ? seg[1] : seg[0]), 1.1, 0);
       grp.add(edge);
     }
-    const warn = makeSprite('⚠'); warn.position.set(wx(gapX), 3.0, -len * K / 2 - 1.2);
+    const warn = makeSprite('warn'); warn.position.set(wx(gapX), 3.0, -len * K / 2 - 1.2);
     grp.add(warn);
     grp.position.z = wz(h.wy);
     scene.add(grp);
@@ -1206,7 +1250,7 @@ function spawnHazard(wy) {
     const lip = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.55, depthWrite: false }));
     lip.rotation.x = -Math.PI / 2; lip.position.y = 0.055;
     lip.scale.set(wpx * K * 1.12, len * K * 1.08, 1);
-    const warn = makeSprite('⚠'); warn.position.set(0, 2.4, -len * K * 0.5 - 1);
+    const warn = makeSprite('warn'); warn.position.set(0, 2.4, -len * K * 0.5 - 1);
     grp.add(lip, hole, warn);
     grp.position.set(wx(x), 0, wz(h.wy));
     scene.add(grp);
@@ -1269,7 +1313,7 @@ function spawnCoinLine(wy) {
   for (let i = 0; i < n && coins.length < MAXCOIN; i++) {
     const u = n === 1 ? 0.5 : i / (n - 1);
     const x = clamp(x0 + drift * (u - 0.5) + (arc ? Math.sin(u * Math.PI) * 42 : 0), road.x0 + 22, road.x1 - 22);
-    coins.push({ x, wy: wy + i * 26, spin: rnd(0, 6) });
+    coins.push({ x, wy: wy + i * Math.max(26, 0.85 / K), spin: i * 0.5 });
   }
 }
 
@@ -1550,8 +1594,8 @@ function spawnBarrels(wy) {
     const ring1 = new THREE.Mesh(barrelRing, new THREE.MeshStandardMaterial({ color: 0xdfe9ff, roughness: 0.4, metalness: 0.6 }));
     ring1.position.y = 0.32;
     const ring2 = ring1.clone(); ring2.position.y = 0.88;
-    const icon = makeSprite(BAR_ICON[kind]); icon.position.y = 1.9;
-    grp.add(body, ring1, ring2, icon);
+    const badge = makeSprite(BAR_ICON[kind], BAR_COL[kind]); badge.position.y = 1.95;
+    grp.add(body, ring1, ring2, badge);
     grp.position.set(wx(b.x), 0, wz(b.wy));
     scene.add(grp);
     b.grp = grp;
@@ -1824,15 +1868,15 @@ function startGame() {
   musicStart();
 }
 function skillLine() {
-  const bits = [];
-  if (G.shield > 0) bits.push('WARD×' + G.shield);
-  for (const s of SKILLS) {
-    const n = G.skills[s.id] || 0;
-    if (!n || s.id === 'shield') continue;
-    bits.push(s.name + (n > 1 ? '×' + n : ''));
+  let h = '';
+  if (G.shield > 0) h += `<span class="ward">${icon('shield')}${G.shield}</span>`;
+  for (const sk of SKILLS) {
+    const n = G.skills[sk.id] || 0;
+    if (!n || sk.id === 'shield') continue;
+    h += `<span>${icon(sk.icon)}${n > 1 ? n : ''}</span>`;
   }
-  if (G.overT > 0.15) bits.push('OVERDRIVE');
-  return bits.join('  ');
+  if (G.overT > 0.15) h += `<span style="color:#ffcc33;border-color:#ffcc33">${icon('chevrons')}</span>`;
+  return h;
 }
 function offerSkills() {
   if (!skillOv || !skillCards) return;
@@ -1849,8 +1893,9 @@ function offerSkills() {
     const st = G.skills[s.id] || 0;
     let pips = '';
     for (let k = 0; k < s.max; k++) pips += `<u class="${k < st ? 'f' : k === st ? 'n' : ''}"></u>`;
-    btn.innerHTML = `<i>${s.icon}</i><kbd>${picks.indexOf(s) + 1}</kbd><b>${s.name}</b><span>${s.desc}</span>` +
-      `<em>${st ? 'UPGRADE · RANK ' + (st + 1) : 'NEW'}</em><div class="pips">${pips}</div>`;
+    btn.style.setProperty('--sc', s.col);
+    btn.innerHTML = `<i>${icon(s.icon)}</i><b>${s.name}</b><span>${s.desc}</span><div class="pips">${pips}</div>` +
+      `<em class="${st ? 'up' : ''}">${st ? 'LV ' + (st + 1) : 'NEW'}</em><kbd>${picks.indexOf(s) + 1}</kbd>`;
     btn.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       chooseSkill(s.id);
@@ -1858,7 +1903,7 @@ function offerSkills() {
     skillCards.appendChild(btn);
   }
   const head = document.getElementById('skillHead');
-  if (head) head.textContent = 'LEVEL ' + G.level + ' · CHOOSE A SKILL';
+  if (head) head.textContent = 'LEVEL ' + G.level + '!';
   skillOv.style.display = 'flex';
   G.mode = 'pick';
   skillIds = picks.map((p) => p.id);
@@ -1897,20 +1942,23 @@ function clearWorld() {
 
 function missionHTML(showNew) {
   let h = '';
+  const live = G.mode !== 'menu';
   for (const m of META.missions) {
     const goal = missionGoal(m);
-    const val = Math.min(goal, m.done ? goal : (G.mode === 'menu' ? 0 : missionValue(m.type)));
+    const val = Math.min(goal, m.done ? goal : (live ? missionValue(m.type) : 0));
     const pct = Math.round((val / goal) * 100);
-    const live = G.mode !== 'menu';
-    h += `<div class="ms${m.done ? ' done' : ''}">${showNew && m.isNew ? '<span class="nw">NEW</span>' : ''}${MISSION_DEFS[m.type].text(goal)}` +
-      (live ? `<span class="pg">${m.done ? 'COMPLETE' + nextTxt(m) : val + ' / ' + goal}</span>` : '') +
-      `<span class="rw">${m.done ? '✔ ' : ''}+${missionReward(m)}★</span><div class="bar" style="width:${live ? pct : 0}%"></div></div>`;
+    const sub = live ? (m.done ? 'Done!' + nextTxt(m) : fmtNum(val) + ' / ' + fmtNum(goal)) : '';
+    h += `<div class="ms${m.done ? ' done' : ''}"><div class="mi">${icon(m.done ? 'check' : MISSION_ICON[m.type])}</div>` +
+      `<div class="mt">${showNew && m.isNew ? '<span class="nw">NEW</span>' : ''}${MISSION_DEFS[m.type].text(goal)}` +
+      (sub ? `<span class="pg">${sub}</span>` : '') +
+      (live && !m.done ? `<div class="bar"><i style="width:${pct}%"></i></div>` : '') +
+      `</div><div class="rw">+${missionReward(m)}${COIN}</div></div>`;
   }
-  return h ? '<div class="missionsHead">MISSIONS</div>' + h : '';
+  return h ? '<h3>MISSIONS</h3>' + h : '';
 }
 function nextTxt(m) {
   const d = MISSION_DEFS[m.type], l = (META.mlv[m.type] || 0) + 1;
-  return l < d.steps.length ? ' · next: ' + d.text(d.steps[l]).toLowerCase() : '';
+  return l < d.steps.length ? ' Next up: ' + d.text(d.steps[l]).toLowerCase() : '';
 }
 function reviveCost() { return Math.max(30, Math.round(G.dist / 8)); }
 function gameOver() {
@@ -1929,13 +1977,15 @@ function gameOver() {
   G.bonusTotal += bonus;
   if (overCause) overCause.textContent = G.cause || 'WIPED OUT';
   const gap = prevBest - d;
-  const sub = isBest ? '<b style="color:#ffd75d; letter-spacing:2px">★ NEW BEST ★</b>'
-    : gap <= 120 ? `<b style="color:#ffb089">only ${gap}m short of your best!</b>`
-    : `<span style="color:#b6aa96">best ${G.best}m</span>`;
+  const sub = isBest && d > 0 ? '<span class="stamp">NEW BEST!</span>'
+    : gap <= 120 ? `<b class="close">So close! ${gap}m short of your best</b>`
+    : `<span class="chip">${icon('crown')}best ${G.best}m</span>`;
+  const earned = G.coinsRun + G.missionCoins;
   overStats.innerHTML =
-    `<span id="overDist" style="font-size:44px;font-weight:900;line-height:1.1">0m</span><br>${sub}<br>` +
-    `<span style="font-size:13px;color:#b6aa96">peak army ${G.peak} &middot; mobs ${G.mobsBeaten} &middot; bosses ${G.bossKills} &middot; kills ${G.kills}</span><br>` +
-    `<span style="color:#ffd75d;font-weight:800">+${G.coinsRun + G.missionCoins}★ this run</span> <span style="color:#9d917c;font-size:12px">(${G.coinsPickedVal} picked · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''})</span>`;
+    `<div id="overDist">0m</div>${sub}` +
+    `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} peak</span>` +
+    `<span class="chip">${icon('skull')}${G.mobsBeaten} mobs</span><span class="chip">${icon('crown')}${G.bossKills} bosses</span></div>` +
+    `<div class="earn">+${earned}${COIN}<small>${G.coinsPickedVal} grabbed · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''}</small></div>`;
   if (overMissions) overMissions.innerHTML = missionHTML(false);
   saveSave();
   overOv.style.display = 'flex';
@@ -1956,7 +2006,7 @@ function gameOver() {
     const c = reviveCost();
     reviveBtn.style.display = revived ? 'none' : '';
     reviveBtn.disabled = G.coins < c;
-    reviveBtn.innerHTML = `REVIVE<small>${c}★ · keep half your peak</small>`;
+    reviveBtn.innerHTML = `${icon('heart')}<span class="stack">REVIVE<small>${c} coins</small></span>`;
   }
   refreshBadges();
   renderQuickBuy();
@@ -2017,6 +2067,7 @@ if (againBtn) againBtn.addEventListener('pointerdown', (e) => {
   if (G.mode === 'over' && performance.now() - overAt > 350) startGame();
 });
 const shareBtn = document.getElementById('shareBtn');
+if (shareBtn) shareBtn.innerHTML = icon('share');
 if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
   e.stopPropagation(); e.preventDefault();
   const d = Math.floor(G.dist);
@@ -2025,8 +2076,8 @@ if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
   try {
     if (navigator.share) { await navigator.share({ title: 'MOB RUN', text, url }); return; }
     await navigator.clipboard.writeText(text + ' ' + url);
-    shareBtn.textContent = 'COPIED!';
-    setTimeout(() => { shareBtn.textContent = 'SHARE'; }, 1500);
+    shareBtn.innerHTML = icon('check');
+    setTimeout(() => { shareBtn.innerHTML = icon('share'); }, 1500);
   } catch (err) { }
 });
 /* results screen: offer the cheapest upgrade you can afford, one tap to buy */
@@ -2045,7 +2096,7 @@ function renderQuickBuy() {
   if (!quickBuy) return;
   const b = bestBuy();
   quickBuy.classList.toggle('on', !!b);
-  if (b) quickBuy.innerHTML = `<small>UPGRADE READY · TAP TO BUY</small>${b.u.name} → <b>${b.u.val(b.l + 1)}</b> · ${b.c}★`;
+  if (b) quickBuy.innerHTML = `${icon(b.u.icon)}<span class="stack">${b.u.name} → ${b.u.val(b.l + 1)}<small>upgrade for ${b.c} coins</small></span>`;
 }
 if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
@@ -2061,7 +2112,7 @@ if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
 });
 function toggleMute() {
   muted = !muted;
-  if (muteBtn) muteBtn.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
+  if (muteBtn) muteBtn.innerHTML = icon(muted ? 'mute' : 'sound');
   try { localStorage.setItem('mobrun_mute', muted ? '1' : '0'); } catch (e) { }
 }
 if (muteBtn) muteBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); toggleMute(); });
@@ -2085,7 +2136,7 @@ function missionToast(text, reward, title) {
 function showToast() {
   if (!toastEl || !toastQ.length) return;
   const q = toastQ[0];
-  toastEl.innerHTML = `<b>${q.title || '✔ MISSION COMPLETE'}</b>${q.text} · <span style="color:#ffd75d">+${q.reward}★</span>`;
+  toastEl.innerHTML = `<div class="chip">${icon(q.title ? 'crown' : 'check')}</div><div><b>${q.title || 'MISSION DONE'}</b>${q.text} · +${q.reward}${COIN}</div>`;
   toastEl.classList.toggle('rank', !!q.title);
   toastEl.classList.add('on');
   sfx.great(); vib(25);
@@ -2099,7 +2150,7 @@ function burstCoinsUI(fromEl, amount) {
   const r = fromEl.getBoundingClientRect();
   const el = document.createElement('div');
   el.className = 'fl';
-  el.textContent = (amount > 0 ? '+' : '') + amount + '★';
+  el.innerHTML = (amount > 0 ? '+' : '') + amount + COIN;
   el.style.cssText = `left:${r.left + r.width / 2}px;top:${r.top}px;color:#ffd75d;font-size:30px;z-index:20;position:fixed;transition:transform .9s cubic-bezier(.16,.84,.28,1),opacity .9s;`;
   document.body.appendChild(el);
   requestAnimationFrame(() => { el.style.transform = 'translate(-50%,-90px) scale(1.2)'; el.style.opacity = '0'; });
@@ -2120,8 +2171,9 @@ function refreshBadges() {
   }
 }
 function refreshMeta() {
-  if (bestLine) bestLine.textContent = (G.best ? `BEST ${G.best}m` : 'NO BEST YET') + `  ·  ★ ${G.coins}`;
-  if (hudCoins) hudCoins.textContent = '★ ' + G.coins;
+  if (bestLine) bestLine.innerHTML = `<span class="chip">${icon('crown')}${G.best ? 'best ' + G.best + 'm' : 'no best yet'}</span>` +
+    `<span class="chip">${COIN}${fmtNum(G.coins)}</span>`;
+  if (hudCoins) hudCoins.innerHTML = COIN + fmtNum(G.coins);
   refreshBadges();
 }
 function rankHTML() {
@@ -2130,8 +2182,8 @@ function rankHTML() {
   const into = META.done - rk * 3;
   let pips = '';
   for (let i = 0; i < 3; i++) pips += `<u class="${maxed || i < into ? 'f' : ''}"></u>`;
-  return `<span class="rk">RANK ${rk + 1} · ${RANKS[rk]}</span><span class="pips">${pips}</span>` +
-    `<span class="nx">${maxed ? 'top rank' : (3 - into) + ' mission' + (3 - into > 1 ? 's' : '') + ' to ' + RANKS[rk + 1]}${rk ? ' · coins +' + rk * 5 + '%' : ''}</span>`;
+  return `<span class="rk">${icon('crown')}${RANKS[rk]}</span><span class="pips">${pips}</span>` +
+    `<span class="nx">${maxed ? 'top rank' : 'next: ' + RANKS[rk + 1]}</span>`;
 }
 function renderMenu() {
   document.body.classList.add('menu');
@@ -2142,7 +2194,7 @@ function renderMenu() {
   if (dailyBtn) {
     const on = dailyReady();
     dailyBtn.classList.toggle('on', on);
-    if (on) { const dd = dailyAmount(); dailyBtn.innerHTML = `🎁 DAILY GIFT  +${dd.coins}★<small>day ${dd.streak} streak · come back tomorrow for more</small>`; }
+    if (on) { const dd = dailyAmount(); dailyBtn.innerHTML = `${icon('gift')}<span class="stack">FREE GIFT +${dd.coins}<small>day ${dd.streak} of 7</small></span>`; }
   }
   refreshMeta();
 }
@@ -2173,7 +2225,7 @@ function loadSave() {
     const legacy = parseInt(localStorage.getItem('mobrun_best') || '0', 10) || 0;
     if (legacy > G.best) G.best = legacy;
     muted = localStorage.getItem('mobrun_mute') === '1';
-    if (muteBtn) muteBtn.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
+    if (muteBtn) muteBtn.innerHTML = icon(muted ? 'mute' : 'sound');
   } catch (e) { }
   /* finished-but-unrolled missions (tab closed mid-run) roll now */
   rollMissions();
@@ -2199,7 +2251,7 @@ function skinNow() { return SKINS.find((s) => s.id === G.skin) || SKINS[0]; }
 function paintDirty() { paintedSkin = ''; }
 function renderShop() {
   if (!shopGrid) return;
-  if (shopCoins) shopCoins.textContent = '★ ' + G.coins;
+  if (shopCoins) shopCoins.innerHTML = COIN + G.coins;
   if (upGrid) {
     upGrid.innerHTML = '';
     for (const u of UPGRADES) {
@@ -2211,8 +2263,9 @@ function renderShop() {
       card.className = 'upCard' + (maxed ? ' maxed' : G.coins >= cost ? ' can' : ' broke');
       let pips = '';
       for (let k = 0; k < u.max; k++) pips += `<u class="${k < l ? 'f' : ''}"></u>`;
-      card.innerHTML = `<i>${u.icon}</i><div class="mid"><b>${u.name}</b><span>${u.desc} · <b class="v">${u.val(l)}</b>${maxed ? '' : ' → <b class="v nx">' + u.val(l + 1) + '</b>'}</span><div class="pips">${pips}</div></div>` +
-        `<div class="price">${maxed ? 'MAX' : cost + '★'}</div>`;
+      card.style.setProperty('--uc', u.col);
+      card.innerHTML = `<i>${icon(u.icon)}</i><div class="mid"><b>${u.name}</b><span>${u.desc}<br><b class="v">${u.val(l)}</b>${maxed ? '' : ' → <b class="v nx">' + u.val(l + 1) + '</b>'}</span><div class="pips">${pips}</div></div>` +
+        `<div class="price">${maxed ? 'MAX' : cost + COIN}</div>`;
       card.addEventListener('pointerdown', (ev) => {
         ev.stopPropagation(); ev.preventDefault();
         audio();
@@ -2234,8 +2287,8 @@ function renderShop() {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'skinCard' + (on ? ' on' : '') + (!owned && G.coins < sk.price ? ' broke' : '');
-    const act = on ? 'EQUIPPED' : owned ? 'EQUIP' : sk.price + '★';
-    card.innerHTML = `<i style="background:${sk.body}"></i><b>${sk.name}</b><span>${act}</span>`;
+    const act = on ? 'ON' : owned ? 'USE' : sk.price + COIN;
+    card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><span>${act}</span>`;
     card.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       audio();
@@ -3735,9 +3788,9 @@ function draw(now) {
     if (zP > 6 || zP < -85) continue;
     const lift = c.fly !== undefined && c.fly > 0 ? Math.sin(Math.min(1, c.fly * 3) * Math.PI) * 1.6 + 0.6 : 0;
     dummy.position.set(wx(c.x), 1.05 + lift + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
-    dummy.rotation.set(1.15, t * 2.6 + c.spin, 0);
-    const sc = 1.15 + Math.min(0.85, Math.max(0, -zP) * 0.03);
-    dummy.scale.set(sc, sc * 0.28, sc);
+    dummy.rotation.set(0, t * 3.4 + c.spin, 0);
+    const sc = 1.25 + Math.min(0.75, Math.max(0, -zP) * 0.025);
+    dummy.scale.set(sc, sc, sc);
     dummy.updateMatrix();
     if (coinI < MAXCOIN) coinMesh.setMatrixAt(coinI++, dummy.matrix);
   }
@@ -3858,19 +3911,25 @@ function draw(now) {
     armyFlashT = Math.max(0, armyFlashT - FD);
     hudArmy.style.color = armyFlashT > 0 ? (armyFlash > 0 ? '#7dff9b' : '#ff6b5d') : '';
   }
-  hudWeapon.textContent = WT[G.tier].name;
-  hudWeapon.style.color = WT[G.tier].col;
+  if (shownTier !== G.tier) {
+    shownTier = G.tier;
+    hudWeapon.innerHTML = icon('gun') + WT[G.tier].name;
+    hudWeapon.style.color = WT[G.tier].col;
+  }
   hudDist.textContent = Math.floor(G.dist) + 'm';
   if (hudCoins) {
     if (shownCoins !== G.coins) {
       if (shownCoins >= 0) { hudCoins.classList.remove('pop'); requestAnimationFrame(() => hudCoins.classList.add('pop')); }
       shownCoins = G.coins;
     }
-    hudCoins.textContent = '★ ' + G.coins;
+    hudCoins.innerHTML = COIN + fmtNum(G.coins);
   }
   hudLevel.textContent = 'LV ' + G.level;
   if (lvlFill) lvlFill.style.width = ((G.dist % 150) / 150 * 100).toFixed(1) + '%';
-  if (hudSkills) hudSkills.textContent = G.mode === 'run' || G.mode === 'pick' ? skillLine() : '';
+  if (hudSkills) {
+    const sl = G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' ? skillLine() : '';
+    if (sl !== shownSkills) { shownSkills = sl; hudSkills.innerHTML = sl; }
+  }
   if (formLabel) {
     formLabel.textContent = G.form > 0.34 ? 'WIDE' : G.form < -0.34 ? 'COLUMN' : 'SQUARE';
     formLabel.style.color = edgeDanger > 0.2 ? '#e25a32' : '#f3ecdf';
