@@ -3,6 +3,13 @@
 import * as THREE from './vendor/three.module.min.js';
 import { icon, drawIcon } from './icons.js';
 const COIN = '<span class="coin"></span>';
+/* language: Bahasa Indonesia for Indonesian devices, English otherwise; switchable in SETTINGS */
+const LANG = (() => {
+  try { const v = localStorage.getItem('mobrun_lang'); if (v === 'en' || v === 'id') return v; } catch (e) { }
+  return /^(id|in)\b/i.test(navigator.language || '') ? 'id' : 'en';
+})();
+const L = (en, id) => (LANG === 'id' ? id : en);
+document.documentElement.lang = LANG;
 const INK = '#1b1430';
 /* canvas text waits for the display font so gate numbers never flash in a fallback face */
 if (document.fonts) document.fonts.load('64px "Lilita One"').catch(() => {});
@@ -55,7 +62,7 @@ const bossFill = document.getElementById('bossFill');
 const pauseOv = document.getElementById('pauseOverlay');
 {
   const tt = document.getElementById('tut');
-  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? 'SWIPE TO STEER' : 'MOVE THE MOUSE TO STEER'}</b>`;
+  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? L('SWIPE TO STEER', 'SWIPE UNTUK BELOK') : L('MOVE THE MOUSE TO STEER', 'GERAKKAN MOUSE UNTUK BELOK')}</b>`;
 }
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
@@ -146,8 +153,8 @@ function resize() {
   if (G.mode === 'menu') { G.armyX = LW / 2; aimX = LW / 2; }
   const keysEl = document.querySelector('#startOverlay .keys');
   if (keysEl) keysEl.textContent = document.body.classList.contains('touch')
-    ? 'one thumb · swipe sideways to steer · up for a column, down to spread'
-    : 'mouse or arrows to steer · scroll or up/down to stretch · P pause · M mute';
+    ? L('one thumb · swipe sideways to steer · up for a column, down to spread', 'satu jempol · swipe ke samping untuk belok · atas barisan, bawah melebar')
+    : L('mouse or arrows to steer · scroll or up/down to stretch · P pause · M mute', 'mouse atau panah untuk belok · scroll atau atas/bawah untuk formasi · P jeda · M senyap');
 }
 window.addEventListener('resize', resize);
 
@@ -314,28 +321,28 @@ const G = {
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
-  { id: 'pierce', name: 'PIERCE', icon: 'arrow', col: '#4aa3ff', desc: 'Bullets punch through one more monster.', max: 3 },
-  { id: 'split', name: 'FAN FIRE', icon: 'fan', col: '#4aa3ff', desc: 'One more pellet in every shot.', max: 3 },
-  { id: 'rate', name: 'TRIGGER', icon: 'bolt', col: '#ff9f1c', desc: 'Everybody shoots faster.', max: 4 },
-  { id: 'dmg', name: 'HOLLOW POINT', icon: 'bullet', col: '#ff4d5e', desc: '+1 damage on every bullet.', max: 5 },
-  { id: 'rally', name: 'RALLY', icon: 'flag', col: '#5bd44a', desc: 'Level-ups bring more recruits.', max: 3 },
-  { id: 'shield', name: 'WARD', icon: 'shield', col: '#7a8cff', desc: 'Shrug off the next hit. Stacks.', max: 3 },
-  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff4d5e', desc: 'Coins and loot fly to you.', max: 2 },
-  { id: 'bulwark', name: 'BULWARK', icon: 'wall', col: '#8b6cff', desc: 'Lava, saws and walls bite less.', max: 3 },
-  { id: 'chain', name: 'CHAIN', icon: 'chain', col: '#ff9f1c', desc: 'Kills zap the monsters next door.', max: 2 },
-  { id: 'crit', name: 'CRIT', icon: 'star', col: '#ffb400', desc: 'Some shots hit double.', max: 3 },
-  { id: 'steady', name: 'ANCHOR', icon: 'anchor', col: '#4aa3ff', desc: 'Fewer soldiers slip off the edge.', max: 2 },
-  { id: 'overdrive', name: 'OVERDRIVE', icon: 'chevrons', col: '#ff9f1c', desc: 'Good gates spin up your guns for a bit.', max: 2 },
-  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: 'Coins are worth 25% more.', max: 3 },
-  { id: 'fortune', name: 'FORTUNE', icon: 'sparkle', col: '#ffb400', desc: 'Bigger distance payout at the end.', max: 2 },
-  { id: 'execution', name: 'EXECUTION', icon: 'skull', col: '#ff4d5e', desc: 'Bosses take way more damage.', max: 3 },
-  { id: 'iron', name: 'IRON', icon: 'shield', col: '#8b6cff', desc: 'Lose fewer soldiers to everything.', max: 3 },
-  { id: 'focus', name: 'FOCUS', icon: 'crosshair', col: '#ff4d5e', desc: 'Tighter, deadlier volleys.', max: 3 },
-  { id: 'warcry', name: 'WARCRY', icon: 'megaphone', col: '#5bd44a', desc: 'Good gates bring extra recruits.', max: 3 },
-  { id: 'scavenge', name: 'SCAVENGE', icon: 'bag', col: '#ffb400', desc: 'Monsters drop coins sometimes.', max: 3 },
-  { id: 'laststand', name: 'LAST STAND', icon: 'heart', col: '#ff4d5e', desc: 'Under 18 soldiers? Hit harder.', max: 2 },
-  { id: 'quickstep', name: 'QUICKSTEP', icon: 'chevrons', col: '#5bd44a', desc: 'Switch formation faster.', max: 2 },
-  { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: 'Grab coins from farther out.', max: 2 },
+  { id: 'pierce', name: 'PIERCE', icon: 'arrow', col: '#4aa3ff', desc: L('Bullets punch through one more monster.', 'Peluru tembus satu monster lagi.'), max: 3 },
+  { id: 'split', name: 'FAN FIRE', icon: 'fan', col: '#4aa3ff', desc: L('One more pellet in every shot.', 'Tambah satu peluru di tiap tembakan.'), max: 3 },
+  { id: 'rate', name: 'TRIGGER', icon: 'bolt', col: '#ff9f1c', desc: L('Everybody shoots faster.', 'Semua menembak lebih cepat.'), max: 4 },
+  { id: 'dmg', name: 'HOLLOW POINT', icon: 'bullet', col: '#ff4d5e', desc: L('+1 damage on every bullet.', '+1 damage di setiap peluru.'), max: 5 },
+  { id: 'rally', name: 'RALLY', icon: 'flag', col: '#5bd44a', desc: L('Level-ups bring more recruits.', 'Naik level dapat lebih banyak rekrutan.'), max: 3 },
+  { id: 'shield', name: 'WARD', icon: 'shield', col: '#7a8cff', desc: L('Shrug off the next hit. Stacks.', 'Tahan satu serangan berikutnya. Bisa ditumpuk.'), max: 3 },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff4d5e', desc: L('Coins and loot fly to you.', 'Koin dan hadiah terbang ke arahmu.'), max: 2 },
+  { id: 'bulwark', name: 'BULWARK', icon: 'wall', col: '#8b6cff', desc: L('Lava, saws and walls bite less.', 'Lava, gergaji, dan tembok tak terlalu sakit.'), max: 3 },
+  { id: 'chain', name: 'CHAIN', icon: 'chain', col: '#ff9f1c', desc: L('Kills zap the monsters next door.', 'Monster yang mati menyetrum tetangganya.'), max: 2 },
+  { id: 'crit', name: 'CRIT', icon: 'star', col: '#ffb400', desc: L('Some shots hit double.', 'Sebagian tembakan berdamage ganda.'), max: 3 },
+  { id: 'steady', name: 'ANCHOR', icon: 'anchor', col: '#4aa3ff', desc: L('Fewer soldiers slip off the edge.', 'Lebih sedikit prajurit jatuh dari tepi.'), max: 2 },
+  { id: 'overdrive', name: 'OVERDRIVE', icon: 'chevrons', col: '#ff9f1c', desc: L('Good gates spin up your guns for a bit.', 'Gerbang bagus bikin senjata ngebut sebentar.'), max: 2 },
+  { id: 'greed', name: 'GREED', icon: 'bag', col: '#ffb400', desc: L('Coins are worth 25% more.', 'Koin bernilai 25% lebih.'), max: 3 },
+  { id: 'fortune', name: 'FORTUNE', icon: 'sparkle', col: '#ffb400', desc: L('Bigger distance payout at the end.', 'Bonus jarak di akhir lebih besar.'), max: 2 },
+  { id: 'execution', name: 'EXECUTION', icon: 'skull', col: '#ff4d5e', desc: L('Bosses take way more damage.', 'Bos menerima damage jauh lebih besar.'), max: 3 },
+  { id: 'iron', name: 'IRON', icon: 'shield', col: '#8b6cff', desc: L('Lose fewer soldiers to everything.', 'Kehilangan lebih sedikit prajurit.'), max: 3 },
+  { id: 'focus', name: 'FOCUS', icon: 'crosshair', col: '#ff4d5e', desc: L('Tighter, deadlier volleys.', 'Tembakan lebih rapat dan mematikan.'), max: 3 },
+  { id: 'warcry', name: 'WARCRY', icon: 'megaphone', col: '#5bd44a', desc: L('Good gates bring extra recruits.', 'Gerbang bagus menambah rekrutan.'), max: 3 },
+  { id: 'scavenge', name: 'SCAVENGE', icon: 'bag', col: '#ffb400', desc: L('Monsters drop coins sometimes.', 'Monster kadang menjatuhkan koin.'), max: 3 },
+  { id: 'laststand', name: 'LAST STAND', icon: 'heart', col: '#ff4d5e', desc: L('Under 18 soldiers? Hit harder.', 'Di bawah 18 prajurit? Pukul lebih keras.'), max: 2 },
+  { id: 'quickstep', name: 'QUICKSTEP', icon: 'chevrons', col: '#5bd44a', desc: L('Switch formation faster.', 'Ganti formasi lebih cepat.'), max: 2 },
+  { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: L('Grab coins from farther out.', 'Ambil koin dari lebih jauh.'), max: 2 },
 ];
 const SKINS = [
   { id: 'recruit', name: 'RECRUIT', price: 0, body: '#3d7bff', lead: '#ffd75d' },
@@ -352,25 +359,25 @@ const SKINS = [
    Upgrades make the next run go further, missions give a reason to try a
    different route, and the daily gift brings people back. */
 const UPGRADES = [
-  { id: 'army', name: 'BIGGER SQUAD', icon: 'flag', col: '#5bd44a', max: 15, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(60 * Math.pow(1.35, l)) },
-  { id: 'gun', name: 'STARTING GUN', icon: 'gun', col: '#ff4d5e', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [600, 1800, 4500][l] },
-  { id: 'armor', name: 'BODY ARMOR', icon: 'shield', col: '#8b6cff', max: 8, desc: 'Fewer soldiers lost to every hit', val: (l) => l ? '-' + l * 5 + '%' : 'none', cost: (l) => Math.round(150 * Math.pow(1.45, l)) },
-  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(200 * Math.pow(1.7, l)) },
-  { id: 'lucky', name: 'LUCKY GATES', icon: 'sparkle', col: '#ffb400', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l ? l * 6 + '%' : 'none', cost: (l) => Math.round(250 * Math.pow(1.6, l)) },
-  { id: 'fire', name: 'FIREPOWER', icon: 'bullet', col: '#ff6b3d', max: 50, desc: 'Every bullet hits harder. Keeps going', val: (l) => l ? '+' + l * 4 + '%' : 'normal', cost: (l) => Math.round(300 * Math.pow(1.12, l)) },
-  { id: 'coin', name: 'COIN VALUE', icon: 'star', col: '#ff9f1c', max: 8, desc: 'Every coin is worth more', val: (l) => l ? '+' + l * 15 + '%' : 'normal', cost: (l) => Math.round(120 * Math.pow(1.5, l)) },
+  { id: 'army', name: L('BIGGER SQUAD', 'PASUKAN BESAR'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('Soldiers at the start', 'Prajurit di awal run'), val: (l) => String(10 + l * 5), cost: (l) => Math.round(60 * Math.pow(1.35, l)) },
+  { id: 'gun', name: L('STARTING GUN', 'SENJATA AWAL'), icon: 'gun', col: '#ff4d5e', max: 3, desc: L('Weapon at the start', 'Senjata di awal run'), val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [600, 1800, 4500][l] },
+  { id: 'armor', name: L('BODY ARMOR', 'BAJU ZIRAH'), icon: 'shield', col: '#8b6cff', max: 8, desc: L('Fewer soldiers lost to every hit', 'Lebih sedikit prajurit hilang tiap kena'), val: (l) => l ? '-' + l * 5 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(150 * Math.pow(1.45, l)) },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: L('Coins fly to you from farther away', 'Koin tertarik dari lebih jauh'), val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : L('off', 'mati'), cost: (l) => Math.round(200 * Math.pow(1.7, l)) },
+  { id: 'lucky', name: L('LUCKY GATES', 'GERBANG HOKI'), icon: 'sparkle', col: '#ffb400', max: 5, desc: L('Chance of a golden gate, good on both sides', 'Peluang gerbang emas, untung di dua sisi'), val: (l) => l ? l * 6 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(250 * Math.pow(1.6, l)) },
+  { id: 'fire', name: L('FIREPOWER', 'DAYA TEMBAK'), icon: 'bullet', col: '#ff6b3d', max: 50, desc: L('Every bullet hits harder. Keeps going', 'Setiap peluru makin sakit. Tanpa batas'), val: (l) => l ? '+' + l * 4 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(300 * Math.pow(1.12, l)) },
+  { id: 'coin', name: L('COIN VALUE', 'NILAI KOIN'), icon: 'star', col: '#ff9f1c', max: 8, desc: L('Every coin is worth more', 'Setiap koin bernilai lebih'), val: (l) => l ? '+' + l * 15 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(120 * Math.pow(1.5, l)) },
 ];
 const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt', rescue: 'lock' };
 const MISSION_DEFS = {
-  dist: { steps: [300, 500, 800, 1200, 1600, 2200, 3000, 4000], text: (n) => `Run ${n}m in one run` },
-  army: { steps: [100, 250, 600, 1500, 4000, 10000, 20000], text: (n) => `Grow your army to ${n}` },
-  mobs: { steps: [2, 4, 6, 9, 13, 18], text: (n) => `Beat ${n} enemy mobs in one run` },
-  boss: { steps: [1, 2, 3, 5, 7, 10], text: (n) => `Defeat ${n} boss${n > 1 ? 'es' : ''} in one run` },
-  coins: { steps: [40, 90, 160, 260, 400, 600], text: (n) => `Grab ${n} coins in one run` },
-  walls: { steps: [2, 4, 7, 10, 15], text: (n) => `Break ${n} walls in one run` },
-  rescue: { steps: [10, 30, 80, 200, 500, 1200], text: (n) => `Free ${n} prisoners in one run` },
-  gun: { steps: [1, 2, 3, 4, 5], text: (n) => `Upgrade your gun ${n} time${n > 1 ? 's' : ''} in one run` },
-  streak: { steps: [4, 6, 8, 11, 15], text: (n) => `Take ${n} good gates in a row` },
+  dist: { steps: [300, 500, 800, 1200, 1600, 2200, 3000, 4000], text: (n) => L(`Run ${n}m in one run`, `Lari ${n}m dalam satu run`) },
+  army: { steps: [100, 250, 600, 1500, 4000, 10000, 20000], text: (n) => L(`Grow your army to ${n}`, `Kumpulkan ${n} pasukan`) },
+  mobs: { steps: [2, 4, 6, 9, 13, 18], text: (n) => L(`Beat ${n} enemy mobs in one run`, `Kalahkan ${n} gerombolan musuh dalam satu run`) },
+  boss: { steps: [1, 2, 3, 5, 7, 10], text: (n) => L(`Defeat ${n} boss${n > 1 ? 'es' : ''} in one run`, `Kalahkan ${n} bos dalam satu run`) },
+  coins: { steps: [40, 90, 160, 260, 400, 600], text: (n) => L(`Grab ${n} coins in one run`, `Ambil ${n} koin dalam satu run`) },
+  walls: { steps: [2, 4, 7, 10, 15], text: (n) => L(`Break ${n} walls in one run`, `Hancurkan ${n} tembok dalam satu run`) },
+  rescue: { steps: [10, 30, 80, 200, 500, 1200], text: (n) => L(`Free ${n} prisoners in one run`, `Bebaskan ${n} tawanan dalam satu run`) },
+  gun: { steps: [1, 2, 3, 4, 5], text: (n) => L(`Upgrade your gun ${n} time${n > 1 ? 's' : ''} in one run`, `Upgrade senjata ${n}x dalam satu run`) },
+  streak: { steps: [4, 6, 8, 11, 15], text: (n) => L(`Take ${n} good gates in a row`, `Lewati ${n} gerbang bagus berturut-turut`) },
 };
 const META = {
   up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0, fire: 0 },
@@ -380,7 +387,8 @@ const META = {
   runs: 0,
 };
 /* rank: every 3 missions done promotes you; each rank pays out and adds +5% coins */
-const RANKS = ['RECRUIT', 'PRIVATE', 'CORPORAL', 'SERGEANT', 'LIEUTENANT', 'CAPTAIN', 'MAJOR', 'COLONEL', 'GENERAL', 'WARLORD'];
+const RANKS = L(['RECRUIT', 'PRIVATE', 'CORPORAL', 'SERGEANT', 'LIEUTENANT', 'CAPTAIN', 'MAJOR', 'COLONEL', 'GENERAL', 'WARLORD'],
+  ['REKRUT', 'PRAJURIT', 'KOPRAL', 'SERSAN', 'LETNAN', 'KAPTEN', 'MAYOR', 'KOLONEL', 'JENDERAL', 'PANGLIMA']);
 function rankOf(done) { return Math.min(RANKS.length - 1, Math.floor(done / 3)); }
 function rankReward(r) { return 150 + r * 100; }
 function missionGoal(m) { const d = MISSION_DEFS[m.type]; return d.steps[Math.min(d.steps.length - 1, META.mlv[m.type] || 0)]; }
@@ -423,7 +431,7 @@ function checkMissions() {
       if (rk > rankOf(META.done - 1)) {
         const rr = rankReward(rk);
         G.coins += rr; G.missionCoins += rr;
-        missionToast('You made ' + RANKS[rk] + '!', rr, 'RANK UP');
+        missionToast(L('You made ', 'Kamu naik jadi ') + RANKS[rk] + '!', rr, L('RANK UP', 'NAIK PANGKAT'));
         setTimeout(() => sfx.fanfare(), 2700);
       }
       saveSave();
@@ -1784,8 +1792,8 @@ function spawnMob(wy, scale, band) {
   const m = { x: band ? (road.x0 + road.x1) / 2 : x, band: !!band, wy, count: n, start: n, hp: n * uh, uh, units, hw, hd: ((rows - 1) * gap * 0.9) / 2 + 10,
     clash: false, tick: 0, hitT: 0, pop: 0, dead: false, deadT: 0, label: mkLabel('mob') };
   mobs.push(m);
-  if (band) bannerFlash('WAR BAND AHEAD', '#ff5d6a');
-  if (!META.seenMob) { META.seenMob = true; showHint('RED MOB AHEAD · shoot it down, then outnumber it on contact', 4.5); }
+  if (band) bannerFlash(L('WAR BAND AHEAD', 'PASUKAN PERANG!'), '#ff5d6a');
+  if (!META.seenMob) { META.seenMob = true; showHint(L('RED MOB AHEAD · shoot it down, then outnumber it on contact', 'GEROMBOLAN MERAH · tembak dulu, lalu kalahkan jumlahnya'), 4.5); }
   return m;
 }
 function mobVisible(m) { return Math.max(1, Math.min(m.units.length, Math.ceil(m.units.length * m.count / m.start))); }
@@ -2093,13 +2101,13 @@ function tutorialHint(kind) {
   if (META.seen[kind]) return;
   const touch = document.body.classList.contains('touch');
   const T = {
-    choke: touch ? 'CHOKEPOINT! Swipe up to squeeze into a column' : 'CHOKEPOINT! Hold ↑ to squeeze into a column',
-    saw: 'SAW BLADE! Time it and steer around',
-    lava: 'LAVA! Keep the squad on the dark side',
-    gap: 'PIT! Steer around the hole',
-    meteor: 'METEOR! Get out of the red circle',
-    wall: 'WALL! Shoot it down or go around the gap',
-    band: 'WAR BAND! As big as your army. Shoot it down first',
+    choke: touch ? L('CHOKEPOINT! Swipe up to squeeze into a column', 'CELAH SEMPIT! Swipe ke atas jadi barisan') : L('CHOKEPOINT! Hold ↑ to squeeze into a column', 'CELAH SEMPIT! Tahan ↑ jadi barisan'),
+    saw: L('SAW BLADE! Time it and steer around', 'GERGAJI! Atur waktu dan hindari'),
+    lava: L('LAVA! Keep the squad on the dark side', 'LAVA! Jaga pasukan di sisi yang gelap'),
+    gap: L('PIT! Steer around the hole', 'LUBANG! Belok menghindari lubang'),
+    meteor: L('METEOR! Get out of the red circle', 'METEOR! Keluar dari lingkaran merah'),
+    wall: L('WALL! Shoot it down or go around the gap', 'TEMBOK! Tembak atau lewati celahnya'),
+    band: L('WAR BAND! As big as your army. Shoot it down first', 'PASUKAN PERANG! Sebesar pasukanmu. Tembak duluan'),
   };
   if (!T[kind]) return;
   META.seen[kind] = true;
@@ -2113,7 +2121,7 @@ function onFirstSteer() {
   G.steered = true;
   if (META.runs <= 3) {
     const touch = document.body.classList.contains('touch');
-    showHint(touch ? 'Nice! Swipe up for a column, down to spread wide' : 'Nice! Scroll or ↑ ↓ to squeeze or spread the squad', 3.2);
+    showHint(touch ? L('Nice! Swipe up for a column, down to spread wide', 'Mantap! Swipe atas jadi barisan, bawah melebar') : L('Nice! Scroll or ↑ ↓ to squeeze or spread the squad', 'Mantap! Scroll atau ↑ ↓ untuk merapat/melebar'), 3.2);
   }
 }
 function showHint(text, secs) {
@@ -2341,7 +2349,7 @@ function offerSkills() {
     for (let k = 0; k < s.max; k++) pips += `<u class="${k < st ? 'f' : k === st ? 'n' : ''}"></u>`;
     btn.style.setProperty('--sc', s.col);
     btn.innerHTML = `<i>${icon(s.icon)}</i><b>${s.name}</b><span>${s.desc}</span><div class="pips">${pips}</div>` +
-      `<em class="${st ? 'up' : ''}">${st ? 'LV ' + (st + 1) : 'NEW'}</em><kbd>${picks.indexOf(s) + 1}</kbd>`;
+      `<em class="${st ? 'up' : ''}">${st ? 'LV ' + (st + 1) : L('NEW', 'BARU')}</em><kbd>${picks.indexOf(s) + 1}</kbd>`;
     btn.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       chooseSkill(s.id);
@@ -2349,7 +2357,7 @@ function offerSkills() {
     skillCards.appendChild(btn);
   }
   const head = document.getElementById('skillHead');
-  if (head) head.textContent = 'LEVEL ' + G.level + '!';
+  if (head) head.textContent = L('LEVEL ', 'LEVEL ') + G.level + '!';
   skillOv.style.display = 'flex';
   G.mode = 'pick';
   skillIds = picks.map((p) => p.id);
@@ -2395,19 +2403,27 @@ function missionHTML(showNew) {
     const goal = missionGoal(m);
     const val = Math.min(goal, m.done ? goal : (live ? missionValue(m.type) : 0));
     const pct = Math.round((val / goal) * 100);
-    const sub = live ? (m.done ? 'Done!' + nextTxt(m) : fmtNum(val) + ' / ' + fmtNum(goal)) : '';
+    const sub = live ? (m.done ? L('Done!', 'Selesai!') + nextTxt(m) : fmtNum(val) + ' / ' + fmtNum(goal)) : '';
     h += `<div class="ms${m.done ? ' done' : ''}"><div class="mi">${icon(m.done ? 'check' : MISSION_ICON[m.type])}</div>` +
-      `<div class="mt">${showNew && m.isNew ? '<span class="nw">NEW</span>' : ''}${MISSION_DEFS[m.type].text(goal)}` +
+      `<div class="mt">${showNew && m.isNew ? '<span class="nw">' + L('NEW', 'BARU') + '</span>' : ''}${MISSION_DEFS[m.type].text(goal)}` +
       (sub ? `<span class="pg">${sub}</span>` : '') +
       (live && !m.done ? `<div class="bar"><i style="width:0" data-w="${pct}%"></i></div>` : '') +
       `</div><div class="rw">+${missionReward(m)}${COIN}</div></div>`;
   }
-  return h ? '<h3>MISSIONS</h3>' + h : '';
+  return h ? '<h3>' + L('MISSIONS', 'MISI') + '</h3>' + h : '';
 }
 function nextTxt(m) {
   const d = MISSION_DEFS[m.type], l = (META.mlv[m.type] || 0) + 1;
-  return l < d.steps.length ? ' Next up: ' + d.text(d.steps[l]).toLowerCase() : '';
+  return l < d.steps.length ? L(' Next up: ', ' Berikutnya: ') + d.text(d.steps[l]).toLowerCase() : '';
 }
+const CAUSE_ID = {
+  'A BAD GATE': 'GERBANG YANG SALAH', 'FELL OFF THE ROAD': 'JATUH DARI JALAN', 'BOSS FIREBALL': 'BOLA API BOS',
+  'OUTNUMBERED BY A MOB': 'KALAH JUMLAH DARI GEROMBOLAN', 'METEOR STRIKE': 'TERTIMPA METEOR', 'FELL IN A PIT': 'JATUH KE LUBANG',
+  'BURNED IN LAVA': 'TERBAKAR LAVA', 'CRUSHED IN A CHOKEPOINT': 'TERJEPIT DI CELAH', 'SHREDDED BY A SAW': 'TERCINCANG GERGAJI',
+  'CRUSHED BY A BOSS': 'DIHANCURKAN BOS', 'OVERRUN BY MONSTERS': 'DIKEROYOK MONSTER', 'SMASHED INTO A WALL': 'MENABRAK TEMBOK',
+  'YOU CALLED IT': 'KAMU MENGAKHIRINYA',
+};
+function causeText(c) { if (!c) return L('WIPED OUT', 'KALAH'); return LANG === 'id' ? (CAUSE_ID[c] || c) : c; }
 function reviveCost() { return Math.max(30, Math.round(G.dist / 8)); }
 function gameOver() {
   if (G.mode === 'over') return;
@@ -2422,19 +2438,19 @@ function gameOver() {
   G.coins += bonus;
   G.coinsRun += bonus;
   G.bonusTotal += bonus;
-  if (overCause) overCause.textContent = G.cause || 'WIPED OUT';
+  if (overCause) overCause.textContent = causeText(G.cause);
   const overH = overOv.querySelector('h1');
-  if (overH) overH.textContent = G.cause === 'YOU CALLED IT' ? 'RUN OVER' : 'WIPED OUT';
+  if (overH) overH.textContent = G.cause === 'YOU CALLED IT' ? L('RUN OVER', 'RUN SELESAI') : L('WIPED OUT', 'KALAH!');
   const gap = prevBest - d;
-  const sub = isBest && d > 0 ? '<span class="stamp">NEW BEST!</span>'
-    : gap <= 120 ? `<b class="close">So close! ${gap}m short of your best</b>`
-    : `<span class="chip">${icon('crown')}best ${G.best}m</span>`;
+  const sub = isBest && d > 0 ? `<span class="stamp">${L('NEW BEST!', 'REKOR BARU!')}</span>`
+    : gap <= 120 ? `<b class="close">${L(`So close! ${gap}m short of your best`, `Dikit lagi! Kurang ${gap}m dari rekor`)}</b>`
+    : `<span class="chip">${icon('crown')}${L('best', 'rekor')} ${G.best}m</span>`;
   const earned = G.coinsRun + G.missionCoins;
   {
-    const L = META.life, prev = G.lifeBanked || { kills: 0, bosses: 0, mobs: 0, coins: 0, freed: 0, meters: 0 };
+    const LB = META.life, prev = G.lifeBanked || { kills: 0, bosses: 0, mobs: 0, coins: 0, freed: 0, meters: 0 };
     const now = { kills: G.kills, bosses: G.bossKills, mobs: G.mobsBeaten, coins: earned, freed: G.rescued, meters: d };
-    for (const k in now) L[k] += Math.max(0, now[k] - prev[k]);
-    L.peak = Math.max(L.peak, G.peak);
+    for (const k in now) LB[k] += Math.max(0, now[k] - prev[k]);
+    LB.peak = Math.max(LB.peak, G.peak);
     G.lifeBanked = now;
   }
   if (!revived || META.hist.length === 0) META.hist.push(d); else META.hist[META.hist.length - 1] = d;
@@ -2444,9 +2460,9 @@ function gameOver() {
     `<i class="${k === META.hist.length - 1 ? 'now' : v === G.best ? 'top' : ''}" style="height:${Math.max(8, Math.round(100 * v / hmax))}%"></i>`).join('')}</div>` : '';
   overStats.innerHTML =
     `<div id="overDist">0m</div>${sub}` +
-    `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} peak</span>` +
-    `<span class="chip">${icon('skull')}${G.mobsBeaten} mobs</span><span class="chip">${icon('crown')}${G.bossKills} bosses</span></div>` + histHTML +
-    `<div class="earn">+<span id="earnN">0</span>${COIN}<small>${G.coinsPickedVal} grabbed · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''}</small></div>`;
+    `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} ${L('peak', 'puncak')}</span>` +
+    `<span class="chip">${icon('skull')}${G.mobsBeaten} ${L('mobs', 'gerombolan')}</span><span class="chip">${icon('crown')}${G.bossKills} ${L('bosses', 'bos')}</span></div>` + histHTML +
+    `<div class="earn">+<span id="earnN">0</span>${COIN}<small>${G.coinsPickedVal} ${L('grabbed', 'diambil')} · ${G.bonusTotal} ${L('distance', 'jarak')}${G.missionCoins ? ' · ' + G.missionCoins + ' ' + L('missions', 'misi') : ''}</small></div>`;
   if (overMissions) {
     overMissions.innerHTML = missionHTML(false);
     setTimeout(() => { for (const b of overMissions.querySelectorAll('.bar i')) b.style.width = b.dataset.w; }, 450);
@@ -2473,7 +2489,7 @@ function gameOver() {
     const c = reviveCost();
     reviveBtn.style.display = revived ? 'none' : '';
     reviveBtn.disabled = G.coins < c;
-    reviveBtn.innerHTML = `${icon('heart')}<span class="stack">REVIVE<small>${c} coins</small></span>`;
+    reviveBtn.innerHTML = `${icon('heart')}<span class="stack">${L('REVIVE', 'HIDUP LAGI')}<small>${c} ${L('coins', 'koin')}</small></span>`;
   }
   refreshBadges();
   renderQuickBuy();
@@ -2525,7 +2541,7 @@ function revive() {
   G.mode = 'run';
   addSoldiers(Math.max(24, Math.ceil(G.peak * 0.5)));
   G.grace = 1.8;
-  bannerFlash('GET READY!', '#7ee081');
+  bannerFlash(L('GET READY!', 'SIAP-SIAP!'), '#7ee081');
   floatText(G.armyX, G.camY + 20, 'SECOND WIND!', '#e2b657', 30, 4);
   ringT = 0; ringMat.color.set('#e2b657');
   sfx.great(); vib(40);
@@ -2573,7 +2589,7 @@ function shareCard() {
 if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
   e.stopPropagation(); e.preventDefault();
   const d = Math.floor(G.dist);
-  const text = `I ran ${d}m in MOB RUN with a peak army of ${G.peak}. Beat that:`;
+  const text = L(`I ran ${d}m in MOB RUN with a peak army of ${G.peak}. Beat that:`, `Aku lari ${d}m di MOB RUN dengan pasukan ${G.peak}. Coba kalahkan:`);
   const url = location.origin + location.pathname.replace(/index\.html$/, '');
   const done = () => { shareBtn.innerHTML = icon('check'); setTimeout(() => { shareBtn.innerHTML = icon('share'); }, 1500); };
   try {
@@ -2612,7 +2628,7 @@ function renderQuickBuy() {
   if (!quickBuy) return;
   const b = bestBuy();
   quickBuy.classList.toggle('on', !!b);
-  if (b) quickBuy.innerHTML = `${icon(b.u.icon)}<span class="stack">${b.u.name} → ${b.u.val(b.l + 1)}<small>upgrade for ${b.c} coins</small></span>`;
+  if (b) quickBuy.innerHTML = `${icon(b.u.icon)}<span class="stack">${b.u.name} → ${b.u.val(b.l + 1)}<small>${L('upgrade for', 'upgrade seharga')} ${b.c} ${L('coins', 'koin')}</small></span>`;
 }
 if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
@@ -2637,19 +2653,20 @@ function toggleMute() {
 const setOv = document.getElementById('settingsOverlay');
 function renderSettings() {
   if (!setOv) return;
-  const rows = [['sfx', 'sound', 'SOUND EFFECTS', !muted], ['music', 'music', 'MUSIC', !musicOff], ['vib', 'phone', 'VIBRATION', !vibOff], ['shake', 'crosshair', 'SCREEN SHAKE', !shakeOff]];
+  const rows = [['sfx', 'sound', L('SOUND EFFECTS', 'EFEK SUARA'), !muted], ['music', 'music', L('MUSIC', 'MUSIK'), !musicOff], ['vib', 'phone', L('VIBRATION', 'GETARAN'), !vibOff], ['shake', 'crosshair', L('SCREEN SHAKE', 'GUNCANGAN LAYAR'), !shakeOff]];
   const rec = document.getElementById('records');
   if (rec) {
-    const L = META.life;
+    const LF = META.life;
     const row = (ic, k, v) => `<div class="recRow"><i>${icon(ic)}</i><span>${k}</span><b>${v}</b></div>`;
-    rec.innerHTML = '<h3>YOUR RECORDS</h3>' + row('run', 'Runs', META.runs) + row('crown', 'Best distance', G.best + 'm') +
-      row('flag', 'Biggest army', fmtNum(L.peak)) + row('skull', 'Monsters beaten', fmtNum(L.kills)) +
-      row('crown', 'Bosses beaten', L.bosses) + row('lock', 'Prisoners freed', fmtNum(L.freed)) +
-      row('star', 'Coins earned', fmtNum(L.coins)) + row('run', 'Total distance', fmtNum(L.meters) + 'm');
+    rec.innerHTML = '<h3>' + L('YOUR RECORDS', 'REKORMU') + '</h3>' + row('run', L('Runs', 'Jumlah run'), META.runs) + row('crown', L('Best distance', 'Jarak terjauh'), G.best + 'm') +
+      row('flag', L('Biggest army', 'Pasukan terbesar'), fmtNum(LF.peak)) + row('skull', L('Monsters beaten', 'Monster dikalahkan'), fmtNum(LF.kills)) +
+      row('crown', L('Bosses beaten', 'Bos dikalahkan'), LF.bosses) + row('lock', L('Prisoners freed', 'Tawanan dibebaskan'), fmtNum(LF.freed)) +
+      row('star', L('Coins earned', 'Koin terkumpul'), fmtNum(LF.coins)) + row('run', L('Total distance', 'Total jarak'), fmtNum(LF.meters) + 'm');
   }
   const list = document.getElementById('setList');
   if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
-    `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('');
+    `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('') +
+    `<button type="button" class="setRow" data-k="lang"><i>${icon('share')}</i><b>${L('LANGUAGE', 'BAHASA')}</b><span class="langTag">${LANG === 'id' ? 'INDONESIA' : 'ENGLISH'}</span></button>`;
 }
 if (setOv) {
   setOv.addEventListener('pointerdown', (e) => {
@@ -2661,6 +2678,10 @@ if (setOv) {
       if (k === 'music') musicOff = !musicOff;
       if (k === 'vib') { vibOff = !vibOff; vib(30); }
       if (k === 'shake') shakeOff = !shakeOff;
+      if (k === 'lang') {
+        try { localStorage.setItem('mobrun_lang', LANG === 'id' ? 'en' : 'id'); } catch (err) { }
+        saveSave(); location.reload(); return;
+      }
       audio(); if (!muted) sfx.power();
       saveSettings(); renderSettings();
       return;
@@ -2689,7 +2710,7 @@ function missionToast(text, reward, title) {
 function showToast() {
   if (!toastEl || !toastQ.length) return;
   const q = toastQ[0];
-  toastEl.innerHTML = `<div class="chip">${icon(q.title ? 'crown' : 'check')}</div><div><b>${q.title || 'MISSION DONE'}</b>${q.text} · +${q.reward}${COIN}</div>`;
+  toastEl.innerHTML = `<div class="chip">${icon(q.title ? 'crown' : 'check')}</div><div><b>${q.title || L('MISSION DONE', 'MISI SELESAI')}</b>${q.text} · +${q.reward}${COIN}</div>`;
   toastEl.classList.toggle('rank', !!q.title);
   toastEl.classList.add('on');
   sfx.great(); vib(25);
@@ -2724,7 +2745,7 @@ function refreshBadges() {
   }
 }
 function refreshMeta() {
-  if (bestLine) bestLine.innerHTML = `<span class="chip">${icon('crown')}${G.best ? 'best ' + G.best + 'm' : 'no best yet'}</span>` +
+  if (bestLine) bestLine.innerHTML = `<span class="chip">${icon('crown')}${G.best ? L('best ', 'rekor ') + G.best + 'm' : L('no best yet', 'belum ada rekor')}</span>` +
     `<span class="chip">${COIN}${fmtNum(G.coins)}</span>`;
   if (hudCoins) hudCoins.innerHTML = COIN + fmtNum(G.coins);
   refreshBadges();
@@ -2736,7 +2757,7 @@ function rankHTML() {
   let pips = '';
   for (let i = 0; i < 3; i++) pips += `<u class="${maxed || i < into ? 'f' : ''}"></u>`;
   return `<span class="rk">${icon('crown')}${RANKS[rk]}</span><span class="pips">${pips}</span>` +
-    `<span class="nx">${maxed ? 'top rank' : 'next: ' + RANKS[rk + 1]}</span>`;
+    `<span class="nx">${maxed ? L('top rank', 'pangkat tertinggi') : L('next: ', 'berikutnya: ') + RANKS[rk + 1]}</span>`;
 }
 function renderMenu() {
   document.body.classList.add('menu');
@@ -2747,7 +2768,7 @@ function renderMenu() {
   if (dailyBtn) {
     const on = dailyReady();
     dailyBtn.classList.toggle('on', on);
-    if (on) { const dd = dailyAmount(); dailyBtn.innerHTML = `${icon('gift')}<span class="stack">FREE GIFT +${dd.coins}<small>day ${dd.streak} of 7</small></span>`; }
+    if (on) { const dd = dailyAmount(); dailyBtn.innerHTML = `${icon('gift')}<span class="stack">${L('FREE GIFT', 'HADIAH GRATIS')} +${dd.coins}<small>${L('day', 'hari')} ${dd.streak} ${L('of', 'dari')} 7</small></span>`; }
   }
   refreshMeta();
 }
@@ -2847,7 +2868,7 @@ function renderShop() {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'skinCard' + (on ? ' on' : '') + (!owned && G.coins < sk.price ? ' broke' : '');
-    const act = on ? 'ON' : owned ? 'USE' : sk.price + COIN;
+    const act = on ? L('ON', 'DIPAKAI') : owned ? L('USE', 'PAKAI') : sk.price + COIN;
     card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><span>${act}</span>`;
     card.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
@@ -2891,13 +2912,13 @@ function maybeOfferInstall() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const coarse = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches;
   if (deferredInstall) {
-    if (installHint) installHint.textContent = 'Keep MOB RUN on your home screen. It opens full screen, like an app.';
+    if (installHint) installHint.textContent = L('Keep MOB RUN on your home screen. It opens full screen, like an app.', 'Simpan MOB RUN di layar utama. Terbuka layar penuh seperti aplikasi.');
     if (installBtn) installBtn.style.display = '';
   } else if (ios) {
-    if (installHint) installHint.textContent = 'On iPhone: tap Share, then Add to Home Screen.';
+    if (installHint) installHint.textContent = L('On iPhone: tap Share, then Add to Home Screen.', 'Di iPhone: ketuk Bagikan, lalu Tambah ke Layar Utama.');
     if (installBtn) installBtn.style.display = 'none';
   } else if (coarse) {
-    if (installHint) installHint.textContent = 'Open the browser menu and choose Install app, or Add to Home Screen.';
+    if (installHint) installHint.textContent = L('Open the browser menu and choose Install app, or Add to Home Screen.', 'Buka menu browser, pilih Instal aplikasi atau Tambah ke Layar Utama.');
     if (installBtn) installBtn.style.display = 'none';
   } else { hide(); return; }
   try { localStorage.setItem('mobrun_pwa_once', '1'); } catch (e) { }
@@ -4595,6 +4616,29 @@ if (/[?&]debug\b/.test(location.search)) {
   };
 }
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
+if (LANG === 'id') {
+  const setT = (sel, txt) => { const el = document.querySelector(sel); if (el) el.firstChild ? (el.firstChild.nodeValue = txt) : (el.textContent = txt); };
+  setT('.ribbon', 'BESARKAN PASUKAN · HANCURKAN SEMUA');
+  setT('#playBtn', 'MAIN');
+  setT('#shopBtn', 'GUDANG');
+  setT('#shopBtnOver', 'GUDANG');
+  setT('#againBtn', 'MAIN LAGI');
+  setT('#skillOverlay .sub', 'Pilih satu. Bisa ditumpuk.');
+  setT('#shopOverlay .head', 'GUDANG');
+  setT('#shopClose', 'KEMBALI');
+  setT('#settingsOverlay .head', 'PENGATURAN');
+  setT('#setClose', 'SELESAI');
+  setT('#pauseOverlay .head', 'JEDA');
+  setT('#resumeBtn', 'LANJUT');
+  setT('#pauseSet', 'PENGATURAN');
+  setT('#pauseQuit', 'AKHIRI RUN');
+  setT('#installCard b', 'PASANG MOB RUN DI LAYAR UTAMA');
+  setT('#installBtn', 'PASANG');
+  setT('#installNo', 'NANTI SAJA');
+  const heads = document.querySelectorAll('#shopOverlay .shopHead');
+  if (heads[0]) heads[0].textContent = 'UPGRADE';
+  if (heads[1]) heads[1].textContent = 'WARNA PASUKAN';
+}
 document.body.classList.remove('loading');
 resize();
 if ('serviceWorker' in navigator) {
