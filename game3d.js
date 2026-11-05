@@ -374,13 +374,13 @@ const SKINS = [
    Upgrades make the next run go further, missions give a reason to try a
    different route, and the daily gift brings people back. */
 const UPGRADES = [
-  { id: 'army', name: L('BIGGER SQUAD', 'PASUKAN BESAR'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('Soldiers at the start', 'Prajurit di awal run'), val: (l) => String(10 + l * 5), cost: (l) => Math.round(60 * Math.pow(1.35, l)) },
-  { id: 'gun', name: L('STARTING GUN', 'SENJATA AWAL'), icon: 'gun', col: '#ff4d5e', max: 3, desc: L('Weapon at the start', 'Senjata di awal run'), val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [600, 1800, 4500][l] },
-  { id: 'armor', name: L('BODY ARMOR', 'BAJU ZIRAH'), icon: 'shield', col: '#8b6cff', max: 8, desc: L('Fewer soldiers lost to every hit', 'Lebih sedikit prajurit hilang tiap kena'), val: (l) => l ? '-' + l * 5 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(150 * Math.pow(1.45, l)) },
-  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: L('Coins fly to you from farther away', 'Koin tertarik dari lebih jauh'), val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : L('off', 'mati'), cost: (l) => Math.round(200 * Math.pow(1.7, l)) },
-  { id: 'lucky', name: L('LUCKY GATES', 'GERBANG HOKI'), icon: 'sparkle', col: '#ffb400', max: 5, desc: L('Chance of a golden gate, good on both sides', 'Peluang gerbang emas, untung di dua sisi'), val: (l) => l ? l * 6 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(250 * Math.pow(1.6, l)) },
+  { id: 'army', name: L('BIGGER SQUAD', 'PASUKAN BESAR'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('Soldiers at the start', 'Prajurit di awal run'), val: (l) => String(10 + l * 6), cost: (l) => Math.round(110 * Math.pow(1.35, l)) },
+  { id: 'gun', name: L('STARTING GUN', 'SENJATA AWAL'), icon: 'gun', col: '#ff4d5e', max: 3, desc: L('Weapon at the start', 'Senjata di awal run'), val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [450, 1700, 4500][l] },
+  { id: 'armor', name: L('BODY ARMOR', 'BAJU ZIRAH'), icon: 'shield', col: '#8b6cff', max: 8, desc: L('Fewer soldiers lost to every hit', 'Lebih sedikit prajurit hilang tiap kena'), val: (l) => l ? '-' + l * 5 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(240 * Math.pow(1.45, l)) },
+  { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: L('Coins fly to you from farther away', 'Koin tertarik dari lebih jauh'), val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : L('off', 'mati'), cost: (l) => Math.round(280 * Math.pow(1.7, l)) },
+  { id: 'lucky', name: L('LUCKY GATES', 'GERBANG HOKI'), icon: 'sparkle', col: '#ffb400', max: 5, desc: L('Chance of a golden gate, good on both sides', 'Peluang gerbang emas, untung di dua sisi'), val: (l) => l ? l * 6 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(350 * Math.pow(1.6, l)) },
   { id: 'fire', name: L('FIREPOWER', 'DAYA TEMBAK'), icon: 'bullet', col: '#ff6b3d', max: 50, desc: L('Every bullet hits harder. Keeps going', 'Setiap peluru makin sakit. Tanpa batas'), val: (l) => l ? '+' + l * 4 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(300 * Math.pow(1.12, l)) },
-  { id: 'coin', name: L('COIN VALUE', 'NILAI KOIN'), icon: 'star', col: '#ff9f1c', max: 8, desc: L('Every coin is worth more', 'Setiap koin bernilai lebih'), val: (l) => l ? '+' + l * 15 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(120 * Math.pow(1.5, l)) },
+  { id: 'coin', name: L('COIN VALUE', 'NILAI KOIN'), icon: 'star', col: '#ff9f1c', max: 8, desc: L('Every coin is worth more', 'Setiap koin bernilai lebih'), val: (l) => l ? '+' + l * 15 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(220 * Math.pow(1.5, l)) },
 ];
 const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt', rescue: 'lock' };
 const MISSION_DEFS = {
@@ -429,6 +429,14 @@ function fillMissions() {
     const t = types[ri(0, types.length - 1)];
     if (META.missions.some((m) => m.type === t)) continue;
     if ((META.mlv[t] || 0) >= MISSION_DEFS[t].steps.length) continue;
+    /* no "reach 100" right after a 20,000 run: start near half the player's record */
+    const rec = t === 'army' ? META.life.peak : t === 'dist' ? G.best : 0;
+    if (rec) {
+      const st = MISSION_DEFS[t].steps;
+      let lv = META.mlv[t] || 0;
+      while (lv < st.length - 1 && st[lv] < rec * 0.5) lv++;
+      META.mlv[t] = lv;
+    }
     META.missions.push({ type: t, done: false, isNew: true });
   }
 }
@@ -475,7 +483,7 @@ const MILES = [100, 250, 500, 1000, 2000, 4000];
 let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [], cages = [];
 let bullets = [], parts = [], floats = [], rewards = [], ebullets = [], coins = [], mobs = [];
 let firstMob = false, nextBand = 320, nextWall = 170, skillDelay = 0;
-let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0;
+let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0, sinceGate = 0;
 let fireAcc = 0, drainAcc = 0, shootSfxAcc = 0, fallAcc = 0, edgeWarn = 0;
 let hintT = 0, zoneIdx = -1, fovKick = 0, muzzleGlow = 0, distMark = 0, revived = false, lastLevel = 1;
 let shownTier = -1, shownSkills = null;
@@ -1623,10 +1631,14 @@ function schedule() {
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += 350; spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
     if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
-    if (G.dist > 60 && !firstMob) { firstMob = true; spawnMob(nextY, 0.7); }
-    else if (G.dist < 100 && gatesSpawned < 3) spawnGate(nextY);
+    /* early rules go by where the event lands (the schedule runs ~65m ahead), not where you are */
+    const at = nextY / 40;
+    if (at > 75 && !firstMob) { firstMob = true; spawnMob(nextY, 0.7); sinceGate++; }
+    else if (at < 100 && gatesSpawned < 3) { spawnGate(nextY); sinceGate = 0; }
+    /* first minute: a gate every other beat, so there is always a choice coming */
+    else if (at < 260 && sinceGate >= 1) { spawnGate(nextY); sinceGate = 0; }
+    else if (at < 260) { if (roll > 0.7 && at > 120) spawnMob(nextY); else if (chance(0.5)) spawnBarrels(nextY); else spawnPack(nextY); sinceGate++; }
     else if (roll > 1 - mobP) spawnMob(nextY);
-    else if (G.dist < 100) { if (chance(0.55)) spawnBarrels(nextY); else spawnPack(nextY); }
     else if (roll < gateP) spawnGate(nextY);
     else if (roll < packP) spawnPack(nextY);
     else if (roll < barrelP) { if (G.dist > 70 && chance(0.35)) spawnCage(nextY); else spawnBarrels(nextY); }
@@ -1685,8 +1697,10 @@ function spawnGate(wy) {
   }
   if (chance(0.06)) styles.push([{ t: 'mul', v: 5 }, { t: 'sub', v: late ? Math.round(S * rnd(0.9, 1.3)) : bigSub }]);
   if (chance(0.05)) styles.push([{ t: 'mul', v: 4 }, { t: 'div', v: 2 }]);
-  const lucky = gatesSpawned >= 2 && chance((META.up.lucky || 0) * 0.06);
+  const lucky = gatesSpawned >= 2 && gatesSpawned !== 3 && chance((META.up.lucky || 0) * 0.06);
+  const trap = chance(0.5) ? [{ t: 'sub', v: Math.max(5, Math.round(S * 0.5)) }, { t: 'add', v: addBase + 6 }] : [{ t: 'add', v: addBase + 6 }, { t: 'sub', v: Math.max(5, Math.round(S * 0.5)) }];
   const pair = gatesSpawned < 2 ? [{ t: 'add', v: addBase }, { t: 'mul', v: 2 }]
+    : gatesSpawned === 3 ? trap
     : lucky ? (chance(0.5) ? [{ t: 'mul', v: 3 }, { t: 'add', v: addBase * 2 }] : [{ t: 'add', v: addBase * 2 }, { t: 'mul', v: 3 }])
     : styles[ri(0, styles.length - 1)];
   /* way above par, a x3/x4/x5 would make the rest of the run a formality: soften it */
@@ -2374,7 +2388,7 @@ let edgeDanger = 0;
 function startGame() {
   G.mode = 'run'; G.camY = 0; G.speed = SPEED_BASE; shownArmy = -1;
   G.armyX = LW / 2; aimX = LW / 2; aimForm = 0; G.form = 0; formKey = ''; bodyN = 0; dragAxis = 0;
-  G.soldiers = 10 + META.up.army * 5; G.kills = 0; G.dist = 0; G.level = 1; G.peak = G.soldiers;
+  G.soldiers = 10 + META.up.army * 6; G.kills = 0; G.dist = 0; G.level = 1; G.peak = G.soldiers;
   G.tier = META.up.gun; G.upDmg = 0; G.upRate = 0; G.upSpread = 0;
   G.streak = 0; G.killChain = 0; G.killChainT = 0; G.mileIdx = 0;
   G.shake = 0; G.slow = 0;
@@ -2382,7 +2396,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -2404,11 +2418,10 @@ function startGame() {
 function skillLine() {
   let h = '';
   if (G.shield > 0) h += `<span class="ward">${icon('shield')}${G.shield}</span>`;
-  for (const sk of SKILLS) {
-    const n = G.skills[sk.id] || 0;
-    if (!n || sk.id === 'shield') continue;
-    h += `<span>${icon(sk.icon)}${n > 1 ? n : ''}</span>`;
-  }
+  /* one tidy row: the four strongest picks, then a +N for the rest */
+  const got = SKILLS.filter((sk) => sk.id !== 'shield' && G.skills[sk.id]).sort((a, b) => G.skills[b.id] - G.skills[a.id]);
+  for (const sk of got.slice(0, 4)) { const n = G.skills[sk.id]; h += `<span style="color:${sk.col}">${icon(sk.icon)}${n > 1 ? '<b>' + n + '</b>' : ''}</span>`; }
+  if (got.length > 4) h += `<span class="more">+${got.length - 4}</span>`;
   if (G.overT > 0.15) h += `<span style="color:#ffcc33;border-color:#ffcc33">${icon('chevrons')}</span>`;
   return h;
 }
@@ -2542,8 +2555,13 @@ function gameOver() {
   if (!revived || META.hist.length === 0) META.hist.push(d); else META.hist[META.hist.length - 1] = d;
   while (META.hist.length > 10) META.hist.shift();
   const hmax = Math.max(1, ...META.hist);
-  const histHTML = META.hist.length > 1 ? `<div class="hist">${META.hist.map((v, k) =>
-    `<i class="${k === META.hist.length - 1 ? 'now' : v === G.best ? 'top' : ''}" style="height:${Math.max(8, Math.round(100 * v / hmax))}%"></i>`).join('')}</div>` : '';
+  /* last runs, labelled: this run and the best one carry their distance */
+  const short = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v + 'm';
+  const topK = META.hist.lastIndexOf(hmax);
+  const histHTML = META.hist.length > 1 ? `<div class="hist">${META.hist.map((v, k) => {
+    const now = k === META.hist.length - 1, top = !now && k === topK;
+    return `<i class="${now ? 'now' : top ? 'top' : ''}" style="height:${Math.max(8, Math.round(100 * v / hmax))}%">${now || top ? '<b>' + short(v) + '</b>' : ''}</i>`;
+  }).join('')}</div><div class="histCap">${L('LAST ' + META.hist.length + ' RUNS', META.hist.length + ' RUN TERAKHIR')}</div>` : '';
   overStats.innerHTML =
     `<div id="overDist">0m</div>${sub}` +
     `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} ${L('peak', 'puncak')}</span>` +
@@ -3171,6 +3189,15 @@ function takePickup(kind, x) {
   for (let i = 0; i < 12; i++) parts.push(mkPart(x, G.camY + 10, '#7de8ff'));
 }
 
+/* Past what we can draw, a bigger army shows as bigger, burlier soldiers in a
+   looser crowd, so 2,000 never looks like 200. Purely visual: the width still
+   stays inside the road, so nobody falls off for it. */
+let crowdS = 1;
+function crowdTarget() {
+  const S = G.soldiers;
+  if (S <= visCap) return 1;
+  return 1 + 0.42 * clamp(Math.log(S / visCap) / Math.log(20000 / visCap), 0, 1);
+}
 function formation(n) {
   /* Width tracks the asphalt. A centered wide line fills the road;
      steering past the edge, or a narrower road later, drops soldiers. */
@@ -3178,14 +3205,14 @@ function formation(n) {
   const wide = (G.form + 1) * 0.5;
   const roadW = Math.max(120, road.x1 - road.x0);
   const span = roadW * (0.18 + wide * 0.66);
-  const spY = (8 + (1 - wide) * 10) * Math.max(0.7, Math.min(1, roadW / 480));
+  const spY = (8 + (1 - wide) * 10) * Math.max(0.7, Math.min(1, roadW / 480)) * crowdS;
   const aspect = Math.pow(2.6, G.form);
   let cols = Math.round(Math.sqrt(n) * aspect);
   cols = clamp(cols, 1, Math.min(n, wide > 0.72 ? 16 : 36));
   const body = n - 1;
   const rows = Math.max(1, Math.ceil(Math.max(1, body) / cols));
   /* small squads stay a tight knot; only big ones fill the road */
-  const spX = cols <= 1 ? 0 : Math.min(span / (cols - 1), 22 + wide * 24);
+  const spX = cols <= 1 ? 0 : Math.min(span / (cols - 1), (22 + wide * 24) * crowdS);
   const out = new Array(n);
   out[0] = { x: 0, y: -((rows - 1) * spY) * 0.45 - spY * 0.9 };
   for (let i = 1; i < n; i++) {
@@ -3219,6 +3246,9 @@ function stepBodies(dt) {
   }
   bodyN = n;
   crowdT += dt;
+  /* ease toward the new size in steps, so the formation is not rebuilt every frame */
+  const ct = crowdTarget();
+  if (Math.abs(ct - crowdS) > 0.02) crowdS += Math.sign(ct - crowdS) * Math.min(Math.abs(ct - crowdS), 0.02);
   const damp = Math.max(0, 1 - 3.4 * dt);
   for (let i = 0; i < n; i++) {
     const slot = squadNow[i] || squadNow[0];
@@ -3237,11 +3267,11 @@ function stepBodies(dt) {
   const reach = 9;
   for (let pass = 0; pass < 2; pass++) {
     for (let i = 0; i < n; i++) {
-      const ri0 = i === 0 ? 8 : 4.2 + (bodyPh[i] % 1) * 2.4;
+      const ri0 = i === 0 ? 8 : (4.2 + (bodyPh[i] % 1) * 2.4) * crowdS;
       for (let j = i + 1; j < n; j++) {
         let dx = bodyX[j] - bodyX[i];
         let dy = bodyY[j] - bodyY[i];
-        const rj = j === 0 ? 8 : 4.2 + (bodyPh[j] % 1) * 2.4;
+        const rj = j === 0 ? 8 : (4.2 + (bodyPh[j] % 1) * 2.4) * crowdS;
         const minD = ri0 + rj;
         const d2 = dx * dx + dy * dy;
         if (d2 >= minD * minD) continue;
@@ -3281,7 +3311,7 @@ function stepBodies(dt) {
 }
 function refreshFormation() {
   const shown = Math.max(1, Math.min(G.soldiers, visCap));
-  const key = shown + ':' + G.form.toFixed(2) + ':' + ((road.x1 - road.x0) | 0);
+  const key = shown + ':' + G.form.toFixed(2) + ':' + ((road.x1 - road.x0) | 0) + ':' + crowdS.toFixed(2);
   if (key === formKey && squadNow.length === shown) return;
   formKey = key;
   squadNow = formation(shown);
@@ -4253,7 +4283,7 @@ function draw(now) {
       Math.sin(bobT * 8 + i) * 0.07,
       liveBodies ? clamp(bodyVX[i] * 0.008, -0.45, 0.45) : 0,
       Math.sin(bobT * 9 + i * 1.7) * 0.1);
-    dummy.scale.setScalar((lead ? 1.65 : 1.3 * bulk) * born);
+    dummy.scale.setScalar((lead ? 1.65 * Math.max(1, crowdS * 0.92) : 1.3 * bulk * crowdS) * born);
     dummy.updateMatrix();
     soldierBody.setMatrixAt(i, dummy.matrix);
     if (lead) {
@@ -4750,7 +4780,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, get rmem() { return renderer.info.memory; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, get rmem() { return renderer.info.memory; }, geoLive() { const m = new Map(); scene.traverse((o) => { if (o.geometry) m.set(o.geometry.uuid, (o.geometry.type || '') + ':' + (o.geometry.attributes.position ? o.geometry.attributes.position.count : 0)); }); return [...m.values()]; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },

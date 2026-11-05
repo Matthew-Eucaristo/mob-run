@@ -64,7 +64,9 @@
   #hudWeapon { display:inline-flex; align-items:center; gap:5px; margin-top:6px; padding:2px 9px 2px 6px; border-radius:999px;
     font-family:var(--disp); font-size:13px; letter-spacing:.6px; background:var(--ink); border:2px solid currentColor; }
   #hudWeapon .ic { font-size:14px; }
-  #hudSkills { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; max-width:44vw; }
+  #hudSkills { display:flex; flex-wrap:nowrap; gap:4px; margin-top:6px; }
+  #hudSkills span b { color:#fff4dc; font-weight:900; margin-left:1px; }
+  #hudSkills span.more { color:#fff4dc; font-weight:900; }
   #hudSkills span { display:inline-flex; align-items:center; gap:2px; padding:1px 5px; border-radius:7px; font-size:11px;
     background:rgba(27,20,48,.78); border:1.5px solid rgba(255,255,255,.18); color:#ffe9a8; }
   #hudSkills span .ic { font-size:12px; }
@@ -175,7 +177,7 @@
   #shareBtn.brag { --c:var(--yellow); --cd:var(--yellow-d); animation:throb 0.9s ease-in-out infinite; }
 
   /* ---------- overlays ---------- */
-  .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  .overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; justify-content:safe center;
     background:radial-gradient(ellipse at 50% 35%, rgba(44,35,72,.72), rgba(14,10,26,.93) 75%); color:#fff; text-align:center;
     padding:24px 16px calc(24px + env(safe-area-inset-bottom)); touch-action:pan-y; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .panel { width:min(420px, 94vw); background:var(--cream); color:var(--ink); border:3px solid var(--ink); border-radius:20px;
@@ -340,9 +342,14 @@
   .tog.on { background:var(--green); }
   .langTag { font-family:var(--disp); font-size:14px; padding:3px 10px; border-radius:9px; background:var(--blue); color:#fff; border:2px solid var(--ink); }
   .tog.on u { left:28px; }
-  .hist { display:flex; align-items:flex-end; gap:4px; height:38px; width:min(260px, 70vw); margin:10px auto 0; padding:0 2px;
+  .hist { display:flex; align-items:flex-end; gap:4px; height:38px; width:min(260px, 70vw); margin:22px auto 0; padding:0 2px;
     border-bottom:2px solid rgba(255,255,255,.25); }
-  .hist i { flex:1; border-radius:4px 4px 0 0; background:rgba(255,255,255,.28); }
+  .hist i { flex:1; position:relative; border-radius:4px 4px 0 0; background:rgba(255,255,255,.28); }
+  .hist i b { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:2px; font-family:var(--disp);
+    font-weight:400; font-size:11px; color:#fff4dc; white-space:nowrap; text-shadow:0 1px 0 var(--ink); }
+  .hist i.now b { color:var(--mint, #7dffb0); }
+  .hist i.top b { color:var(--yellow); }
+  .histCap { font-size:10px; letter-spacing:1.2px; color:rgba(255,255,255,.5); margin-top:4px; font-weight:800; }
   .hist i.top { background:var(--yellow); }
   .hist i.now { background:var(--green); box-shadow:0 0 0 2px var(--ink); }
   #pauseOverlay .head { color:#fff; }
@@ -365,7 +372,6 @@
   @media (max-width: 700px) {
     #bossBar { width:min(44vw, 330px); top:calc(50px + env(safe-area-inset-top)); }
     #bossBar b { font-size:11px; }
-    #hudSkills { max-width:36vw; }
     #hudArmy { font-size:34px; }
     #hudDist { font-size:20px; }
     #hudCoins { font-size:17px; }
@@ -384,7 +390,7 @@
   }
   @media (orientation: landscape) and (max-height: 480px) {
     #hudForm { display:none; }
-    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys, .hist, #tut { display:none; }
+    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys, .hist, .histCap, #tut { display:none; }
     .logo span { font-size:58px; display:inline; }
     .logo span + span { margin-left:.2em; }
     #overOverlay h1 { font-size:40px; }
