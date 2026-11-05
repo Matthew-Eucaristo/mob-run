@@ -1568,7 +1568,7 @@ function spawnMeteor(wy) {
   hazards.push(h);
 }
 
-function spawnHazard(wy) {
+function spawnHazard(wy, forced) {
   const d = G.level;
   let roll = Math.random();
   /* each zone leans on its own hazard: pits in Toxic Mire, lava in Ember Ridge,
@@ -1576,6 +1576,7 @@ function spawnHazard(wy) {
   const sig = [null, 0.86, 0.12, 0.4, 0.62][Math.max(0, zoneIdx) % 5];
   if (G.dist < 150 && roll > 0.62) roll = Math.random() * 0.62;
   if (sig !== null && chance(0.45)) roll = sig;
+  if (forced !== undefined) roll = forced;
   if (roll < 0.28) {
     /* lava pool(s) anchored to a road edge — steer to the free side */
     const n = d >= 3 && chance(0.45) ? 2 : 1;
@@ -1738,6 +1739,22 @@ function spawnCoinLine(wy) {
   }
 }
 
+/* Each zone has one signature moment, once per visit, a little after you enter it:
+   built from the zone's own hazard so it reads as that place's big set-piece. */
+const PIECES = [
+  { title: L('PRISON CONVOY', 'KONVOI TAHANAN'), sub: L('Shoot the locks, take the men.', 'Tembak gemboknya, bawa orangnya.'), len: 620,
+    make: (wy) => { for (let i = 0; i < 3; i++) spawnCage(wy + i * 200); } },
+  { title: L('SINKHOLES', 'LUBANG AMBLAS'), sub: L('The mire is eating the road.', 'Rawa sedang memakan jalan.'), len: 820,
+    make: (wy) => { for (let i = 0; i < 3; i++) spawnHazard(wy + i * 270, 0.86); } },
+  { title: L('METEOR SHOWER', 'HUJAN METEOR'), sub: L('Keep moving. Do not stop.', 'Terus bergerak. Jangan berhenti.'), len: 700,
+    make: (wy) => { for (let i = 0; i < 6; i++) spawnMeteor(wy + i * 115); } },
+  { title: L('SAW GAUNTLET', 'LORONG GERGAJI'), sub: L('Three blades, one squad.', 'Tiga gergaji, satu pasukan.'), len: 920,
+    make: (wy) => { for (let i = 0; i < 3; i++) spawnHazard(wy + i * 300, 0.4); } },
+  { title: L('THE SQUEEZE', 'JEPITAN'), sub: L('Swipe up. Breathe in.', 'Geser ke atas. Tahan napas.'), len: 760,
+    make: (wy) => { spawnHazard(wy, 0.62); spawnCoinLine(wy + 200); spawnHazard(wy + 380, 0.62); } },
+];
+let pieceZone = -1, pieceAt = 0;
+const pieceMarks = [];
 function schedule() {
   const heat = clamp((G.dist - 220) / 1900, 0, 1);
   while (nextY < G.camY + LH * 3.2) {
@@ -1749,6 +1766,15 @@ function schedule() {
     const hazP = hordeP + 0.08 + heat * 0.09;
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += Math.max(170, 350 - Math.max(0, G.dist - 900) * 0.2); spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
+    /* the zone's set-piece, ~70m into the zone (never in the first 100m of a run) */
+    if (pieceZone >= 0 && nextY / 40 > pieceAt) {
+      const pc = PIECES[pieceZone % PIECES.length];
+      pc.make(nextY);
+      pieceMarks.push({ wy: nextY, pc });
+      nextY += pc.len + 300;
+      pieceZone = -1;
+      continue;
+    }
     if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
     /* early rules go by where the event lands (the schedule runs ~65m ahead), not where you are */
     const at = nextY / 40;
@@ -2594,7 +2620,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.rankUp = null; G.reserve = 0; G.reserveFlow = 0; G.reserveMsgT = -9; G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; skillDelay = 0; pendingZone = null; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; pendingZone = null; pieceZone = -1; pieceMarks.length = 0; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -3682,6 +3708,7 @@ function update(dt) {
     tintProps();
     /* the Salt Flats are pale: floating text gets a dark halo there */
     document.body.classList.toggle('pale', zi === 3);
+    if (G.dist > 100) { pieceZone = zi; pieceAt = G.dist + 70; }
     /* the zones loop every five levels; later laps say so */
     const lap = Math.floor((G.level - 1) / ZONES.length);
     const zoneName = ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : '');
@@ -3690,6 +3717,10 @@ function update(dt) {
   }
 
   schedule();
+  for (let i = pieceMarks.length - 1; i >= 0; i--) {
+    const pm = pieceMarks[i];
+    if (pm.wy - G.camY < 900) { bannerFlash(pm.pc.title + '!', '#ffcc33', pm.pc.sub); sfx.power(); vib(30); pieceMarks.splice(i, 1); }
+  }
   if (!bossIntro && G.dist > 170) {
     bossIntro = true;
     spawnBoss(G.camY + Math.max(460, LH * 0.7));

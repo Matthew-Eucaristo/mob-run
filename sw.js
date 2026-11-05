@@ -1,7 +1,7 @@
 /* MOB RUN cache.
    The big Three.js file stays cached. The game shell prefers the network
    so a refresh picks up changes, and falls back to cache within 1.2s. */
-const CACHE = 'mobrun-v27';
+const CACHE = 'mobrun-v28';
 const PRECACHE = [
   './',
   './index.html',
