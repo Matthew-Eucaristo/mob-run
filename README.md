@@ -6,7 +6,7 @@ The game from those fake mobile ads — for real, in 3D. A crowd-runner × multi
 - **Enemy mobs** march in with a count. Shoot them down on approach, then whatever is left trades 1:1 with your squad on contact. They scale with distance, your army and your firepower, so every run ends eventually.
 - **War bands** every ~350m: a road-wide mob sized to your army. Build up, get tested, build up again.
 - **Bosses**: brutes, gunners that lob fireballs, and splitters that burst into three brutes.
-- **Zones** each have their own weather and favourite hazard: pits in Toxic Flats, lava and meteors in Ember Ridge, saws on the Salt Flats, chokepoints in Deep Run.
+- **Zones** each have their own weather and favourite hazard: pits in Toxic Mire, lava and meteors in Ember Ridge, saws on the Salt Flats, chokepoints in Deep Run.
 - Guns unlock along the run; **close calls** (a saw or meteor that only just misses) pay coins; every level-up offers a pick of three stacking skills.
 
 **Between runs**

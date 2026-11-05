@@ -77,7 +77,7 @@ const bossFill = document.getElementById('bossFill');
 const pauseOv = document.getElementById('pauseOverlay');
 {
   const tt = document.getElementById('tut');
-  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? L('SWIPE TO STEER', 'SWIPE UNTUK BELOK') : L('MOVE THE MOUSE TO STEER', 'GERAKKAN MOUSE UNTUK BELOK')}</b>`;
+  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? L('SWIPE TO STEER', 'GESER UNTUK BELOK') : L('MOVE THE MOUSE TO STEER', 'GERAKKAN MOUSE UNTUK BELOK')}</b>`;
 }
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
@@ -304,7 +304,7 @@ const ZONES = [
   { bg: '#8d8270', ground: '#6e6455', road: '#ada38b', post: '#efe5cf', dash: '#fff7e6', sky: 0xfff0d4 },
   { bg: '#0d3340', ground: '#0a2530', road: '#1e5468', post: '#3fb6d8', dash: '#7fe6ff', sky: 0xa8f0ff },
 ];
-const ZONE_NAMES = ['NIGHTFALL', 'TOXIC FLATS', 'EMBER RIDGE', 'SALT FLATS', 'DEEP RUN'];
+const ZONE_NAMES = L(['NIGHTFALL', 'TOXIC MIRE', 'EMBER RIDGE', 'SALT FLATS', 'DEEP RUN'], ['MALAM TIBA', 'RAWA RACUN', 'BUKIT BARA', 'PADANG GARAM', 'ARUS DALAM']);
 const colCache = {};
 const col3 = (hex) => colCache[hex] || (colCache[hex] = new THREE.Color(hex));
 const curZone = { bg: new THREE.Color(ZONES[0].bg), ground: new THREE.Color(ZONES[0].ground), road: new THREE.Color(ZONES[0].road), post: new THREE.Color(ZONES[0].post), dash: new THREE.Color(ZONES[0].dash) };
@@ -482,13 +482,13 @@ const MILES = [100, 250, 500, 1000, 2000, 4000];
 
 let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [], cages = [];
 let bullets = [], parts = [], floats = [], rewards = [], ebullets = [], coins = [], mobs = [];
-let firstMob = false, nextBand = 320, nextWall = 170, skillDelay = 0;
+let firstMob = false, nextBand = 320, nextWall = 170, skillDelay = 0, pendingZone = null;
 let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0, sinceGate = 0;
 let fireAcc = 0, drainAcc = 0, shootSfxAcc = 0, fallAcc = 0, edgeWarn = 0;
 let hintT = 0, zoneIdx = -1, fovKick = 0, muzzleGlow = 0, distMark = 0, revived = false, lastLevel = 1;
 let shownTier = -1, shownSkills = null;
 let bossIntro = false, deathT = 0, shownCoins = -1, shownArmy = -1, armyRoll = 10, armyFlash = 0, armyFlashT = 0;
-const fmtNum = (n) => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'K' : String(n);
+const fmtNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'K' : String(n);
 let halfPxCache = 28, coinSfx = 0, saveT = 0, paintedSkin = '';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -1517,7 +1517,7 @@ function spawnMeteor(wy) {
 function spawnHazard(wy) {
   const d = G.level;
   let roll = Math.random();
-  /* each zone leans on its own hazard: pits in Toxic Flats, lava in Ember Ridge,
+  /* each zone leans on its own hazard: pits in Toxic Mire, lava in Ember Ridge,
      saws on the Salt Flats, chokepoints in Deep Run */
   const sig = [null, 0.86, 0.12, 0.4, 0.62][Math.max(0, zoneIdx) % 5];
   if (G.dist < 150 && roll > 0.62) roll = Math.random() * 0.62;
@@ -1698,7 +1698,8 @@ function schedule() {
     if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
     /* early rules go by where the event lands (the schedule runs ~65m ahead), not where you are */
     const at = nextY / 40;
-    if (at > 75 && !firstMob) { firstMob = true; spawnMob(nextY, 0.7); sinceGate++; }
+    /* the first rival mob is tough enough to reach you: the first real crowd-on-crowd clash */
+    if (at > 75 && !firstMob) { firstMob = true; const fm = spawnMob(nextY, 1.5); fm.tough = true; fm.maxHp = fm.hp; sinceGate++; }
     else if (at < 100 && gatesSpawned < 3) { spawnGate(nextY); sinceGate = 0; }
     /* first minute: a gate every other beat, so there is always a choice coming */
     else if (at < 260 && sinceGate >= 1) { spawnGate(nextY); sinceGate = 0; }
@@ -1958,6 +1959,8 @@ function killMob(m, how) {
 }
 function hurtMob(m, dmg) {
   if (m.dead) return;
+  /* the first mob of a run is a lesson in clashing: it can't be shot away entirely */
+  if (m.tough && !m.clash) { const now = G.time; const bud = Math.min(m.maxHp * 0.12, (m.bud ?? m.maxHp * 0.05) + (now - (m.budT ?? now)) * m.maxHp * 0.12); m.budT = now; dmg = Math.min(dmg, bud); m.bud = bud - dmg; }
   m.hp -= dmg;
   const c = Math.max(0, Math.ceil(m.hp / m.uh));
   if (c < m.count) { G.kills += m.count - c; m.count = c; if (!(m.hitCD > 0)) { m.hitT = 0.06; m.hitCD = 0.2; } }
@@ -1989,7 +1992,9 @@ function bossBits(boss) {
   return g;
 }
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
+function bossTitle(e) { return e.shooter ? L('GUNNER BOSS', 'BOS PENEMBAK') : e.splitter ? L('SPLITTER BOSS', 'BOS PEMBELAH') : L('BRUTE BOSS', 'BOS RAKSASA'); }
 function spawnBoss(wy) {
+  bossIntro = true;   /* whichever boss comes first is the intro: never two in a row */
   const d = G.level;
   /* as tough as a rival mob of about a quarter of par: the same per-unit health that tracks your guns */
   const early = clamp(0.45 + G.dist / 600, 0.45, 1);
@@ -2166,7 +2171,7 @@ function applyGate(g) {
   const shown = Math.min(army, 180);
   let left = 0, counted = 0, seam = 0;
   /* the middle post: soldiers who run straight into it don't make it through */
-  const SEAM = 11;
+  const SEAM = 13;
   if (bodyN > 1) {
     counted = bodyN;
     for (let i = 0; i < bodyN; i++) { const x = G.armyX + bodyX[i]; if (x < mid) left++; if (Math.abs(x - mid) < SEAM) seam++; }
@@ -2458,7 +2463,7 @@ let ringT = 9;
 const deadEnemies = [];
 function flingEnemy(e) {
   deadEnemies.push({ x: e.x, wy: e.wy, kind: e.kind, col: e.col, s: e._s || (e.boss ? 1.1 : 0.5), t: 0,
-    vx: rnd(-55, 55), vwy: rnd(25, 65), y: e.boss ? 1.2 : 0.4, vy: rnd(3.2, 6) * (e.boss ? 1.35 : 1), spin: rnd(-7, 7) });
+    vx: rnd(-55, 55), vwy: e.boss ? G.speed + rnd(60, 110) : rnd(25, 65), y: e.boss ? 1.2 : 0.4, vy: rnd(3.2, 6) * (e.boss ? 1.35 : 1), spin: rnd(-7, 7) });
   if (deadEnemies.length > 26) deadEnemies.shift();
 }
 const deadSoldiers = [];
@@ -2489,7 +2494,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; skillDelay = 0; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; pendingZone = null; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -2549,7 +2554,7 @@ function offerSkills() {
     skillCards.appendChild(btn);
   }
   const head = document.getElementById('skillHead');
-  if (head) head.textContent = L('LEVEL ', 'LEVEL ') + G.level + '!';
+  if (head) head.textContent = L('LEVEL ', 'NAIK KE LEVEL ') + G.level + '!';
   skillOv.style.display = 'flex';
   G.mode = 'pick';
   skillIds = picks.map((p) => p.id);
@@ -2618,6 +2623,8 @@ const CAUSE_ID = {
 function causeText(c) { if (!c) return L('WIPED OUT', 'KALAH'); return LANG === 'id' ? (CAUSE_ID[c] || c) : c; }
 function reviveCost() { return Math.max(30, Math.round(G.dist / 8)); }
 function gameOver() {
+  /* the results screen lists missions itself: drop any toast still queued */
+  toastQ.length = 0; clearTimeout(toastT); if (toastEl) toastEl.classList.remove('on', 'hush');
   if (G.mode === 'over') return;
   G.mode = 'over';
   overAt = performance.now();
@@ -2658,8 +2665,8 @@ function gameOver() {
   overStats.innerHTML =
     `<div id="overDist">0m</div>${sub}` +
     `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} ${L('peak', 'puncak')}</span>` +
-    `<span class="chip">${icon('skull')}${G.mobsBeaten} ${L('mobs', 'gerombolan')}</span><span class="chip">${icon('crown')}${G.bossKills} ${L('bosses', 'bos')}</span></div>` + histHTML +
-    `<div class="earn">+<span id="earnN">0</span>${COIN}<small>${G.coinsPickedVal} ${L('grabbed', 'diambil')} · ${G.bonusTotal} ${L('distance', 'jarak')}${G.missionCoins ? ' · ' + G.missionCoins + ' ' + L('missions', 'misi') : ''}</small></div>`;
+    `<span class="chip">${icon('skull')}${G.mobsBeaten} ${G.mobsBeaten === 1 ? L('mob', 'gerombolan') : L('mobs', 'gerombolan')}</span><span class="chip">${icon('crown')}${G.bossKills} ${G.bossKills === 1 ? L('boss', 'bos') : L('bosses', 'bos')}</span></div>` + histHTML +
+    `<div class="earn">+<span id="earnN">0</span>${COIN}<small>${G.coinsPickedVal} ${L('picked up', 'dipungut')} · ${G.bonusTotal} ${L('distance bonus', 'bonus jarak')}${G.missionCoins ? ' · ' + G.missionCoins + ' ' + L('from missions', 'dari misi') : ''}</small></div>`;
   if (overMissions) {
     overMissions.innerHTML = missionHTML(false);
     setTimeout(() => { for (const b of overMissions.querySelectorAll('.bar i')) b.style.width = b.dataset.w; }, 450);
@@ -2819,7 +2826,10 @@ function bestBuy() {
     const l = META.up[u.id] || 0;
     if (l >= u.max) continue;
     const c = u.cost(l);
-    if (c <= G.coins && (!pick || c < pick.c)) pick = { u, l, c };
+    /* suggest what changes the next run most: a better starting gun, then firepower,
+       then the cheapest of the rest */
+    const w = u.id === 'gun' ? 0.35 : u.id === 'fire' ? 0.6 : 1;
+    if (c <= G.coins && (!pick || c * w < pick.c * pick.w)) pick = { u, l, c, w };
   }
   return pick;
 }
@@ -2911,7 +2921,7 @@ function missionToast(text, reward, title) {
 let bannerUntil = 0;
 function toastBlocked() {
   if (G.mode !== 'run') return false;
-  if (performance.now() < bannerUntil) return true;
+  if (performance.now() < bannerUntil || hintT > 0) return true;
   return gates.some((g) => !g.passed && g.wy > G.camY && g.wy - G.camY < 560);
 }
 function showToast() {
@@ -3072,7 +3082,8 @@ function renderShop() {
       card.style.setProperty('--uc', u.col);
       card.innerHTML = `<i>${icon(u.icon)}</i><div class="mid"><b>${u.name}</b><span>${u.desc}<br><b class="v">${u.val(l)}</b>${maxed ? '' : ' → <b class="v nx">' + u.val(l + 1) + '</b>'}</span><div class="pips">${pips}</div></div>` +
         `<div class="price">${maxed ? 'MAX' : cost + COIN}</div>`;
-      card.addEventListener('pointerdown', (ev) => {
+      card.addEventListener('click', (ev) => {
+        /* click, not pointerdown: a swipe that starts on a card scrolls the list instead of buying */
         ev.stopPropagation(); ev.preventDefault();
         audio();
         if (maxed) return;
@@ -3095,7 +3106,7 @@ function renderShop() {
     card.className = 'skinCard' + (on ? ' on' : '') + (!owned && G.coins < sk.price ? ' broke' : '');
     const act = on ? L('ON', 'DIPAKAI') : owned ? L('USE', 'PAKAI') : sk.price + COIN;
     card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><small>${sk.hat || L('Standard kit', 'Seragam biasa')}</small><span>${act}</span>`;
-    card.addEventListener('pointerdown', (ev) => {
+    card.addEventListener('click', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       audio();
       if (on) return;
@@ -3550,7 +3561,9 @@ function update(dt) {
     tintProps();
     /* the zones loop every five levels; later laps say so */
     const lap = Math.floor((G.level - 1) / ZONES.length);
-    if (G.dist > 5) bannerFlash(ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : ''), lap ? '#ffcc33' : '');
+    const zoneName = ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : '');
+    /* zones turn over on a level-up: hold the name until the skill pick is out of the way */
+    if (G.dist > 5) { if (wantSkill) pendingZone = [zoneName, lap ? '#ffcc33' : '']; else bannerFlash(zoneName, lap ? '#ffcc33' : ''); }
   }
 
   schedule();
@@ -3791,11 +3804,12 @@ function update(dt) {
     if (e.hitCD > 0) e.hitCD -= dt;
     if (e.kind === 'gold' && Math.random() < 0.22 && parts.length < MAXP - 4)
       parts.push(mkPart(e.x + rnd(-8, 8), e.wy + rnd(-6, 6), '#ffd75d'));
-    if (e.roar) e.roar -= dt * 1.4;
+    /* roar eases back to rest; letting it run negative shrank bosses to nothing */
+    if (e.roar > 0) e.roar = Math.max(0, e.roar - dt * 1.4);
     /* boss entrance: name card, roar, a jolt, the moment it comes into view */
     if (e.boss && !e.introduced && e.wy - G.camY < 540) {
       e.introduced = true; e.roar = 1; e.fightT = 0; e.budget = 0;
-      bannerFlash(e.shooter ? 'GUNNER BOSS!' : e.splitter ? 'SPLITTER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
+      bannerFlash(bossTitle(e) + '!', '#ff5d4a');
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
     }
     /* the showdown: once in view the boss keeps its distance, then closes in.
@@ -4094,6 +4108,7 @@ function update(dt) {
   /* level up: a beat of slow motion and a ring before the cards come up */
   if (wantSkill && G.mode === 'run') { skillDelay = 0.55; hitstop(0.5); ringT = 0; ringMat.color.set('#ffcc33'); sfx.fanfare(); }
   if (skillDelay > 0) { skillDelay -= dt; if (skillDelay <= 0 && G.mode === 'run') offerSkills(); }
+  else if (pendingZone && G.mode === 'run') { bannerFlash(pendingZone[0], pendingZone[1]); pendingZone = null; }
 }
 
 /* ---------------- draw ---------------- */
@@ -4497,7 +4512,7 @@ function draw(now) {
       }
     }
     const labelY = e.boss ? s * 3.05 + 0.3 : s * d.labelY + 0.4;
-    setLabel(e.label, wx(e.x), labelY, zP, String(Math.ceil(e.hp)));
+    setLabel(e.label, wx(e.x), labelY, zP, fmtNum(Math.ceil(e.hp)));
     if (e.attacking) e.label.style.color = '#ffb0a0';
     else e.label.style.color = '';
   }
@@ -4823,7 +4838,7 @@ function draw(now) {
       for (const e of enemies) if (e.boss && e.introduced && e.hp > 0 && (!bo || e.wy < bo.wy)) bo = e;
     bossBar.classList.toggle('on', !!bo);
     if (bo) {
-      if (bossName) bossName.textContent = bo.shooter ? 'GUNNER BOSS' : bo.splitter ? 'SPLITTER BOSS' : 'BRUTE BOSS';
+      if (bossName) bossName.textContent = bossTitle(bo);
       if (bossFill) bossFill.style.width = (100 * bo.hp / bo.maxhp).toFixed(1) + '%';
     }
   }
