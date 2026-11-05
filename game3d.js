@@ -130,7 +130,7 @@ function resize() {
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
   syncRoad();
-  if (G.mode !== 'run') { G.armyX = LW / 2; aimX = LW / 2; }
+  if (G.mode === 'menu') { G.armyX = LW / 2; aimX = LW / 2; }
   const keysEl = document.querySelector('#startOverlay .keys');
   if (keysEl) keysEl.textContent = document.body.classList.contains('touch')
     ? 'one thumb · swipe sideways to steer · up for a column, down to spread'
@@ -173,7 +173,7 @@ function audio() {
       for (let k = 0; k < nd.length; k++) nd[k] = Math.random() * 2 - 1;
     } catch (e) { AC = null; }
   }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (AC && AC.state === 'suspended') AC.resume().catch(() => { });
 }
 /* oscillator voice: pitch glide, attack, exponential decay, optional reverb send */
 function voice(f, d, type, v, slide, opt) {
@@ -206,7 +206,8 @@ function hiss(d, v, kind, f0, f1, q, opt) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + d);
   src.connect(fl); fl.connect(g); g.connect(BUS);
   if (opt && opt.verb && VERB) g.connect(VERB);
-  src.start(t, Math.random() * 0.8); src.stop(t + d + 0.02);
+  src.loop = d > 0.9;
+  src.start(t, Math.random() * Math.max(0, 0.98 - d)); src.stop(t + d + 0.02);
 }
 function noise(d, v) { hiss(d, v, 'lowpass', 900); }
 const sfx = {
@@ -497,7 +498,10 @@ function syncRoad() {
   road.x1 = LW * 0.5 + halfPx;
   roadHalf = halfPx * K;
 }
-cv.addEventListener('pointerdown', e => press(e.clientX, e.clientY));
+cv.addEventListener('pointerdown', (e) => {
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { }
+  press(e.clientX, e.clientY);
+});
 cv.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'mouse' && !dragging && G.mode === 'run') {
     const f = clamp((e.clientX / Math.max(1, W) - 0.18) / 0.64, 0, 1);
@@ -514,6 +518,8 @@ cv.addEventListener('wheel', (e) => {
 }, { passive: false });
 cv.addEventListener('pointerup', release);
 cv.addEventListener('pointercancel', release);
+window.addEventListener('pointerup', release);
+window.addEventListener('blur', release);
 startOv.addEventListener('pointerdown', () => press());
 overOv.addEventListener('pointerdown', (e) => {
   if (e.target.closest && e.target.closest('button, .missions, #installCard')) return;
@@ -562,10 +568,11 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
   else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
   else if (e.key === 'm' || e.key === 'M') toggleMute();
+  else if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && setOv && setOv.style.display === 'flex') setOv.style.display = 'none';
   else if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && shopOv && shopOv.style.display === 'flex') closeShop();
   else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') setPause(G.mode === 'run');
   else if (e.key === ' ' || e.key === 'Enter') {
-    if ((shopOv && shopOv.style.display === 'flex') || G.mode === 'pick') return;
+    if ((shopOv && shopOv.style.display === 'flex') || (setOv && setOv.style.display === 'flex') || G.mode === 'pick') return;
     e.preventDefault();
     if (G.mode === 'paused') setPause(false); else press();
   }
@@ -1296,7 +1303,17 @@ function layoutGate(g) {
   g.postMesh.position.set(wx(mid), 2.6, 0);
   g.baseMesh.scale.x = Math.max(0.4, roadHalf * 2); g.baseMesh.position.set(0, 0.09, 0);
 }
-function removeGate(g) { if (g.grp) scene.remove(g.grp); }
+function removeGate(g) {
+  if (!g.grp) return;
+  scene.remove(g.grp);
+  /* panel canvases and materials are per gate; geometries are shared, leave them */
+  for (const m of [...(g.meshes || []), ...(g.frames || []), g.postMesh, g.baseMesh]) {
+    if (!m) continue;
+    if (m.material.map) m.material.map.dispose();
+    m.material.dispose();
+  }
+  g.grp = null;
+}
 
 /* --- walls: barricade slab + rim + side pillars + warning core --- */
 const wallGeo = mergeParts([
@@ -1478,7 +1495,7 @@ function spawnHazard(wy) {
     const hole = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0x070910, transparent: true, opacity: 0.92, depthWrite: false }));
     hole.rotation.x = -Math.PI / 2; hole.position.y = 0.05;
     hole.scale.set(wpx * K, len * K, 1);
-    const lipTex = stripeTex.clone(); lipTex.needsUpdate = true; lipTex.repeat.set(4, 4);
+    const lipTex = stripeTex.clone(); lipTex.needsUpdate = true; lipTex.repeat.set(4, 4); h.ownTex = lipTex;
     const lip = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ map: lipTex, transparent: true, opacity: 0.95, depthWrite: false }));
     lip.rotation.x = -Math.PI / 2; lip.position.y = 0.055;
     lip.scale.set(wpx * K * 1.12, len * K * 1.08, 1);
@@ -2256,6 +2273,7 @@ function startGame() {
   if (vigEl) { vigEl.classList.remove('doom'); vigEl.style.opacity = '0'; }
   if (skillOv) skillOv.style.display = 'none';
   if (shopOv) shopOv.style.display = 'none';
+  if (setOv) setOv.style.display = 'none';
   if (installCard) installCard.style.display = 'none';
   document.body.classList.remove('menu');
   rollMissions();
@@ -2423,6 +2441,8 @@ function gameOver() {
   }
   refreshBadges();
   renderQuickBuy();
+  shareBlob = null;
+  setTimeout(() => { if (G.mode === 'over') shareCard().then((b) => { shareBlob = b; }); }, 1200);
   maybeOfferInstall();
   vib(30);
 }
@@ -2485,6 +2505,7 @@ const shareBtn = document.getElementById('shareBtn');
 if (shareBtn) shareBtn.innerHTML = icon('share');
 /* share card: a 4:5 branded image of the run, shared as a file where the
    platform allows it, downloaded otherwise */
+let shareBlob = null;
 function shareCard() {
   const c = document.createElement('canvas'); c.width = 1080; c.height = 1350;
   const g = c.getContext('2d');
@@ -2520,13 +2541,15 @@ if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
   const url = location.origin + location.pathname.replace(/index\.html$/, '');
   const done = () => { shareBtn.innerHTML = icon('check'); setTimeout(() => { shareBtn.innerHTML = icon('share'); }, 1500); };
   try {
-    const blob = await shareCard();
+    const blob = shareBlob || await shareCard();
     const file = blob && new File([blob], `mobrun-${d}m.png`, { type: 'image/png' });
-    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'MOB RUN', text: text + ' ' + url });
-      return;
-    }
-    if (navigator.share) { await navigator.share({ title: 'MOB RUN', text, url }); return; }
+    try {
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'MOB RUN', text: text + ' ' + url });
+        return;
+      }
+      if (navigator.share) { await navigator.share({ title: 'MOB RUN', text, url }); return; }
+    } catch (err) { if (err && err.name === 'AbortError') return; }
     if (blob) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = `mobrun-${d}m.png`;
@@ -2711,6 +2734,8 @@ function loadSave() {
     }
     const legacy = parseInt(localStorage.getItem('mobrun_best') || '0', 10) || 0;
     if (legacy > G.best) G.best = legacy;
+  } catch (e) { }
+  try {
     const st = JSON.parse(localStorage.getItem('mobrun_settings') || 'null');
     if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; shakeOff = st.shake === false; }
     else if (localStorage.getItem('mobrun_mute') === '1') { muted = true; musicOff = true; }
@@ -3520,6 +3545,7 @@ function update(dt) {
       }
       if (m.wy < G.camY - 260) { m.label.remove(); mobs.splice(i, 1); continue; }
     }
+    if (m.clash && G.grace > 0) m.tick = 0;
     if (m.clash) {
       m.wy = G.camY + m.hd + sr * 0.35;
       m.x += (G.armyX - m.x) * Math.min(1, dt * 4);
@@ -3546,10 +3572,10 @@ function update(dt) {
     const h = hazards[i];
     if (h.dead) {
       h.deadT += dt;
-      if (h.deadT > 0.6) { scene.remove(h.grp); hazards.splice(i, 1); }
+      if (h.deadT > 0.6) { scene.remove(h.grp); if (h.ownTex) h.ownTex.dispose(); hazards.splice(i, 1); }
       continue;
     }
-    if (h.wy < G.camY - (h.len || 0) / 2 - 240) { scene.remove(h.grp); hazards.splice(i, 1); continue; }
+    if (h.wy < G.camY - (h.len || 0) / 2 - 240) { scene.remove(h.grp); if (h.ownTex) h.ownTex.dispose(); hazards.splice(i, 1); continue; }
     if (h.wy - G.camY > 1500 || h.wy < G.camY - 200) continue;
     if (!h.hinted && h.wy - (h.len || 0) / 2 - G.camY < 720) { h.hinted = true; tutorialHint(h.kind); }
     if (h.kind === 'lava' && Math.random() < 0.3 && parts.length < MAXP - 6)
