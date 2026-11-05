@@ -1935,7 +1935,7 @@ function breakCage(c, rammed) {
   addSoldiers(G.soldiers + freed);
   scene.remove(c.grp);
   c.label.remove();
-  floatText(c.x, c.wy, (rammed ? '+' + freed + ' (half got out)' : '+' + freed + ' FREED!'), rammed ? '#ffb089' : '#7ee081', rammed ? 20 : 28, 3);
+  floatText(c.x, c.wy, (rammed ? '+' + freed + L(' (half got out)', ' (separuh lolos)') : '+' + freed + L(' FREED!', ' BEBAS!')), rammed ? '#ffb089' : '#7ee081', rammed ? 20 : 28, 3);
   const col = skinNow().body;
   for (let k = 0; k < 22 && parts.length < MAXP - 4; k++)
     parts.push({ x: c.x + rnd(-20, 20), wy: c.wy + rnd(-10, 10), h: rnd(0.4, 1.8), vx: (G.armyX - c.x) * rnd(0.8, 1.6), vwy: (G.camY - c.wy) * rnd(0.8, 1.4),
@@ -1965,7 +1965,7 @@ function addSoldiers(n) {
   G.peak = Math.max(G.peak, G.soldiers);
   while (G.mileIdx < MILES.length && G.peak >= MILES[G.mileIdx]) {
     if (MILES[G.mileIdx] > prevPeak) {
-      floatText(G.armyX, G.camY, 'ARMY ' + MILES[G.mileIdx] + '!', '#ffd75d', 34, 4);
+      floatText(G.armyX, G.camY, L('ARMY ', 'PASUKAN ') + MILES[G.mileIdx] + '!', '#ffd75d', 34, 4);
       sfx.great(); G.shake = Math.max(G.shake, 8);
     }
     G.mileIdx += 1;
@@ -2019,7 +2019,7 @@ function applyGate(g) {
   const good = gunUp || delta >= 0;
   if (good) G.streak += 1; else G.streak = 0;
   G.gateStreakBest = Math.max(G.gateStreakBest, G.streak);
-  if (G.streak >= 3 && good) floatText(G.armyX, G.camY + 60, G.streak + ' IN A ROW!', '#7dff9b', 18, 4.4);
+  if (G.streak >= 3 && good) floatText(G.armyX, G.camY + 60, G.streak + L(' IN A ROW!', ' BERUNTUN!'), '#7dff9b', 18, 4.4);
   if (gunUp) weaponUp();
   if (good && G.skills.overdrive) G.overT = 2.4 + G.skills.overdrive * 0.8;
   if (good && G.skills.warcry) {
@@ -2030,7 +2030,7 @@ function applyGate(g) {
   for (const [pp, fr, side] of [[lp, lFrac, 0], [rp, rFrac, 1]]) {
     if (pp.t !== 'mys' || fr <= 0) continue;
     const good = pp.res.t === 'add' || pp.res.t === 'mul';
-    floatText(G.armyX, G.camY + 70, 'MYSTERY ' + gateLabel(pp.res) + (good ? '!' : '...'), good ? '#c8a8ff' : '#ff8d98', 28, 4.8);
+    floatText(G.armyX, G.camY + 70, L('MYSTERY ', 'MISTERI ') + gateLabel(pp.res) + (good ? '!' : '...'), good ? '#c8a8ff' : '#ff8d98', 28, 4.8);
     if (g.meshes && g.meshes[side]) { g.meshes[side].material.map = panelTex({ ...pp.res, gold: false }); g.meshes[side].material.needsUpdate = true; }
     (good ? sfx.fanfare : sfx.bad)();
   }
@@ -2135,7 +2135,7 @@ function closeCall(x, wy) {
   const n = 3 + Math.min(5, G.closeCalls);
   for (let i = 0; i < n && coins.length < MAXCOIN; i++)
     coins.push({ x: x + rnd(-20, 20), wy: G.camY + 30 + rnd(-10, 10), spin: rnd(0, 6), fly: 0.12 + i * 0.04 });
-  floatText(G.armyX, G.camY + 50, 'CLOSE CALL!', '#7de8ff', 26, 4.2);
+  floatText(G.armyX, G.camY + 50, L('CLOSE CALL!', 'NYARIS!'), '#7de8ff', 26, 4.2);
   voice(1600, 0.08, 'triangle', 0.05, 2400); voice(2400, 0.1, 'sine', 0.035, 0, { at: 0.06 });
   hitstop(0.06);
 }
@@ -2252,7 +2252,7 @@ function weaponUp() {
     G.tier += 1;
     floatText(G.armyX, G.camY, WT[G.tier].name + '!', WT[G.tier].col, 28, 4);
     sfx.great();
-  } else { G.upDmg += 1; floatText(G.armyX, G.camY, 'GUN DMG +1', '#ffd75d', 24, 4); sfx.power(); }
+  } else { G.upDmg += 1; floatText(G.armyX, G.camY, L('GUN DMG +1', 'DAMAGE SENJATA +1'), '#ffd75d', 24, 4); sfx.power(); }
 }
 
 function mkPart(x, wy, color) {
@@ -2542,7 +2542,7 @@ function revive() {
   addSoldiers(Math.max(24, Math.ceil(G.peak * 0.5)));
   G.grace = 1.8;
   bannerFlash(L('GET READY!', 'SIAP-SIAP!'), '#7ee081');
-  floatText(G.armyX, G.camY + 20, 'SECOND WIND!', '#e2b657', 30, 4);
+  floatText(G.armyX, G.camY + 20, L('SECOND WIND!', 'BANGKIT LAGI!'), '#e2b657', 30, 4);
   ringT = 0; ringMat.color.set('#e2b657');
   sfx.great(); vib(40);
 }
@@ -2964,7 +2964,7 @@ function hurt(e, dmg) {
           b2.col = '#a45ae8'; b2.pop = 0.4; b2.roar = 1;
           enemies.push(b2);
         }
-        floatText(e.x, e.wy + 40, 'IT SPLIT!', '#c8a8ff', 30, 4.2);
+        floatText(e.x, e.wy + 40, L('IT SPLIT!', 'DIA PECAH!'), '#c8a8ff', 30, 4.2);
       }
       const reward = 25 + G.level * 10;
       floatText(e.x, e.wy, 'BOSS DOWN +' + reward, '#ffd75d', 30, 4);
@@ -3038,18 +3038,18 @@ function killWall(w, quiet) {
   G.wallsBroken += 1;
   sfx.power(); G.shake = 8;
   for (let i = 0; i < 26; i++) parts.push(mkPart(rnd(road.x0, road.x1), w.wy, '#b7c6e8'));
-  floatText(w.cx, w.wy, 'WALL BROKEN', '#b7c6e8', 24, 3);
+  floatText(w.cx, w.wy, L('WALL BROKEN', 'TEMBOK HANCUR'), '#b7c6e8', 24, 3);
   w.label.style.display = 'none';
 }
 
 function takePickup(kind, x) {
   sfx.power();
-  if (kind === 'rate') { G.upRate += 0.02; floatText(x, G.camY, 'FIRE RATE +', '#7de8ff', 21, 3.5); }
+  if (kind === 'rate') { G.upRate += 0.02; floatText(x, G.camY, L('FIRE RATE +', 'TEMBAK CEPAT +'), '#7de8ff', 21, 3.5); }
   if (kind === 'dmg') { G.upDmg += 1; floatText(x, G.camY, 'DAMAGE +1', '#ffd75d', 21, 3.5); }
   if (kind === 'spread') { G.upSpread = Math.min(3, G.upSpread + 1); floatText(x, G.camY, 'SPREAD +1', '#7dff9b', 21, 3.5); }
-  if (kind === 'heal') { addSoldiers(G.soldiers + 15); floatText(x, G.camY, '+15 SOLDIERS', '#7dff9b', 21, 3.5); }
+  if (kind === 'heal') { addSoldiers(G.soldiers + 15); floatText(x, G.camY, L('+15 SOLDIERS', '+15 PRAJURIT'), '#7dff9b', 21, 3.5); }
   if (kind === 'ward') { G.shield = Math.min(5, G.shield + 1); floatText(x, G.camY, 'WARD +1', '#f3ecdf', 21, 3.5); }
-  if (kind === 'gold') { const g = ri(10, 24); addSoldiers(G.soldiers + g); floatText(x, G.camY, '+' + g + ' GOLD', '#ffd75d', 21, 3.5); }
+  if (kind === 'gold') { const g = ri(10, 24); addSoldiers(G.soldiers + g); floatText(x, G.camY, '+' + g + L(' GOLD', ' EMAS'), '#ffd75d', 21, 3.5); }
   if (kind === 'weapon') weaponUp();
   if (kind === 'upgrade') { G.upRate += 0.015; G.upDmg += 1; floatText(x, G.camY, 'OVERCLOCK!', '#7de8ff', 23, 3.5); }
   for (let i = 0; i < 12; i++) parts.push(mkPart(x, G.camY + 10, '#7de8ff'));
@@ -3265,7 +3265,7 @@ function update(dt) {
       if (++flung >= 3) break;
     }
     if (edgeWarn <= 0) {
-      floatText(G.armyX, G.camY + 8, 'FALL', '#ff5d6a', 20, 2.4);
+      floatText(G.armyX, G.camY + 8, L('FALL', 'JATUH'), '#ff5d6a', 20, 2.4);
       edgeWarn = 0.75; sfx.hurt();
     }
   }
@@ -3278,7 +3278,7 @@ function update(dt) {
   G.level = 1 + Math.floor(G.dist / 150);
   if (!bestFlagPassed && G.best > 0 && G.dist > G.best) {
     bestFlagPassed = true;
-    floatText(G.armyX, G.camY + 40, 'NEW BEST!', '#ffd75d', 40, 4.6);
+    floatText(G.armyX, G.camY + 40, L('NEW BEST!', 'REKOR BARU!'), '#ffd75d', 40, 4.6);
     sfx.fanfare();
     G.shake = Math.max(G.shake, 9); vib(60); fovKick = 10;
     for (let i = 0; i < 50 && parts.length < MAXP - 4; i++)
@@ -3718,7 +3718,7 @@ function update(dt) {
   /* gates */
   for (let i = gates.length - 1; i >= 0; i--) {
     const g = gates[i];
-    if (g.announce && g.wy - G.camY < 900) { g.announce = false; bannerFlash('GOLDEN GATE', '#ffd75d'); tone(1320, 0.1, 'sine', 0.05); }
+    if (g.announce && g.wy - G.camY < 900) { g.announce = false; bannerFlash(L('GOLDEN GATE', 'GERBANG EMAS'), '#ffd75d'); tone(1320, 0.1, 'sine', 0.05); }
     if (!g.passed && G.camY >= g.wy) { g.passed = true; applyGate(g); }
     if (g.wy < G.camY - 200) { removeGate(g); gates.splice(i, 1); }
   }
