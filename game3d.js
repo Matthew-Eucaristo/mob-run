@@ -1563,12 +1563,16 @@ function spawnHazard(wy) {
 }
 
 /* --- HTML label pool --- */
+let squadLabel = null, squadNumEl = null, squadShownN = -1;
 function mkLabel(cls) {
   const d = document.createElement('div');
   d.className = 'lb' + (cls ? ' ' + cls : '');
   labelsEl.appendChild(d);
   return d;
 }
+squadLabel = mkLabel('squad');
+squadNumEl = document.createElement('b');
+squadLabel.appendChild(squadNumEl);
 const tmpV = new THREE.Vector3();
 function project(x3, y3, z3) {
   tmpV.set(x3, y3, z3).project(camera);
@@ -1686,6 +1690,13 @@ function spawnGate(wy) {
     [{ t: 'gun' }, { t: 'sub', v: bigSub }],
     [{ t: 'gun' }, { t: 'div', v: 2 }],
   ];
+  /* close calls: two good options that need a second of maths, and the odd
+     "least bad" pair where both sides cost you */
+  const flip = (x, y) => (chance(0.5) ? [x, y] : [y, x]);
+  const near2 = Math.max(6, Math.round(SA * rnd(0.85, 1.2)) + ri(2, 9));
+  styles.push(flip({ t: 'add', v: near2 }, { t: 'mul', v: 2 }), flip({ t: 'add', v: near2 }, { t: 'mul', v: 2 }));
+  styles.push(flip({ t: 'add', v: Math.max(10, Math.round(SA * rnd(1.7, 2.3))) }, { t: 'mul', v: 3 }));
+  if (G.dist > 300) styles.push(flip({ t: 'sub', v: Math.max(4, Math.round(S * rnd(0.4, 0.6))) }, { t: 'div', v: 2 }));
   /* mystery: a sealed panel next to a known one. Decided now, revealed on the way through */
   if (G.dist > 120 && chance(0.14)) {
     const r = Math.random();
@@ -1911,7 +1922,9 @@ function bossBits(boss) {
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
 function spawnBoss(wy) {
   const d = G.level;
-  const hp = Math.round((42 + d * 46 + (par(G.dist) * 0.6 + G.soldiers * 0.4) * 1.5 * (1 + G.dist / 1400)) * 0.75);
+  /* as tough as a rival mob of about a quarter of par: the same per-unit health that tracks your guns */
+  const early = clamp(0.45 + G.dist / 600, 0.45, 1);
+  const hp = Math.round((42 + d * 46 + unitHp(G.dist) * (par(G.dist) * 0.28 + G.soldiers * 0.06)) * early);
   const bx = (road.x0 + road.x1) / 2 + rnd(-60, 60);
     const boss = mkEnemy('boss', bx, wy, hp);
   boss.roar = 1;
@@ -2092,8 +2105,9 @@ function applyGate(g) {
     for (const o of offs) if (G.armyX + o.x < mid) left++;
   }
   let lFrac = left / counted, rFrac = 1 - lFrac;
-  if (lFrac < 0.08) { lFrac = 0; rFrac = 1; }
-  else if (rFrac < 0.08) { rFrac = 0; lFrac = 1; }
+  /* a few stragglers on the other side follow the crowd: aiming at a panel gets you that panel */
+  if (lFrac < 0.2) { lFrac = 0; rFrac = 1; }
+  else if (rFrac < 0.2) { rFrac = 0; lFrac = 1; }
   const lp = g.panels[0], rp = g.panels[1];
   let nl = transformCount(army * lFrac, lp);
   let nr = transformCount(army * rFrac, rp);
@@ -2492,7 +2506,7 @@ function clearWorld() {
   bullets = []; parts = []; floats = []; rewards = []; ebullets = []; coins = []; mobs = [];
   deadEnemies.length = 0; deadSoldiers.length = 0; scorches.length = 0;
   labelsEl.innerHTML = ''; floatsEl.innerHTML = '';
-  labelsEl.appendChild(bestLabel);
+  labelsEl.appendChild(bestLabel); labelsEl.appendChild(squadLabel);
 }
 
 function missionHTML(showNew) {
@@ -3066,10 +3080,13 @@ function hurt(e, dmg) {
   /* a boss shrugs off shots until it makes its entrance: the fight happens up close, not on the horizon */
   if (e.boss && !e.introduced) return;
   if (e.boss && G.skills.execution) dmg *= 1 + G.skills.execution * 0.4;
+  /* a boss soaks at most a quarter of its health a second, so even a monster squad
+     gets a few seconds of showdown instead of a pop on the horizon */
+  if (e.boss && !e.attacking) { const bud = e.budget ?? e.maxhp * 0.25; dmg = Math.min(dmg, Math.max(0, bud)); e.budget = bud - dmg; }
   e.hp -= dmg;
   /* flash in short pulses so a monster under constant fire keeps its color */
   if (!(e.hitCD > 0)) { e.hitT = 0.07; e.hitCD = 0.22; }
-  e.wy += Math.min(7, dmg * 0.18);
+  if (!e.boss) e.wy += Math.min(7, dmg * 0.18);
   if (e.hp > 0 && parts.length < MAXP - 8 && Math.random() < 0.55)
     parts.push(mkPart(e.x + rnd(-5, 5), e.wy + rnd(-4, 4), '#e8f2ff'));
   if (e.hp <= 0 && !e._dead) {
@@ -3204,7 +3221,9 @@ function formation(n) {
   n = Math.max(1, n | 0);
   const wide = (G.form + 1) * 0.5;
   const roadW = Math.max(120, road.x1 - road.x0);
-  const span = roadW * (0.18 + wide * 0.66);
+  /* the default square is about a third of the road, so it fits one gate panel;
+     only a deliberate WIDE spread straddles both */
+  const span = roadW * (0.12 + 0.72 * Math.pow(wide, 1.8));
   const spY = (8 + (1 - wide) * 10) * Math.max(0.7, Math.min(1, roadW / 480)) * crowdS;
   const aspect = Math.pow(2.6, G.form);
   let cols = Math.round(Math.sqrt(n) * aspect);
@@ -3695,10 +3714,19 @@ function update(dt) {
       parts.push(mkPart(e.x + rnd(-8, 8), e.wy + rnd(-6, 6), '#ffd75d'));
     if (e.roar) e.roar -= dt * 1.4;
     /* boss entrance: name card, roar, a jolt, the moment it comes into view */
-    if (e.boss && !e.introduced && e.wy - G.camY < 820) {
-      e.introduced = true; e.roar = 1;
+    if (e.boss && !e.introduced && e.wy - G.camY < 540) {
+      e.introduced = true; e.roar = 1; e.fightT = 0; e.budget = 0;
       bannerFlash(e.shooter ? 'GUNNER BOSS!' : e.splitter ? 'SPLITTER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
+    }
+    /* the showdown: once in view the boss keeps its distance, then closes in.
+       Kill it in time or it wades into the squad */
+    if (e.boss && e.introduced && e.hp > 0) {
+      e.fightT += dt;
+      e.budget = Math.min(e.maxhp * 0.22, (e.budget ?? 0) + e.maxhp * 0.22 * dt);
+      /* after a short stomp through the squad it lumbers past and falls behind */
+      const hold = Math.max(0, 500 - e.fightT * 75);
+      if (e.fightT < 8.2 && e.wy - G.camY < hold) e.wy = G.camY + hold;
     }
     /* shooter bosses lob orbs at the squad while in range */
     if (e.shooter && !e._dead) {
@@ -4245,6 +4273,17 @@ function draw(now) {
   /* shadows (filled across sections below) */
   let shI = 0;
 
+  /* the army count rides above the crowd, the way every crowd runner shows it */
+  if (G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' || G.mode === 'dying') {
+    const n = Math.round(G.soldiers);
+    if (n !== squadShownN) {
+      squadNumEl.textContent = fmtNum(n);
+      if (Math.abs(n - squadShownN) >= Math.max(3, squadShownN * 0.04)) { squadNumEl.classList.remove('pop'); void squadNumEl.offsetWidth; squadNumEl.classList.add('pop'); }
+      squadLabel.classList.toggle('low', n < 10);
+      squadShownN = n;
+    }
+    setLabel(squadLabel, axw, 2.5 + (crowdS - 1) * 1.6, 0.9);
+  } else squadLabel.style.display = 'none';
   /* squad */
   const shown = Math.min(G.soldiers, visCap);
   if (G.mode === 'run' && squadNow.length === shown) soldierOffsets = squadNow;

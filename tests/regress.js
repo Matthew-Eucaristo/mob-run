@@ -9,7 +9,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await p.goto('http://localhost:8787/index.html?debug');
   await p.waitForTimeout(800);
 
-  // 1. a boss alone in contact drains the army
+  // 1. a boss alone in contact drains the army (fightT 7: the showdown has closed in)
   const r1 = await p.evaluate(() => {
     const M = window.__mob; M.SIM.on = true; M.startGame();
     for (let i = 0; i < 60; i++) M.update(1 / 60); M.spawnBoss(M.G.camY + 300);
@@ -19,7 +19,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
     M.G.soldiers = 400;
     const s0 = M.G.soldiers;
     let lost = 0;
-    for (let i = 0; i < 120; i++) { bo.wy = M.G.camY + 5; bo.x = M.G.armyX; const a = M.G.soldiers; M.update(1 / 60); if (M.G.soldiers < a && M.G.cause === 'CRUSHED BY A BOSS') lost += a - M.G.soldiers; if (M.G.mode === 'pick') M.chooseSkill('dmg'); }
+    for (let i = 0; i < 120; i++) { bo.introduced = true; bo.fightT = 7; bo.wy = M.G.camY + 5; bo.x = M.G.armyX; const a = M.G.soldiers; M.update(1 / 60); if (M.G.soldiers < a && M.G.cause === 'CRUSHED BY A BOSS') lost += a - M.G.soldiers; if (M.G.mode === 'pick') M.chooseSkill('dmg'); }
     return [s0, s0 - lost, M.G.cause];
   });
   assert(r1[1] < r1[0], 'a lone boss in contact hurts the squad ' + r1.join(' '));
