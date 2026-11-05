@@ -2552,6 +2552,7 @@ function gameOver() {
   refreshBadges();
   renderQuickBuy();
   shareBlob = null;
+  if (shareBtn) shareBtn.classList.toggle('brag', isBest && d > 0);
   setTimeout(() => { if (G.mode === 'over') shareCard().then((b) => { shareBlob = b; }); }, 1200);
   maybeOfferInstall();
   vib(30);
