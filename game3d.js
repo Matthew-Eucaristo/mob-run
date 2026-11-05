@@ -1168,7 +1168,7 @@ bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(bulletMesh);
 const MAXEB = 30;
 const ebulletMesh = new THREE.InstancedMesh(
-  new THREE.SphereGeometry(0.16, 8, 8),
+  new THREE.SphereGeometry(0.3, 12, 10),
   new THREE.MeshBasicMaterial({ color: 0xffffff }), MAXEB);
 ebulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(ebulletMesh);
@@ -3532,6 +3532,8 @@ function update(dt) {
   for (let i = ebullets.length - 1; i >= 0; i--) {
     const p = ebullets[i];
     p.t += dt; p.x += p.vx * dt; p.wy += p.vwy * dt;
+    if (parts.length < MAXP - 4 && Math.random() < 0.6)
+      parts.push({ x: p.x + rnd(-5, 5), wy: p.wy + rnd(-4, 8), h: 1 + rnd(-0.2, 0.2), vx: rnd(-10, 10), vwy: rnd(10, 30), vh: rnd(0.3, 1.2), t: 0, life: rnd(0.2, 0.4), color: Math.random() < 0.5 ? '#ff7a2a' : '#ffd06a' });
     if (p.t > 7 || p.wy < G.camY - 140 || p.x < road.x0 - 80 || p.x > road.x1 + 80) { ebullets.splice(i, 1); continue; }
     const dx = p.x - G.armyX, dy = p.wy - G.camY, rr = sr * 0.8 + p.r;
     if (dx * dx + dy * dy < rr * rr) {
@@ -4505,16 +4507,25 @@ function draw(now) {
   for (const p of ebullets) {
     const zP = wz(p.wy);
     if (zP > 14) continue;
-    dummy.position.set(wx(p.x), 0.9, zP);
+    /* fireballs: bigger, pulsing hot, with a ground shadow so you can judge the dodge */
+    const pulse = Math.sin(t * 14 + p.t * 9);
+    dummy.position.set(wx(p.x), 1.0, zP);
     dummy.rotation.set(0, 0, 0);
-    dummy.scale.setScalar(1 + Math.sin(t * 12 + p.t * 9) * 0.15);
+    dummy.scale.setScalar(1 + pulse * 0.15);
     dummy.updateMatrix();
     if (ebi < MAXEB) {
       ebulletMesh.setMatrixAt(ebi, dummy.matrix);
-      ebulletMesh.setColorAt(ebi, tmpCol.set(p.col));
+      ebulletMesh.setColorAt(ebi, tmpCol.set('#ff6a1a').lerp(col3('#fff1a8'), 0.35 + pulse * 0.3));
       ebi += 1;
     }
+    if (shI < MAXSH) {
+      dummy.position.set(wx(p.x), 0.06, zP);
+      dummy.rotation.set(-Math.PI / 2, 0, 0); dummy.scale.set(1.1, 0.8, 1);
+      dummy.updateMatrix();
+      shadowMesh.setMatrixAt(shI++, dummy.matrix);
+    }
   }
+  shadowMesh.count = shI; shadowMesh.instanceMatrix.needsUpdate = true;
   ebulletMesh.count = ebi;
   ebulletMesh.instanceMatrix.needsUpdate = true;
   if (ebulletMesh.instanceColor) ebulletMesh.instanceColor.needsUpdate = true;
