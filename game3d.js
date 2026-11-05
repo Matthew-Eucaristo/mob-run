@@ -1191,12 +1191,14 @@ const PANEL_STYLE = {
   gun: { bg: 'rgba(40,130,220,0.8)', edge: '#a8dcff' },
   sub: { bg: 'rgba(220,50,70,0.78)', edge: '#ffb0b8' },
   div: { bg: 'rgba(170,40,90,0.82)', edge: '#ffb0d0' },
+  mys: { bg: 'rgba(120,70,210,0.85)', edge: '#dcc4ff' },
 };
 function gateLabel(p) {
   if (p.t === 'add') return '+' + p.v;
   if (p.t === 'sub') return '-' + p.v;
   if (p.t === 'mul') return '×' + p.v;
   if (p.t === 'gun') return 'GUN UP';
+  if (p.t === 'mys') return '?';
   return '÷' + p.v;
 }
 function gateGood(p) { return p.t === 'add' || p.t === 'mul' || p.t === 'gun'; }
@@ -1568,6 +1570,15 @@ function spawnGate(wy) {
     [{ t: 'gun' }, { t: 'sub', v: bigSub }],
     [{ t: 'gun' }, { t: 'div', v: 2 }],
   ];
+  /* mystery: a sealed panel next to a known one. Decided now, revealed on the way through */
+  if (G.dist > 120 && chance(0.14)) {
+    const r = Math.random();
+    const res = r < 0.28 ? { t: 'add', v: Math.round(addBase * 1.8) } : r < 0.48 ? { t: 'mul', v: 2 } : r < 0.6 ? { t: 'mul', v: 3 }
+      : r < 0.85 ? { t: 'sub', v: Math.max(4, Math.round(S * rnd(0.4, 0.6))) } : { t: 'div', v: 2 };
+    const safe = { t: 'add', v: addBase };
+    styles.length = 0;
+    styles.push(chance(0.5) ? [{ t: 'mys', res }, safe] : [safe, { t: 'mys', res }]);
+  }
   if (chance(0.06)) styles.push([{ t: 'mul', v: 5 }, { t: 'sub', v: late ? Math.round(S * rnd(0.9, 1.3)) : bigSub }]);
   if (chance(0.05)) styles.push([{ t: 'mul', v: 4 }, { t: 'div', v: 2 }]);
   const lucky = gatesSpawned >= 2 && chance((META.up.lucky || 0) * 0.06);
@@ -1755,6 +1766,7 @@ function spawnBoss(wy) {
   boss.pop = 0.55;
   /* variant: a gunner boss lobs burning orbs */
   if (d >= 2 && chance(0.45)) { boss.shooter = true; boss.col = '#d8762a'; boss.fireT = 1.1; }
+  else if (d >= 3 && chance(0.45)) { boss.splitter = true; boss.col = '#8a3ad8'; }
   const aura = new THREE.Mesh(bossAuraGeo, new THREE.MeshBasicMaterial({
     color: boss.shooter ? 0xe2b657 : 0xff5d3d, transparent: true, opacity: 0.72,
     side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
@@ -1891,6 +1903,7 @@ function gateMid(g) {
 
 function transformCount(count, p) {
   if (count <= 0) return 0;
+  if (p.t === 'mys') return transformCount(count, p.res);
   if (p.t === 'add') return count + p.v;
   if (p.t === 'sub') return Math.max(0, count - p.v);
   if (p.t === 'mul') return count * p.v;
@@ -1936,6 +1949,13 @@ function applyGate(g) {
     const extra = 4 * G.skills.warcry;
     addSoldiers(G.soldiers + extra);
     floatText(G.armyX, G.camY + 28, 'WARCRY +' + extra, '#f3ecdf', 20, 3);
+  }
+  for (const [pp, fr, side] of [[lp, lFrac, 0], [rp, rFrac, 1]]) {
+    if (pp.t !== 'mys' || fr <= 0) continue;
+    const good = pp.res.t === 'add' || pp.res.t === 'mul';
+    floatText(G.armyX, G.camY + 70, 'MYSTERY ' + gateLabel(pp.res) + (good ? '!' : '...'), good ? '#c8a8ff' : '#ff8d98', 28, 4.8);
+    if (g.meshes && g.meshes[side]) { g.meshes[side].material.map = panelTex({ ...pp.res, gold: false }); g.meshes[side].material.needsUpdate = true; }
+    (good ? sfx.fanfare : sfx.bad)();
   }
   const lab = gunUp && delta === 0 ? 'WEAPON UP!' : ((delta >= 0 ? '+' : '') + delta);
   const tag = split ? (gateLabel(lp) + ' | ' + gateLabel(rp) + '  ') : '';
@@ -2804,6 +2824,15 @@ function hurt(e, dmg) {
     }
     if (e.boss) {
       sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib(70); G.bossKills += 1;
+      /* a splitter bursts into three brutes that each carry a quarter of its health */
+      if (e.splitter) {
+        for (let k = -1; k <= 1; k++) {
+          const b2 = mkEnemy('brute', clamp(e.x + k * 55, road.x0 + 20, road.x1 - 20), e.wy + 20 + Math.abs(k) * 20, Math.round(e.maxhp * 0.25));
+          b2.col = '#a45ae8'; b2.pop = 0.4; b2.roar = 1;
+          enemies.push(b2);
+        }
+        floatText(e.x, e.wy + 40, 'IT SPLIT!', '#c8a8ff', 30, 4.2);
+      }
       const reward = 25 + G.level * 10;
       floatText(e.x, e.wy, 'BOSS DOWN +' + reward, '#ffd75d', 30, 4);
       for (let i = 0; i < 16 && coins.length < MAXCOIN; i++)
@@ -3387,7 +3416,7 @@ function update(dt) {
     /* boss entrance: name card, roar, a jolt, the moment it comes into view */
     if (e.boss && !e.introduced && e.wy - G.camY < 980) {
       e.introduced = true; e.roar = 1;
-      bannerFlash(e.shooter ? 'GUNNER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
+      bannerFlash(e.shooter ? 'GUNNER BOSS!' : e.splitter ? 'SPLITTER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
     }
     /* shooter bosses lob orbs at the squad while in range */
@@ -4359,7 +4388,7 @@ function draw(now) {
       for (const e of enemies) if (e.boss && e.hp > 0 && e.wy - G.camY < 1150 && (!bo || e.wy < bo.wy)) bo = e;
     bossBar.classList.toggle('on', !!bo);
     if (bo) {
-      if (bossName) bossName.textContent = bo.shooter ? 'GUNNER BOSS' : 'BRUTE BOSS';
+      if (bossName) bossName.textContent = bo.shooter ? 'GUNNER BOSS' : bo.splitter ? 'SPLITTER BOSS' : 'BRUTE BOSS';
       if (bossFill) bossFill.style.width = (100 * bo.hp / bo.maxhp).toFixed(1) + '%';
     }
   }
