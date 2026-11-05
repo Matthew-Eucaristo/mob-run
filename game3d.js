@@ -2664,7 +2664,7 @@ if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
     } catch (err) { if (err && err.name === 'AbortError') return; }
     if (blob) {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = `mobrun-${d}m.png`;
+      a.href = URL.createObjectURL(blob); a.download = `mobrun-${d}m.png`; a.target = "_blank"; a.rel = "noopener";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }
