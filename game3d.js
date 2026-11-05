@@ -262,7 +262,7 @@ function coinLadder() {
 
 /* ---------------- zones ---------------- */
 const ZONES = [
-  { bg: '#0e1526', ground: '#0a1020', road: '#1a2440', post: '#2c3f63', dash: '#3a4f7a', sky: 0x9db8ff },
+  { bg: '#24305e', ground: '#17213f', road: '#2e3a66', post: '#4a5c92', dash: '#7d93cc', sky: 0xb4c4ff },
   { bg: '#0f1f10', ground: '#0a160a', road: '#1d3319', post: '#35572b', dash: '#4a7240', sky: 0xa8ffb0 },
   { bg: '#241209', ground: '#160b04', road: '#3d2214', post: '#5f3a28', dash: '#7a5238', sky: 0xffc89d },
   { bg: '#161410', ground: '#100e0c', road: '#2c281f', post: '#4a4336', dash: '#6b5e45', sky: 0xf0d2a4 },
