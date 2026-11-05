@@ -1299,7 +1299,8 @@ const MAXB = 500;
 const BULLET_CAP = Q.low ? 140 : Q.phone ? 260 : MAXB;
 const bulletMesh = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.12, 0.12, 0.78),
-  new THREE.MeshBasicMaterial({ color: 0xffffff }), MAXB);
+  /* tracers glow through haze: on the pale Salt Flats fog they used to vanish */
+  new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), MAXB);
 bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(bulletMesh);
 const MAXEB = 30;
