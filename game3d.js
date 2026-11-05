@@ -676,19 +676,51 @@ const stars = new THREE.Points(starGeo, starMat);
 scene.add(stars);
 const ZONE_STARS = [0.9, 0.3, 0.15, 0.85, 0.45];
 
-const NMOTES = 220;
+/* weather: every zone has its own air. Particles live in a box around the
+   camera, scroll with the road and drift with the zone's wind. */
+const NMOTES = Q.low ? 60 : Q.phone ? 130 : 240;
+const WEATHER = [
+  { col: '#f2f6ff', size: 0.38, op: 0.85, vx: 0, vy: -1.3, wob: 0.6, add: false },    // nightfall: snow
+  { col: '#b4ff8a', size: 0.42, op: 0.7, vx: 0, vy: 0.55, wob: 0.9, add: true },       // toxic: spores
+  { col: '#ffd06a', size: 0.36, op: 1, vx: 0.3, vy: 2.6, wob: 0.5, add: true },     // ember: embers
+  { col: '#fff1d6', size: 0.44, op: 0.55, vx: 3.8, vy: -0.15, wob: 0.3, add: false },   // salt: blowing dust
+  { col: '#bff2ff', size: 0.46, op: 0.65, vx: 0, vy: 0.9, wob: 0.7, add: true },        // deep run: bubbles
+];
+const wx0 = { col: new THREE.Color(WEATHER[0].col), size: WEATHER[0].size, op: WEATHER[0].op, vx: WEATHER[0].vx, vy: WEATHER[0].vy, wob: WEATHER[0].wob };
 const moteGeo = new THREE.BufferGeometry();
+const moteSeed = new Float32Array(NMOTES);
 {
   const mp = new Float32Array(NMOTES * 3);
   for (let i = 0; i < NMOTES; i++) {
-    mp[i * 3] = rnd(-20, 20); mp[i * 3 + 1] = rnd(0.2, 6); mp[i * 3 + 2] = rnd(-120, 10);
+    mp[i * 3] = rnd(-18, 18); mp[i * 3 + 1] = rnd(0.2, 9); mp[i * 3 + 2] = rnd(-45, 10);
+    moteSeed[i] = rnd(0, 6.28);
   }
   moteGeo.setAttribute('position', new THREE.BufferAttribute(mp, 3));
 }
-const moteMat = new THREE.PointsMaterial({ map: dotTex, size: 0.24, color: 0x9db8ff, transparent: true, opacity: 0.28, depthWrite: false });
+const moteMat = new THREE.PointsMaterial({ map: dotTex, size: 0.26, color: 0xe8f0ff, transparent: true, opacity: 0.7, depthWrite: false });
 const motes = new THREE.Points(moteGeo, moteMat);
-motes.visible = !Q.low && !Q.phone;
 scene.add(motes);
+function stepWeather(dt, zi, scrollV, t) {
+  const w = WEATHER[zi % WEATHER.length];
+  const k = Math.min(1, dt * 0.8);
+  wx0.col.lerp(tmpCol.set(w.col), k);
+  wx0.size += (w.size - wx0.size) * k; wx0.op += (w.op - wx0.op) * k;
+  wx0.vx += (w.vx - wx0.vx) * k; wx0.vy += (w.vy - wx0.vy) * k; wx0.wob += (w.wob - wx0.wob) * k;
+  moteMat.color.copy(wx0.col); moteMat.size = wx0.size; moteMat.opacity = wx0.op;
+  const blend = w.add ? THREE.AdditiveBlending : THREE.NormalBlending;
+  if (moteMat.blending !== blend) { moteMat.blending = blend; moteMat.needsUpdate = true; }
+  const a = moteGeo.attributes.position.array;
+  for (let i = 0; i < NMOTES; i++) {
+    const o = i * 3, sd = moteSeed[i];
+    a[o] += (wx0.vx + Math.sin(t * 1.3 + sd) * wx0.wob) * dt;
+    a[o + 1] += (wx0.vy * (0.7 + (sd % 1) * 0.6)) * dt;
+    a[o + 2] += scrollV * dt + Math.cos(t * 1.1 + sd) * wx0.wob * 0.3 * dt;
+    if (a[o + 2] > 10) { a[o + 2] -= 55; a[o] = rnd(-18, 18); }
+    if (a[o + 1] > 9.5) a[o + 1] = 0.2; else if (a[o + 1] < 0.1) a[o + 1] = 9.4;
+    if (a[o] > 24) a[o] = -24; else if (a[o] < -24) a[o] = 24;
+  }
+  moteGeo.attributes.position.needsUpdate = true;
+}
 
 /* --- merged-geometry builder: multi-part meshes, one draw call each --- */
 function M4(px, py, pz, rx, ry, rz, sx, sy, sz) {
@@ -3577,7 +3609,7 @@ function draw(now) {
   horizonGlow.material.color.set(z.sky);
   stripMat.color.copy(edgeDanger > 0.18 ? tmpCol.set('#ff5d6a') : curZone.post);
   moon.material.color.copy(tmpCol.set(z.sky).lerp(col3('#ffffff'), 0.6));
-  moteMat.color.copy(tmpCol.set(z.sky));
+  stepWeather(FD, zi, (G.mode === 'run' ? G.speed : G.mode === 'menu' ? 70 : 0) * K, t);
   patchMesh.material.color.copy(tmpCol.copy(curZone.ground).multiplyScalar(0.55));
 
   /* scorch decals */
