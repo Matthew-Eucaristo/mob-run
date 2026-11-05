@@ -255,6 +255,8 @@ const UPGRADES = [
   { id: 'army', name: 'BIGGER SQUAD', icon: '⚑', max: 10, desc: 'Soldiers at the start', val: (l) => String(10 + l * 5), cost: (l) => Math.round(30 * Math.pow(1.5, l)) },
   { id: 'gun', name: 'STARTING GUN', icon: '➹', max: 3, desc: 'Weapon at the start', val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [150, 450, 1100][l] },
   { id: 'armor', name: 'BODY ARMOR', icon: '▣', max: 6, desc: 'Fewer soldiers lost to every hit', val: (l) => '-' + l * 5 + '%', cost: (l) => Math.round(60 * Math.pow(1.6, l)) },
+  { id: 'magnet', name: 'MAGNET', icon: '◎', max: 4, desc: 'Coins fly to you from farther away', val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : 'off', cost: (l) => Math.round(80 * Math.pow(1.7, l)) },
+  { id: 'lucky', name: 'LUCKY GATES', icon: '✦', max: 5, desc: 'Chance of a golden gate, good on both sides', val: (l) => l * 6 + '%', cost: (l) => Math.round(100 * Math.pow(1.65, l)) },
   { id: 'coin', name: 'COIN VALUE', icon: '★', max: 8, desc: 'Every coin is worth more', val: (l) => '+' + l * 15 + '%', cost: (l) => Math.round(45 * Math.pow(1.55, l)) },
 ];
 const MISSION_DEFS = {
@@ -268,7 +270,7 @@ const MISSION_DEFS = {
   streak: { steps: [4, 6, 8, 11, 15], text: (n) => `Take ${n} good gates in a row` },
 };
 const META = {
-  up: { army: 0, gun: 0, armor: 0, coin: 0 },
+  up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0 },
   mlv: {}, missions: [], done: 0, seenMob: false,
   daily: { last: '', streak: 0 },
   runs: 0,
@@ -1002,7 +1004,7 @@ function gateGood(p) { return p.t === 'add' || p.t === 'mul' || p.t === 'gun'; }
 function panelTex(p) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 160;
   const g = c.getContext('2d');
-  const st = PANEL_STYLE[p.t];
+  const st = p.gold ? { bg: 'rgba(170,120,20,0.82)', edge: '#ffd75d' } : PANEL_STYLE[p.t];
   g.fillStyle = st.bg;
   g.beginPath(); g.roundRect(6, 6, 244, 148, 18); g.fill();
   g.strokeStyle = st.edge; g.lineWidth = 6; g.stroke();
@@ -1021,7 +1023,7 @@ function makeGateMeshes(g) {
   g.meshes = []; g.frames = [];
   for (const p of g.panels) {
     const frame = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({
-      color: PANEL_STYLE[p.t].edge, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false,
+      color: p.gold ? '#ffd75d' : PANEL_STYLE[p.t].edge, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false,
     }));
     frame.position.z = -0.02; frame.scale.setScalar(1.07);
     grp.add(frame); g.frames.push(frame);
@@ -1247,7 +1249,13 @@ function floatText(x, wy, text, color, size, h) {
   el.className = 'fl'; el.textContent = text;
   el.style.color = color; el.style.fontSize = (size || 18) + 'px';
   floatsEl.appendChild(el);
-  floats.push({ el, x, wy, h: h === undefined ? 2.5 : h, vh: 2.6, t: 0, life: 1.05 });
+  /* stack instead of overlapping when several pop at once near the squad */
+  let hh = h === undefined ? 2.5 : h;
+  let busy = 0;
+  for (const f of floats) if (f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90) busy++;
+  hh += busy * 1.15;
+  floats.push({ el, x, wy, h: hh, vh: 2.6, t: 0, life: 1.05 + busy * 0.12 });
+  while (floats.length > 14) { floats[0].el.remove(); floats.shift(); }
 }
 
 /* ---------------- spawning ---------------- */
@@ -1319,15 +1327,18 @@ function spawnGate(wy) {
   ];
   if (chance(0.06)) styles.push([{ t: 'mul', v: 5 }, { t: 'sub', v: late ? Math.round(S * rnd(0.9, 1.3)) : bigSub }]);
   if (chance(0.05)) styles.push([{ t: 'mul', v: 4 }, { t: 'div', v: 2 }]);
+  const lucky = gatesSpawned >= 2 && chance((META.up.lucky || 0) * 0.06);
   const pair = gatesSpawned < 2 ? [{ t: 'add', v: addBase }, { t: 'mul', v: 2 }]
+    : lucky ? (chance(0.5) ? [{ t: 'mul', v: 3 }, { t: 'add', v: addBase * 2 }] : [{ t: 'add', v: addBase * 2 }, { t: 'mul', v: 3 }])
     : styles[ri(0, styles.length - 1)];
   gatesSpawned += 1;
   const moving = gatesSpawned > 3 && chance(Math.min(0.55, 0.22 + G.level * 0.05))
     ? { amp: rnd(45, 105), speed: rnd(0.0017, 0.0034), phase: rnd(0, 6) } : null;
-  const g = { id: ++gateSeq, wy, passed: false, moving, mid: (road.x0 + road.x1) / 2, pop: 0,
-    panels: [{ ...pair[0], side: 0 }, { ...pair[1], side: 1 }] };
+  const g = { id: ++gateSeq, wy, passed: false, moving: lucky ? null : moving, lucky, mid: (road.x0 + road.x1) / 2, pop: 0,
+    panels: [{ ...pair[0], side: 0, gold: lucky }, { ...pair[1], side: 1, gold: lucky }] };
   makeGateMeshes(g);
   gates.push(g);
+  if (lucky) g.announce = true;
 }
 
 function mkEnemy(kind, x, wy, hp) {
@@ -1644,6 +1655,7 @@ function applyGate(g) {
   if (g.grp) { for (const m of g.meshes) m.material.opacity = 0.25; for (const f of g.frames) f.material.opacity = 0.12; }
   vib(good ? 18 : 45);
 }
+function magLevel() { return (G.skills.magnet || 0) + (META.up.magnet || 0) * 0.5; }
 function armorFrac() {
   return Math.min(0.55, (G.skills.iron || 0) * 0.12 + (META.up.armor || 0) * 0.05);
 }
@@ -3044,6 +3056,7 @@ function update(dt) {
   /* gates */
   for (let i = gates.length - 1; i >= 0; i--) {
     const g = gates[i];
+    if (g.announce && g.wy - G.camY < 900) { g.announce = false; bannerFlash('GOLDEN GATE', '#ffd75d'); tone(1320, 0.1, 'sine', 0.05); }
     if (!g.passed && G.camY >= g.wy) { g.passed = true; applyGate(g); }
     if (g.wy < G.camY - 200) { removeGate(g); gates.splice(i, 1); }
   }
@@ -3070,13 +3083,13 @@ function update(dt) {
   /* pickups */
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i];
-    const reach = (sr + 14) * (1 + (G.skills.magnet || 0) * 0.9);
+    const reach = (sr + 14) * (1 + magLevel() * 0.9);
     if (Math.abs(p.wy - G.camY) < reach && Math.abs(p.x - G.armyX) < reach) {
       takePickup(p.kind, p.x); scene.remove(p.mesh); pickups.splice(i, 1); continue;
     }
     if (p.wy < G.camY - 160) { scene.remove(p.mesh); pickups.splice(i, 1); }
   }
-  const mag = G.skills.magnet || 0;
+  const mag = magLevel();
   const hoard = G.skills.hoard || 0;
   const reachX = halfPxCache * 0.92 + 18 + mag * 34 + hoard * 18;
   const reachY = 26 + mag * 40 + hoard * 12;
@@ -3111,7 +3124,7 @@ function update(dt) {
     const r = rewards[i];
     r.t += dt * 2.2;
     const k = Math.min(1, r.t);
-    const pull = k * (0.25 + (G.skills.magnet || 0) * 0.22);
+    const pull = k * (0.25 + magLevel() * 0.22);
     r.x += (G.armyX - r.x) * pull;
     r.wy += (G.camY + 10 - r.wy) * pull;
     r.mesh.position.set(wx(r.x), 1.4, wz(r.wy));
