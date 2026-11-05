@@ -2083,6 +2083,16 @@ function showHint(text, secs) {
   hintEl.textContent = text;
   hintT = secs;
 }
+/* skill reward: a hazard that only just missed */
+function closeCall(x, wy) {
+  G.closeCalls = (G.closeCalls || 0) + 1;
+  const n = 3 + Math.min(5, G.closeCalls);
+  for (let i = 0; i < n && coins.length < MAXCOIN; i++)
+    coins.push({ x: x + rnd(-20, 20), wy: G.camY + 30 + rnd(-10, 10), spin: rnd(0, 6), fly: 0.12 + i * 0.04 });
+  floatText(G.armyX, G.camY + 50, 'CLOSE CALL!', '#7de8ff', 26, 4.2);
+  voice(1600, 0.08, 'triangle', 0.05, 2400); voice(2400, 0.1, 'sine', 0.035, 0, { at: 0.06 });
+  hitstop(0.06);
+}
 function hitstop(t) { G.slow = Math.max(G.slow, t); }
 /* a little coin flies from the pickup to the HUD counter; pooled DOM, capped */
 const flyPool = [];
@@ -2237,7 +2247,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
@@ -3562,6 +3572,7 @@ function update(dt) {
           for (let k = 0; k < 24 && parts.length < MAXP - 26; k++)
             parts.push(mkPart(h.x + rnd(-30, 30), h.wy + rnd(-24, 24), '#ff9d5d'));
           const dd = Math.hypot(h.x - G.armyX, h.wy - G.camY);
+          if (dd >= h.r + sr && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
           if (dd < h.r + sr) {
             const frac = clamp(1 - dd / (h.r + sr), 0.15, 1);
             loseSoldiers(Math.max(3, Math.ceil(G.soldiers * 0.4 * frac)), 'METEOR STRIKE');
@@ -3589,6 +3600,12 @@ function update(dt) {
       : h.kind === 'choke'
         ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(G.armyX - h.gapX) + sr * 0.75 > h.gapW / 2
         : Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) < h.r + sr * 0.75;
+    if (h.kind === 'saw') {
+      const dSaw = Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) - (h.r + sr * 0.75);
+      if (touching) h.hit = true;
+      if (Math.abs(h.wy - G.camY) < 40) h.near = Math.min(h.near === undefined ? 1e9 : h.near, dSaw);
+      if (!h.paid && h.wy < G.camY - 40) { h.paid = true; if (!h.hit && h.near < 34) closeCall(sawX(h), h.wy); }
+    }
     if (touching) {
       hazDmg += h.drain;
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
