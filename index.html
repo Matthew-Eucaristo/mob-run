@@ -38,6 +38,9 @@
   .coin { display:inline-block; width:.95em; height:.95em; border-radius:50%; vertical-align:-0.13em; flex:none;
     background:radial-gradient(circle at 38% 34%, #fff2a8 0 18%, #ffd23d 19% 55%, #f0a812 56%);
     box-shadow:0 0 0 2px var(--ink), inset 0 0 0 2px rgba(255,255,255,.35); margin:0 .12em 0 .05em; }
+  .confetti { position:fixed; inset:0; z-index:30; pointer-events:none; overflow:hidden; }
+  .confetti i { position:absolute; top:-20px; border-radius:2px; animation:confettiFall linear forwards; }
+  @keyframes confettiFall { to { transform:translate(var(--dx), 110vh) rotate(var(--rot)); } }
   .flycoin { position:fixed; left:0; top:0; z-index:8; pointer-events:none; width:15px; height:15px; margin:-7px 0 0 -7px; opacity:0; will-change:transform; }
   .disp { font-family:var(--disp); font-weight:400; letter-spacing:.5px; }
   .ol { color:#fff; text-shadow:var(--ol-drop); }

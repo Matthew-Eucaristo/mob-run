@@ -74,7 +74,7 @@ if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
   if (id === 'pauseQuit') {
     /* quitting still banks the run: coins, distance bonus, missions */
     pauseOv.style.display = 'none';
-    revived = true;
+    G.quit = true;
     G.cause = 'YOU CALLED IT';
     gameOver();
     return;
@@ -1291,6 +1291,8 @@ function panelTex(p) {
   return t;
 }
 const panelGeo = new THREE.PlaneGeometry(1, 4.6);
+const gatePostGeo = new THREE.BoxGeometry(0.28, 5.2, 0.28);
+const gateBaseGeo = new THREE.BoxGeometry(1, 0.18, 0.5);
 function makeGateMeshes(g) {
   const grp = new THREE.Group();
   g.meshes = []; g.frames = [];
@@ -1305,10 +1307,10 @@ function makeGateMeshes(g) {
     }));
     grp.add(m); g.meshes.push(m);
   }
-  const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 5.2, 0.28),
+  const post = new THREE.Mesh(gatePostGeo,
     new THREE.MeshLambertMaterial({ color: g.moving ? 0x7de8ff : 0xdfe9ff, transparent: true }));
   grp.add(post); g.postMesh = post;
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1, 0.18, 0.5),
+  const base = new THREE.Mesh(gateBaseGeo,
     new THREE.MeshLambertMaterial({ color: 0x5f729a }));
   grp.add(base); g.baseMesh = base;
   grp.position.z = wz(g.wy);
@@ -1434,8 +1436,8 @@ function spawnHazard(wy) {
   /* each zone leans on its own hazard: pits in Toxic Flats, lava in Ember Ridge,
      saws on the Salt Flats, chokepoints in Deep Run */
   const sig = [null, 0.86, 0.12, 0.4, 0.62][Math.max(0, zoneIdx) % 5];
+  if (G.dist < 150 && roll > 0.62) roll = Math.random() * 0.62;
   if (sig !== null && chance(0.45)) roll = sig;
-  if (G.dist < 220 && roll > 0.62) roll = Math.random() * 0.62;
   if (roll < 0.28) {
     /* lava pool(s) anchored to a road edge — steer to the free side */
     const n = d >= 3 && chance(0.45) ? 2 : 1;
@@ -1512,7 +1514,7 @@ function spawnHazard(wy) {
     scene.add(grp);
     h.grp = grp;
     hazards.push(h);
-  } else if (G.dist > 260) {
+  } else if (G.dist > 180) {
     /* hole in the asphalt — anyone standing on it drops */
     const wpx = (road.x1 - road.x0) * rnd(0.28, 0.55);
     const len = rnd(78, 140);
@@ -1844,13 +1846,14 @@ const cannonGeo = mergeParts([
 ]);
 const cannonMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.5, emissive: 0x331a00, emissiveIntensity: 0.5 });
 const coreMat = new THREE.MeshBasicMaterial({ color: 0xd8a8ff });
+const coreGeo = SPH(0.17, 10);
 function bossBits(boss) {
   const g = new THREE.Group();
   if (boss.shooter) {
     for (const sx of [-1, 1]) { const c = new THREE.Mesh(cannonGeo, cannonMat); c.position.set(sx * 1.0, 2.45, 0.1); g.add(c); }
   } else if (boss.splitter) {
     for (const [x, y] of [[0, 1.35], [-0.38, 1.85], [0.38, 1.85]]) {
-      const c = new THREE.Mesh(SPH(0.17, 10), coreMat); c.position.set(x, y, 0.78); g.add(c);
+      const c = new THREE.Mesh(coreGeo, coreMat); c.position.set(x, y, 0.78); g.add(c);
     }
   } else return null;
   g.visible = false;   /* shown once the draw loop has placed it */
@@ -2056,7 +2059,7 @@ function applyGate(g) {
     if (pp.t !== 'mys' || fr <= 0) continue;
     const good = pp.res.t === 'add' || pp.res.t === 'mul';
     floatText(G.armyX, G.camY + 70, L('MYSTERY ', 'MISTERI ') + gateLabel(pp.res) + (good ? '!' : '...'), good ? '#c8a8ff' : '#ff8d98', 28, 4.8);
-    if (g.meshes && g.meshes[side]) { g.meshes[side].material.map = panelTex({ ...pp.res, gold: false }); g.meshes[side].material.needsUpdate = true; }
+    if (g.meshes && g.meshes[side]) { const mat = g.meshes[side].material, old = mat.map; mat.map = panelTex({ ...pp.res, gold: false }); mat.needsUpdate = true; if (old) old.dispose(); }
     (good ? sfx.fanfare : sfx.bad)();
   }
   const lab = gunUp && delta === 0 ? 'WEAPON UP!' : ((delta >= 0 ? '+' : '') + delta);
@@ -2325,7 +2328,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
@@ -2507,12 +2510,12 @@ function gameOver() {
     const en = document.getElementById('earnN');
     if (en) en.textContent = Math.floor(earned * ease);
     if (k < 1 && G.mode === 'over') requestAnimationFrame(tick);
-    else if (isBest && d > 0 && G.mode === 'over') { sfx.great(); vib(40); }
+    else if (isBest && d > 0 && G.mode === 'over') { sfx.fanfare(); vib(40); confetti(90); }
   };
   requestAnimationFrame(tick);
   if (reviveBtn) {
     const c = reviveCost();
-    reviveBtn.style.display = revived ? 'none' : '';
+    reviveBtn.style.display = revived || G.quit ? 'none' : '';
     reviveBtn.disabled = G.coins < c;
     reviveBtn.innerHTML = `${icon('heart')}<span class="stack">${L('REVIVE', 'HIDUP LAGI')}<small>${c} ${L('coins', 'koin')}</small></span>`;
   }
@@ -2527,6 +2530,7 @@ function beginDeath() {
   if (G.mode === 'dying' || G.mode === 'over') return;
   G.mode = 'dying';
   deathT = 0.78;
+  skillDelay = 0;
   G.shake = 18;
   G.slow = 0;
   clearTimeout(vigT);
@@ -2602,9 +2606,9 @@ function shareCard() {
   word('RUN', 590, 380, 190, '#ffffff', -0.06);
   const d = Math.floor(G.dist);
   word(d + 'm', 540, 650, 230, '#ffffff', 0);
-  if (d >= G.best && d > 0) word('NEW BEST!', 540, 820, 90, '#ffcc33', -0.04);
-  else word('best ' + G.best + 'm', 540, 820, 70, '#b9a9d4', 0);
-  word('peak army ' + fmtNum(G.peak) + '  ·  ' + G.mobsBeaten + ' mobs', 540, 935, 58, '#7ee081', 0);
+  if (d >= G.best && d > 0) word(L('NEW BEST!', 'REKOR BARU!'), 540, 820, 90, '#ffcc33', -0.04);
+  else word(L('best ', 'rekor ') + G.best + 'm', 540, 820, 70, '#b9a9d4', 0);
+  word(L('peak army ', 'pasukan ') + fmtNum(G.peak) + '  ·  ' + G.mobsBeaten + L(' mobs', ' gerombolan'), 540, 935, 58, '#7ee081', 0);
   const cols = ['#4aa3ff', '#5ee0ff', '#4aa3ff', '#7ab8ff', '#4aa3ff', '#5ee0ff', '#4aa3ff'];
   for (let k = 0; k < 7; k++) drawIcon(g, 'run', 180 + k * 120, 1095, 120, cols[k]);
   g.font = '44px Nunito, sans-serif'; g.fillStyle = '#b9a9d4';
@@ -2691,7 +2695,8 @@ function renderSettings() {
   const list = document.getElementById('setList');
   if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
     `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('') +
-    `<button type="button" class="setRow" data-k="lang"><i>${icon('share')}</i><b>${L('LANGUAGE', 'BAHASA')}</b><span class="langTag">${LANG === 'id' ? 'INDONESIA' : 'ENGLISH'}</span></button>`;
+    (G.mode === 'menu' || G.mode === 'over'
+      ? `<button type="button" class="setRow" data-k="lang"><i>${icon('share')}</i><b>${L('LANGUAGE', 'BAHASA')}</b><span class="langTag">${LANG === 'id' ? 'INDONESIA' : 'ENGLISH'}</span></button>` : '');
 }
 if (setOv) {
   setOv.addEventListener('pointerdown', (e) => {
@@ -2703,7 +2708,7 @@ if (setOv) {
       if (k === 'music') musicOff = !musicOff;
       if (k === 'vib') { vibOff = !vibOff; vib(30); }
       if (k === 'shake') shakeOff = !shakeOff;
-      if (k === 'lang') {
+      if (k === 'lang' && (G.mode === 'menu' || G.mode === 'over')) {
         try { localStorage.setItem('mobrun_lang', LANG === 'id' ? 'en' : 'id'); } catch (err) { }
         saveSave(); location.reload(); return;
       }
@@ -2725,6 +2730,7 @@ if (dailyBtn) dailyBtn.addEventListener('pointerdown', (e) => {
   sfx.great(); vib(30);
   dailyBtn.classList.remove('on');
   burstCoinsUI(dailyBtn, dd.coins);
+  confetti(50);
 });
 let toastT = null;
 const toastQ = [];
@@ -2744,6 +2750,21 @@ function showToast() {
     toastEl.classList.remove('on');
     setTimeout(() => { toastQ.shift(); showToast(); }, 380);
   }, 2300);
+}
+/* confetti for the big wins: plain DOM pieces on a fixed layer, cleaned up when they land */
+function confetti(n) {
+  const cols = ['#ffcc33', '#5bd44a', '#4aa3ff', '#ff4d5e', '#ff7ab8', '#fff4dc'];
+  const layer = document.createElement('div');
+  layer.className = 'confetti';
+  document.body.appendChild(layer);
+  for (let i = 0; i < (n || 70); i++) {
+    const c = document.createElement('i');
+    const x = Math.random() * 100, dx = (Math.random() - 0.5) * 30, rot = (Math.random() - 0.5) * 900;
+    c.style.cssText = `left:${x}vw;background:${cols[i % cols.length]};width:${6 + Math.random() * 6}px;height:${8 + Math.random() * 8}px;` +
+      `animation-duration:${1.6 + Math.random() * 1.4}s;animation-delay:${Math.random() * 0.35}s;--dx:${dx}vw;--rot:${rot}deg;`;
+    layer.appendChild(c);
+  }
+  setTimeout(() => layer.remove(), 3600);
 }
 function burstCoinsUI(fromEl, amount) {
   const r = fromEl.getBoundingClientRect();
@@ -2992,7 +3013,7 @@ function hurt(e, dmg) {
         floatText(e.x, e.wy + 40, L('IT SPLIT!', 'DIA PECAH!'), '#c8a8ff', 30, 4.2);
       }
       const reward = 25 + G.level * 10;
-      floatText(e.x, e.wy, 'BOSS DOWN +' + reward, '#ffd75d', 30, 4);
+      floatText(e.x, e.wy, L('BOSS DOWN +', 'BOS TUMBANG +') + reward, '#ffd75d', 30, 4);
       for (let i = 0; i < 16 && coins.length < MAXCOIN; i++)
         coins.push({ x: e.x + rnd(-50, 50), wy: e.wy + rnd(-30, 30), spin: rnd(0, 6), fly: 0.3 + i * 0.035 });
       addSoldiers(G.soldiers + reward);
@@ -3318,7 +3339,7 @@ function update(dt) {
     const rally = 1 + (G.skills.rally || 0) * 0.45;
     const bonus = Math.max(5, Math.round(Math.ceil(G.soldiers * 0.1) * rally)) * steps;
     addSoldiers(G.soldiers + bonus);
-    floatText(G.armyX, G.camY + 30, 'LEVEL UP +' + bonus, '#e2b657', 26, 3.8);
+    floatText(G.armyX, G.camY + 30, L('LEVEL UP +', 'NAIK LEVEL +') + bonus, '#e2b657', 26, 3.8);
     wantSkill = true;
   }
   G.shake = Math.max(0, G.shake - dt * 22);
@@ -3712,18 +3733,18 @@ function update(dt) {
       }
       continue;
     }
+    if (h.kind === 'saw') {
+      const dSaw = Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) - (h.r + sr * 0.75);
+      if (dSaw < 0) h.hit = true;
+      if (Math.abs(h.wy - G.camY) < 40) h.near = Math.min(h.near === undefined ? 1e9 : h.near, dSaw);
+      if (!h.paid && h.wy < G.camY - 40) { h.paid = true; if (!h.hit && h.near < 34) closeCall(sawX(h), h.wy); }
+    }
     if (!doDrain) continue;
     const touching = h.kind === 'lava'
       ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(h.x - G.armyX) < h.w / 2 + sr * 0.55
       : h.kind === 'choke'
         ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(G.armyX - h.gapX) + sr * 0.75 > h.gapW / 2
         : Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) < h.r + sr * 0.75;
-    if (h.kind === 'saw') {
-      const dSaw = Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) - (h.r + sr * 0.75);
-      if (touching) h.hit = true;
-      if (Math.abs(h.wy - G.camY) < 40) h.near = Math.min(h.near === undefined ? 1e9 : h.near, dSaw);
-      if (!h.paid && h.wy < G.camY - 40) { h.paid = true; if (!h.hit && h.near < 34) closeCall(sawX(h), h.wy); }
-    }
     if (touching) {
       hazDmg += h.drain;
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
@@ -3862,7 +3883,7 @@ function update(dt) {
   }
   checkMissions();
   /* level up: a beat of slow motion and a ring before the cards come up */
-  if (wantSkill) { skillDelay = 0.55; hitstop(0.5); ringT = 0; ringMat.color.set('#ffcc33'); sfx.fanfare(); }
+  if (wantSkill && G.mode === 'run') { skillDelay = 0.55; hitstop(0.5); ringT = 0; ringMat.color.set('#ffcc33'); sfx.fanfare(); }
   if (skillDelay > 0) { skillDelay -= dt; if (skillDelay <= 0 && G.mode === 'run') offerSkills(); }
 }
 
@@ -4625,7 +4646,7 @@ function draw(now) {
     if (sl !== shownSkills) { shownSkills = sl; hudSkills.innerHTML = sl; }
   }
   if (formLabel) {
-    formLabel.textContent = G.form > 0.34 ? 'WIDE' : G.form < -0.34 ? 'COLUMN' : 'SQUARE';
+    formLabel.textContent = G.form > 0.34 ? L('WIDE', 'MELEBAR') : G.form < -0.34 ? L('COLUMN', 'BARISAN') : L('SQUARE', 'KOTAK');
     formLabel.style.color = edgeDanger > 0.2 ? '#e25a32' : '#f3ecdf';
   }
   if (formFill) formFill.style.left = ((G.form + 1) * 0.5 * 86) + 'px';
@@ -4650,7 +4671,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, get rmem() { return renderer.info.memory; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
@@ -4678,6 +4699,7 @@ if (LANG === 'id') {
   setT('#installCard b', 'PASANG MOB RUN DI LAYAR UTAMA');
   setT('#installBtn', 'PASANG');
   setT('#installNo', 'NANTI SAJA');
+  setT('#hudForm .t', 'FORMASI');
   const heads = document.querySelectorAll('#shopOverlay .shopHead');
   if (heads[0]) heads[0].textContent = 'UPGRADE';
   if (heads[1]) heads[1].textContent = 'WARNA PASUKAN';
