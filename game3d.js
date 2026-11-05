@@ -60,7 +60,20 @@ const pauseOv = document.getElementById('pauseOverlay');
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
 if (pauseBtn) pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); setPause(true); });
-if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); setPause(false); });
+if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); e.preventDefault(); audio();
+  const id = e.target.closest && e.target.closest('button') && e.target.closest('button').id;
+  if (id === 'pauseSet') { renderSettings(); if (setOv) setOv.style.display = 'flex'; return; }
+  if (id === 'pauseQuit') {
+    /* quitting still banks the run: coins, distance bonus, missions */
+    pauseOv.style.display = 'none';
+    revived = true;
+    G.cause = 'YOU CALLED IT';
+    gameOver();
+    return;
+  }
+  setPause(false);
+});
 
 /* Phones drop MSAA and cap the pixel ratio. Truly weak devices also
    cut instance counts. Missing deviceMemory (iPhone) counts as fine. */
@@ -174,6 +187,7 @@ function audio() {
     } catch (e) { AC = null; }
   }
   if (AC && AC.state === 'suspended') AC.resume().catch(() => { });
+  if (AC) musicStart();
 }
 /* oscillator voice: pitch glide, attack, exponential decay, optional reverb send */
 function voice(f, d, type, v, slide, opt) {
@@ -2171,28 +2185,29 @@ const BASSLINE = [0, null, 0, 12, null, 0, 7, null, 0, null, 12, 0, null, 7, 5, 
 const ZONE_KEY = [0, 2, -2, 3, 5];
 const hz = (semi) => 110 * Math.pow(2, semi / 12);
 function musicStep(step, at) {
+  const calm = G.mode !== 'run';
   const s16 = step % 16, bar = Math.floor(step / 16) % 4;
   const key = ZONE_KEY[Math.max(0, zoneIdx) % ZONE_KEY.length];
   const ch = CHORDS[bar];
   const o = { at, mus: true };
   /* drums */
   /* boss on screen: double-time kick and a growl under the bass */
-  const bossy = musicHeat >= 1.5;
-  if (s16 % 4 === 0 || (bossy && s16 % 2 === 0)) { voice(150, 0.11, 'sine', 0.16, 42, o); }
+  const bossy = !calm && musicHeat >= 1.5;
+  if (!calm && (s16 % 4 === 0 || (bossy && s16 % 2 === 0))) { voice(150, 0.11, 'sine', 0.16, 42, o); }
   if (bossy && s16 % 4 === 2) voice(hz(key + ch[0] - 36), STEP * 1.8, 'sawtooth', 0.03, 0, o);
-  if (s16 === 4 || s16 === 12) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
-  if (s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
+  if (!calm && (s16 === 4 || s16 === 12)) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
+  if (!calm && s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
   /* bass: root of the bar's chord, sidestepping on the off-beats */
   const b = BASSLINE[s16];
   if (b !== null) {
     const f = hz(key + ch[0] + b - 24);
-    voice(f, STEP * 1.6, 'triangle', 0.075, 0, o);
-    voice(f, STEP * 1.2, 'sawtooth', 0.012, 0, o);
+    voice(f, STEP * 1.6, 'triangle', calm ? 0.045 : 0.075, 0, o);
+    if (!calm) voice(f, STEP * 1.2, 'sawtooth', 0.012, 0, o);
   }
   /* chord stab on the "and" of beat 2 and 4 */
   if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012, mus: true });
   /* tension arpeggio */
-  if (musicHeat > 0.5) {
+  if (!calm && musicHeat > 0.5) {
     const n = ch[s16 % 3] + (s16 % 6 > 2 ? 24 : 12);
     voice(hz(key + n + 12), 0.08, 'square', 0.01 + 0.006 * musicHeat, 0, o);
   }
@@ -2203,7 +2218,7 @@ function musicStart() {
   musNext = AC.currentTime + 0.06;
   musTimer = setInterval(() => {
     if (!AC) return;
-    if (musicOff || G.mode !== 'run' || document.hidden) { musNext = AC.currentTime + 0.06; return; }
+    if (musicOff || document.hidden) { musNext = AC.currentTime + 0.06; return; }
     const ahead = AC.currentTime + 0.14;
     if (musNext < AC.currentTime - 0.2) musNext = AC.currentTime + 0.02;
     while (musNext < ahead) {
@@ -2393,7 +2408,6 @@ function gameOver() {
   if (G.mode === 'over') return;
   G.mode = 'over';
   overAt = performance.now();
-  musicStop();
   const d = Math.floor(G.dist);
   const prevBest = G.best;
   const isBest = d > G.best;
@@ -2404,6 +2418,8 @@ function gameOver() {
   G.coinsRun += bonus;
   G.bonusTotal += bonus;
   if (overCause) overCause.textContent = G.cause || 'WIPED OUT';
+  const overH = overOv.querySelector('h1');
+  if (overH) overH.textContent = G.cause === 'YOU CALLED IT' ? 'RUN OVER' : 'WIPED OUT';
   const gap = prevBest - d;
   const sub = isBest && d > 0 ? '<span class="stamp">NEW BEST!</span>'
     : gap <= 120 ? `<b class="close">So close! ${gap}m short of your best</b>`
@@ -3125,7 +3141,6 @@ function setPause(on) {
     keys.left = keys.right = keys.up = keys.down = false;
     dragging = false; dragAxis = 0;
     if (pauseOv) pauseOv.style.display = 'flex';
-    musicStop();
   } else if (!on && G.mode === 'paused') {
     G.mode = 'run';
     if (pauseOv) pauseOv.style.display = 'none';
