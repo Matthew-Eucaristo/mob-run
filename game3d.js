@@ -4472,6 +4472,7 @@ if (/[?&]debug\b/.test(location.search)) {
   };
 }
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
+document.body.classList.remove('loading');
 resize();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});

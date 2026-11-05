@@ -325,6 +325,11 @@
   #pauseOverlay .head { color:#fff; }
 
   body.menu .hud, body.menu #hudForm, body.menu #pauseBtn { opacity:0 !important; }
+  /* until the game script is up: PLAY reads LOADING and the menu bits that need data stay hidden */
+  body.loading #playBtn { pointer-events:none; filter:grayscale(.6) brightness(.9); color:transparent; text-shadow:none; }
+  body.loading #playBtn::after { content:'LOADING'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#fff; text-shadow:0 2px 0 rgba(0,0,0,.35); font-size:22px; animation:pulse 1s ease-in-out infinite; }
+  body.loading #menuTop, body.loading #rankLine, body.loading .btnRow, body.loading .keys { visibility:hidden; }
   @keyframes numPop { 0% { transform:scale(1); } 40% { transform:scale(1.2); } 100% { transform:scale(1); } }
   @keyframes throb { 0%,100% { transform:scale(1); } 50% { transform:scale(1.1); } }
   @keyframes cardIn { from { opacity:0; transform:translateY(16px) scale(.94); } to { opacity:1; transform:none; } }
@@ -368,7 +373,7 @@
   }
 </style>
 </head>
-<body class="menu">
+<body class="menu loading">
 <canvas id="game"></canvas>
 <div id="labels"></div>
 <div id="floats"></div>
