@@ -229,6 +229,7 @@ const sfx = {
   boom: () => { hiss(0.7, 0.24, 'lowpass', 2400, 60, 0.7, { verb: true }); voice(65, 0.45, 'sine', 0.2, 30); },
   barrel: () => { hiss(0.16, 0.12, 'bandpass', 1800, 400, 1.4); voice(260, 0.12, 'triangle', 0.08, 90); },
   coin: () => { voice(1568, 0.08, 'sine', 0.05); voice(1568 * 2.76, 0.05, 'sine', 0.015); },
+  click: () => { voice(1250, 0.03, 'sine', 0.05, 900); hiss(0.018, 0.03, 'highpass', 4000); },
   /* big moments: a rising major arpeggio over a thump, into the room */
   fanfare: () => {
     voice(70, 0.32, 'sine', 0.16, 40);
@@ -290,7 +291,7 @@ const G = {
   form: 0, shield: 0, overT: 0, skillPicks: 0,
   skills: {},
   coinsPicked: 0, coinsPickedVal: 0, bonusTotal: 0, gunUps: 0, missionCoins: 0, coinFrac: 0, bonusPaid: 0,
-  rescued: 0,
+  rescued: 0, grace: 0,
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
@@ -527,6 +528,11 @@ if (installBtn) installBtn.addEventListener('pointerdown', async (e) => {
   deferredInstall = null;
   installCard.style.display = 'none';
 });
+/* every button press: a soft click and a tiny buzz, so the UI feels physical */
+document.addEventListener('pointerdown', (e) => {
+  if (!(e.target.closest && e.target.closest('button, .skillCard, .upCard, .skinCard, .setRow'))) return;
+  audio(); sfx.click(); vib(8);
+}, true);
 document.addEventListener('touchmove', (e) => {
   if (e.target.closest && e.target.closest('.overlay')) return;
   e.preventDefault();
@@ -1948,6 +1954,7 @@ function clashTick(m) {
 }
 function sr0() { return squadRadius(); }
 function loseSoldiers(n, cause) {
+  if (G.grace > 0) return;
   if (cause) G.cause = cause;
   n = Math.max(0, Math.round(n));
   if (n <= 0) return;
@@ -2151,7 +2158,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = META.runs < 3 ? 4.5 : 0; zoneIdx = -1;
@@ -2257,7 +2264,7 @@ function missionHTML(showNew) {
     h += `<div class="ms${m.done ? ' done' : ''}"><div class="mi">${icon(m.done ? 'check' : MISSION_ICON[m.type])}</div>` +
       `<div class="mt">${showNew && m.isNew ? '<span class="nw">NEW</span>' : ''}${MISSION_DEFS[m.type].text(goal)}` +
       (sub ? `<span class="pg">${sub}</span>` : '') +
-      (live && !m.done ? `<div class="bar"><i style="width:${pct}%"></i></div>` : '') +
+      (live && !m.done ? `<div class="bar"><i style="width:0" data-w="${pct}%"></i></div>` : '') +
       `</div><div class="rw">+${missionReward(m)}${COIN}</div></div>`;
   }
   return h ? '<h3>MISSIONS</h3>' + h : '';
@@ -2296,8 +2303,11 @@ function gameOver() {
     `<div id="overDist">0m</div>${sub}` +
     `<div class="runline"><span class="chip">${icon('flag')}${fmtNum(G.peak)} peak</span>` +
     `<span class="chip">${icon('skull')}${G.mobsBeaten} mobs</span><span class="chip">${icon('crown')}${G.bossKills} bosses</span></div>` + histHTML +
-    `<div class="earn">+${earned}${COIN}<small>${G.coinsPickedVal} grabbed · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''}</small></div>`;
-  if (overMissions) overMissions.innerHTML = missionHTML(false);
+    `<div class="earn">+<span id="earnN">0</span>${COIN}<small>${G.coinsPickedVal} grabbed · ${G.bonusTotal} distance${G.missionCoins ? ' · ' + G.missionCoins + ' missions' : ''}</small></div>`;
+  if (overMissions) {
+    overMissions.innerHTML = missionHTML(false);
+    setTimeout(() => { for (const b of overMissions.querySelectorAll('.bar i')) b.style.width = b.dataset.w; }, 450);
+  }
   saveSave();
   overOv.style.display = 'flex';
   overOv.classList.remove('on');
@@ -2308,7 +2318,10 @@ function gameOver() {
   const t0 = performance.now();
   const tick = () => {
     const k = Math.min(1, (performance.now() - t0) / 900);
-    if (el) el.textContent = Math.floor(d * (1 - Math.pow(1 - k, 3))) + 'm';
+    const ease = 1 - Math.pow(1 - k, 3);
+    if (el) el.textContent = Math.floor(d * ease) + 'm';
+    const en = document.getElementById('earnN');
+    if (en) en.textContent = Math.floor(earned * ease);
     if (k < 1 && G.mode === 'over') requestAnimationFrame(tick);
     else if (isBest && d > 0 && G.mode === 'over') { sfx.great(); vib(40); }
   };
@@ -2366,6 +2379,8 @@ function revive() {
   if (vigEl) { vigEl.classList.remove('doom'); vigEl.style.opacity = '0'; }
   G.mode = 'run';
   addSoldiers(Math.max(24, Math.ceil(G.peak * 0.5)));
+  G.grace = 1.8;
+  bannerFlash('GET READY!', '#7ee081');
   floatText(G.armyX, G.camY + 20, 'SECOND WIND!', '#e2b657', 30, 4);
   ringT = 0; ringMat.color.set('#e2b657');
   sfx.great(); vib(40);
@@ -2976,6 +2991,7 @@ function update(dt) {
   if (saveT > 0) { saveT -= dt; if (saveT <= 0) saveSave(); }
   if (G.overT > 0) G.overT = Math.max(0, G.overT - dt);
   G.time += dt;
+  if (G.grace > 0) G.grace -= dt;
   syncRoad();
   const keyX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   const keyY = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
@@ -3367,7 +3383,7 @@ function update(dt) {
       m.wy = G.camY + m.hd + sr * 0.35;
       m.x += (G.armyX - m.x) * Math.min(1, dt * 4);
       m.tick += dt;
-      while (m.tick >= 0.05 && m.count > 0 && G.soldiers > 0) {
+      while (m.tick >= 0.05 && m.count > 0 && G.soldiers > 0 && G.grace <= 0) {
         m.tick -= 0.05;
         const k = Math.max(1, Math.ceil(Math.max(Math.min(m.count, G.soldiers) * 0.08, (m.clashN || 1) / 22)));
         const hitN = Math.min(k, m.count);
@@ -3899,6 +3915,7 @@ function draw(now) {
     }
   }
   soldierBody.count = shown;
+  soldierBody.visible = !(G.grace > 0 && G.mode === 'run' && Math.floor(t * 12) % 2 === 1);
   muzzleMesh.count = muzzleGlow > 0.4 ? Math.min(shown, 16) : 0;
   soldierBody.instanceMatrix.needsUpdate = true;
   muzzleMesh.instanceMatrix.needsUpdate = true;
