@@ -1965,6 +1965,7 @@ function startGame() {
   for (const m of META.missions) m.isNew = false;
   META.runs += 1;
   bestFlagPassed = G.best <= 0;
+  camIntro = 1;
   floatText(W / 2, H * 0.3, 'GO!', '#f3ecdf', 46, 2.2);
   sfx.power();
   musicStart();
@@ -3325,7 +3326,7 @@ const tmpCol = new THREE.Color();
 let soldierOffsets = [];
 let soldierBirth = [];
 
-let lastDraw = performance.now();
+let lastDraw = performance.now(), camIntro = 0;
 function draw(now) {
   const t = now * 0.001;
   /* real frame time: animations run the same speed at 60, 90 or 120 Hz */
@@ -3385,8 +3386,11 @@ function draw(now) {
   const shx = (Math.random() - 0.5) * G.shake * 0.02;
   const shy = (Math.random() - 0.5) * G.shake * 0.02;
   const camZoom = Math.max(0, squadRadius() * K - 1.2) * 0.55;
-  camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6, 12.5 + camZoom);
-  camera.lookAt(axw * 0.35, 1.0, -12);
+  /* run start: the camera swoops down from a high wide shot into the chase cam */
+  if (camIntro > 0) camIntro = Math.max(0, camIntro - FD / 0.9);
+  const swoop = camIntro * camIntro * (3 - 2 * camIntro);
+  camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9, 12.5 + camZoom + swoop * 7);
+  camera.lookAt(axw * 0.35, 1.0 - swoop * 0.5, -12 - swoop * 10);
   camera.rotateZ(bank);
   const fovT = 62 + fovKick + Math.max(0, G.speed - SPEED_BASE) * 0.02;
   if (Math.abs(camera.fov - fovT) > 0.01) { camera.fov += (fovT - camera.fov) * 0.12; camera.updateProjectionMatrix(); }
