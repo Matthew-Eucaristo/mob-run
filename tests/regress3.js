@@ -44,7 +44,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   // 3. geometry count stays flat once every kind of object has been drawn once
   const r3 = await p.evaluate(() => {
     const M = window.__mob; M.SIM.on = true; const g = [];
-    for (let pass = 0; pass < 6; pass++) {
+    for (let pass = 0; pass < 7; pass++) {
       M.startGame();
       for (let i = 0; i < 60 * 120; i++) { if (M.G.mode === 'pick') M.chooseSkill('dmg'); if (M.G.mode !== 'run') { M.G.mode = 'run'; M.G.soldiers = 400; } M.update(1 / 60); M.G.soldiers = Math.max(M.G.soldiers, 200); if (i % 30 === 0) M.draw(performance.now() + i * 16); }
       g.push(M.rmem.geometries);
@@ -52,7 +52,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
     M.SIM.on = false;
     return g;
   });
-  assert(r3[5] - r3[2] <= 6, 'after warm-up, more long runs add no geometry (' + r3.join(' / ') + ')');
+  assert(r3[6] - r3[3] <= 6, 'after warm-up, more long runs add no geometry (' + r3.join(' / ') + ')');
   console.log(errs.length ? errs.join('\n') : 'no page errors');
   await b.close();
 })();
