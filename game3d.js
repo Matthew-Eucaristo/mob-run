@@ -755,8 +755,9 @@ function mergeParts(parts) {
 /* geometry detail per quality tier: at phone size the extra segments are invisible but cost
    thousands of triangles once a crowd of 90 soldiers and a mob are on screen */
 const LOD = Q.low ? 0.55 : Q.phone ? 0.72 : 1;
-const CAP = (r, l, s) => new THREE.CapsuleGeometry(r, l, Math.max(2, Math.round((s || 3) * LOD)), Math.max(5, Math.round((s ? 10 : 8) * LOD)));
-const SPH = (r, s) => new THREE.SphereGeometry(r, Math.max(5, Math.round((s || 10) * LOD)), Math.max(4, Math.round((s || 10) * LOD)));
+let LODK = 1;   /* extra squeeze for crowd units seen mostly from afar */
+const CAP = (r, l, s) => new THREE.CapsuleGeometry(r, l, Math.max(2, Math.round((s || 3) * LOD * LODK)), Math.max(5, Math.round((s ? 10 : 8) * LOD * LODK)));
+const SPH = (r, s) => new THREE.SphereGeometry(r, Math.max(5, Math.round((s || 10) * LOD * LODK)), Math.max(4, Math.round((s || 10) * LOD * LODK)));
 const CONE = (r, h) => new THREE.ConeGeometry(r, h, 6);
 const BOX = (a, b, c) => new THREE.BoxGeometry(a, b, c);
 
@@ -890,16 +891,20 @@ kindMesh.boss.renderOrder = 2;
 /* rival mobs: one shared instanced crowd for every enemy army on screen */
 const MOBU_MAX = 300;
 const MOB_VIS = Q.low ? 34 : Q.phone ? 56 : 90;
-const mobUnitMesh = new THREE.InstancedMesh(EDEF.runner.geo,
+LODK = 0.6;
+const mobUnitGeo = enemyGeo('runner');
+LODK = 1;
+const mobUnitMesh = new THREE.InstancedMesh(mobUnitGeo,
   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05, emissive: 0x3a0a06, emissiveIntensity: 0.6 }), MOBU_MAX);
 mobUnitMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(mobUnitMesh);
 const MAXE = 320;
+const ES = Q.low ? [5, 4, 4, 3] : Q.phone ? [7, 5, 5, 4] : [10, 8, 8, 6];
 const eyeGeo = mergeParts([
-  { geo: new THREE.SphereGeometry(0.15, 10, 8), m: M4(-0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
-  { geo: new THREE.SphereGeometry(0.15, 10, 8), m: M4(0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
-  { geo: new THREE.SphereGeometry(0.07, 8, 6), m: M4(-0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
-  { geo: new THREE.SphereGeometry(0.07, 8, 6), m: M4(0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
+  { geo: new THREE.SphereGeometry(0.15, ES[0], ES[1]), m: M4(-0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
+  { geo: new THREE.SphereGeometry(0.15, ES[0], ES[1]), m: M4(0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
+  { geo: new THREE.SphereGeometry(0.07, ES[2], ES[3]), m: M4(-0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
+  { geo: new THREE.SphereGeometry(0.07, ES[2], ES[3]), m: M4(0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
   { geo: BOX(0.24, 0.06, 0.06), m: M4(-0.15, 0.14, 0.06, 0, 0, -0.42), c: '#1b1430' },
   { geo: BOX(0.24, 0.06, 0.06), m: M4(0.15, 0.14, 0.06, 0, 0, 0.42), c: '#1b1430' },
 ]);
@@ -1967,7 +1972,6 @@ function bannerFlash(text, color) {
   zoneBanner.style.opacity = '1';
   clearTimeout(bannerT);
   bannerT = setTimeout(() => { zoneBanner.style.opacity = '0'; }, 1500);
-  setTimeout(() => { if (zoneBanner.style.opacity === '0') zoneBanner.style.color = ''; }, 1900);
 }
 let bannerT = null;
 /* the first time each hazard shows up, say what to do about it, once ever */
@@ -3053,15 +3057,7 @@ function update(dt) {
   if (zi !== zoneIdx) {
     zoneIdx = zi;
     tintProps();
-    if (G.dist > 5) {
-      zoneBanner.textContent = ZONE_NAMES[zi];
-      zoneBanner.style.color = '';
-      zoneBanner.classList.remove('go');
-      void zoneBanner.offsetWidth;
-      zoneBanner.classList.add('go');
-      zoneBanner.style.opacity = '1';
-      setTimeout(() => { zoneBanner.style.opacity = '0'; }, 1400);
-    }
+    if (G.dist > 5) bannerFlash(ZONE_NAMES[zi], '');
   }
 
   schedule();
@@ -3970,7 +3966,7 @@ function draw(now) {
     const zP0 = wz(m.wy);
     if (zP0 > 14 || zP0 < -110) { m.label.style.display = 'none'; continue; }
     const v = mobVisible(m);
-    const base = m.hitT > 0 ? '#ffffff' : (m.clash ? '#ff7a6a' : '#e8485a');
+    const base = m.hitT > 0 ? '#ffb0b0' : (m.clash ? '#ff7a6a' : '#e8485a');
     for (let i = 0; i < v && mu < MOBU_MAX; i++) {
       const u = m.units[i];
       const hop = Math.abs(Math.sin(t * 11 + u.ph)) * 0.18;
@@ -3982,7 +3978,7 @@ function draw(now) {
       mobUnitMesh.setMatrixAt(mu, dummy.matrix);
       mobUnitMesh.setColorAt(mu, tmpCol.set(base).offsetHSL(0, 0, ((u.ph % 1) - 0.5) * 0.12));
       mu++;
-      if (ei < MAXE && i < 60) {
+      if (ei < MAXE && i < (Q.phone ? 30 : 60)) {
         const es = 0.85 * Math.max(0.05, m.pop);
         dummy.position.set(wx(m.x + u.ox), hop + es * EDEF.runner.eyeY, wz(m.wy + u.oy) + lunge + es * EDEF.runner.eyeZ);
         dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(es * EDEF.runner.eyeS);
