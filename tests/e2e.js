@@ -33,14 +33,14 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await cards[0].tap();
   await p.waitForTimeout(150);
   const after = await p.evaluate(() => ({ c: window.__mob.G.coins, s: JSON.parse(localStorage.getItem('mobrun_save')) }));
-  assert(after.c === 390 && after.s.up.army === 1, 'bought BIGGER SQUAD lvl1 for 110 (coins ' + after.c + ')');
+  assert(after.c === 390 && after.s.up.army === 1, 'bought RECRUITER lvl1 for 110 (coins ' + after.c + ')');
   await p.tap('#shopClose');
   assert((await G()).mode === 'menu', 'closing armory keeps menu');
 
   await p.tap('#playBtn');
   await p.waitForTimeout(300);
   const st = await G();
-  assert(st.mode === 'run' && st.soldiers === 16, 'tap starts run with upgraded 16 soldiers (' + st.soldiers + ')');
+  assert(st.mode === 'run' && st.soldiers === 12, 'tap starts run with upgraded 12 soldiers (' + st.soldiers + ')');
 
   const cdp = await ctx.newCDPSession(p);
   const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });

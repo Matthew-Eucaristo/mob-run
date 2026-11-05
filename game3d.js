@@ -38,6 +38,7 @@ const bestLine = document.getElementById('bestLine');
 const labelsEl = document.getElementById('labels');
 const floatsEl = document.getElementById('floats');
 const hudArmy = document.getElementById('hudArmy');
+const hudReserve = document.getElementById('hudReserve');
 const hudWeapon = document.getElementById('hudWeapon');
 const hudDist = document.getElementById('hudDist');
 const hudLevel = document.getElementById('hudLevel');
@@ -317,7 +318,7 @@ const WT = [
   { name: 'RIFLE', dmg: 2, rate: 0.13, spread: 2, col: '#a8ffb0', tl: 1.5 },
   { name: 'SHOTGUN', dmg: 3, rate: 0.19, spread: 3, col: '#ff9d5d', tl: 0.8, tw: 1.5 },
   { name: 'MINIGUN', dmg: 2, rate: 0.065, spread: 3, col: '#f0c14a', tl: 2.1 },
-  { name: 'ANNIHILATOR', dmg: 5, rate: 0.11, spread: 3, col: '#ff5a4a', tl: 2.4, tw: 1.35 },
+  { name: 'ANNIHILATOR', dmg: 5, rate: 0.11, spread: 3, col: '#ff6ef2', tl: 2.4, tw: 1.35 },
 ];
 
 /* ---------------- state ---------------- */
@@ -375,7 +376,7 @@ const SKINS = [
    Upgrades make the next run go further, missions give a reason to try a
    different route, and the daily gift brings people back. */
 const UPGRADES = [
-  { id: 'army', name: L('BIGGER SQUAD', 'PASUKAN BESAR'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('Soldiers at the start', 'Prajurit di awal run'), val: (l) => String(10 + l * 6), cost: (l) => Math.round(110 * Math.pow(1.35, l)) },
+  { id: 'army', name: L('RECRUITER', 'PEREKRUT'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('More soldiers from every green gate', 'Lebih banyak prajurit dari tiap gerbang hijau'), val: (l) => l ? '+' + l * 3 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(110 * Math.pow(1.35, l)) },
   { id: 'gun', name: L('STARTING GUN', 'SENJATA AWAL'), icon: 'gun', col: '#ff4d5e', max: 3, desc: L('Weapon at the start', 'Senjata di awal run'), val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [450, 1700, 4500][l] },
   { id: 'armor', name: L('BODY ARMOR', 'BAJU ZIRAH'), icon: 'shield', col: '#8b6cff', max: 8, desc: L('Fewer soldiers lost to every hit', 'Lebih sedikit prajurit hilang tiap kena'), val: (l) => l ? '-' + l * 5 + '%' : L('none', 'belum ada'), cost: (l) => Math.round(240 * Math.pow(1.45, l)) },
   { id: 'magnet', name: 'MAGNET', icon: 'magnet', col: '#ff7ab8', max: 4, desc: L('Coins fly to you from farther away', 'Koin tertarik dari lebih jauh'), val: (l) => l ? 'x' + (1 + l * 0.5).toFixed(1) : L('off', 'mati'), cost: (l) => Math.round(280 * Math.pow(1.7, l)) },
@@ -454,7 +455,7 @@ function checkMissions() {
       const rk = rankOf(META.done);
       if (rk > rankOf(META.done - 1)) {
         const rr = rankReward(rk);
-        G.coins += rr; G.missionCoins += rr;
+        G.coins += rr; G.missionCoins += rr; G.rankUp = { rk, rr };
         missionToast(L('You made ', 'Kamu naik jadi ') + RANKS[rk] + '!', rr, L('RANK UP', 'NAIK PANGKAT'));
         setTimeout(() => { sfx.fanfare(); vib([30, 50, 30, 50, 90]); }, 2700);
       }
@@ -1953,7 +1954,7 @@ function spawnMob(wy, scale, band) {
   /* never a flat wall of arithmetic: a band stays just under the army cap, so a
      full army can always win the clash. The late game is about rebuilding in time
      for the next one, which comes sooner the further you get */
-  n = Math.min(n, band ? ARMY_CAP * 0.95 : ARMY_CAP * 0.6);
+  n = Math.min(n, band ? ARMY_CAP * 0.95 : ARMY_CAP * rnd(0.35, 0.7));
   n = Math.max(4, Math.round(n));
   const uh = unitHp(d);
   const vis = Math.min(n, MOB_VIS);
@@ -2178,6 +2179,18 @@ function squadRadius() {
 /* past the army cap, extra recruits aren't wasted: they turn into coins,
    and every ~2000 of overflow sharpens the guns, so big gates still pay */
 const ARMY_CAP = 20000;
+const RESERVE_CAP = 6000;
+/* reserves top the army back up once it has dropped well below the cap */
+function stepReserve(dt) {
+  if (G.reserve <= 0 || G.soldiers >= ARMY_CAP * 0.85 || G.soldiers <= 0) return;
+  const move = Math.min(G.reserve, ARMY_CAP - G.soldiers, Math.ceil(2600 * dt));
+  G.reserve -= move; G.soldiers += move; G.reserveFlow = (G.reserveFlow || 0) + move;
+  if (G.time - (G.reserveMsgT || -9) > 0.9) {
+    G.reserveMsgT = G.time;
+    floatText(G.armyX, G.camY + 50, L('RESERVES +', 'CADANGAN +') + fmtNum(G.reserveFlow), '#9fe0ff', 20, 4);
+    G.reserveFlow = 0;
+  }
+}
 function overflow(extra) {
   /* logarithmic: a x3 gate at the cap is worth a little more than a +500, not 20x more */
   const coinsN = Math.min(14, Math.max(1, Math.round(Math.log2(1 + extra / 500) * 2)));
@@ -2185,8 +2198,12 @@ function overflow(extra) {
     coins.push({ x: G.armyX + rnd(-40, 40), wy: G.camY + 40 + rnd(-10, 20), spin: rnd(0, 6), fly: 0.1 + i * 0.03 });
   const dmg = extra >= 20000 ? 2 : extra >= 3000 ? 1 : 0;
   G.upDmg += dmg;
-  const txt = dmg ? L('MAX ARMY! GUN DMG +', 'PASUKAN PENUH! DAMAGE +') + dmg : L('MAX ARMY!', 'PASUKAN PENUH!');
-  if (G.time - (G.overflowMsgT || -9) > 1.2) { G.overflowMsgT = G.time; floatText(G.armyX, G.camY + 66, txt, '#ffcc33', 24, 4.6); }
+  /* the surplus isn't lost: a third of it waits in reserve and marches in after the next clash */
+  const banked = Math.min(RESERVE_CAP - G.reserve, Math.round(extra * 0.35));
+  if (banked > 0) G.reserve += banked;
+  const txt = dmg ? L('MAX ARMY! GUN DMG +', 'PASUKAN PENUH! DAMAGE +') + dmg
+    : banked > 0 ? L('RESERVE +', 'CADANGAN +') + fmtNum(banked) : '';
+  if (txt && G.time - (G.overflowMsgT || -9) > (dmg ? 1.2 : 3)) { G.overflowMsgT = G.time; floatText(G.armyX, G.camY + 66, txt, '#ffcc33', dmg ? 24 : 18, 4.6); }
 }
 function addSoldiers(n) {
   const prevPeak = G.peak;
@@ -2252,6 +2269,8 @@ function applyGate(g) {
   if (lp.t === 'gun' && lFrac > 0) gunUp = true;
   if (rp.t === 'gun' && rFrac > 0) gunUp = true;
   let after = Math.max(0, Math.round(nl + nr));
+  /* RECRUITER: every green gate brings a few percent more */
+  if (after > army && META.up.army) after = army + Math.round((after - army) * (1 + 0.03 * META.up.army));
   /* the first stretch is a tutorial: a wrong gate hurts but never ends the run */
   if (G.dist < 250 && after < 5) after = Math.min(army, 5);
   const delta = after - army;
@@ -2267,7 +2286,7 @@ function applyGate(g) {
   if (good && G.skills.warcry) {
     const extra = 4 * G.skills.warcry;
     addSoldiers(G.soldiers + extra);
-    floatText(G.armyX, G.camY + 28, 'WARCRY +' + extra, '#f3ecdf', 20, 3);
+    floatText(G.armyX, G.camY + 28, L('WARCRY +', 'TERIAKAN PERANG +') + extra, '#f3ecdf', 20, 3);
   }
   for (const [pp, fr, side] of [[lp, lFrac, 0], [rp, rFrac, 1]]) {
     if (pp.t !== 'mys' || fr <= 0) continue;
@@ -2276,7 +2295,7 @@ function applyGate(g) {
     if (g.meshes && g.meshes[side]) { const mat = g.meshes[side].material, old = mat.map; mat.map = panelTex({ ...pp.res, gold: false }); mat.needsUpdate = true; if (old) old.dispose(); }
     (good ? sfx.fanfare : sfx.bad)();
   }
-  const lab = gunUp && delta === 0 ? 'WEAPON UP!' : ((delta >= 0 ? '+' : '') + delta);
+  const lab = gunUp && delta === 0 ? L('WEAPON UP!', 'SENJATA NAIK!') : ((delta >= 0 ? '+' : '') + delta);
   const tag = split ? (gateLabel(lp) + ' | ' + gateLabel(rp) + '  ') : '';
   floatText(G.armyX, G.camY + 10, tag + lab,
     good ? '#ffd75d' : '#ff5d6a', split || gunUp ? 26 : 24, 3.4);
@@ -2321,7 +2340,7 @@ function loseSoldiers(n, cause) {
   if (arm > 0) n = Math.max(1, Math.round(n * (1 - arm)));
   if (G.shield > 0) {
     G.shield -= 1;
-    floatText(G.armyX, G.camY + 18, 'WARD', '#f3ecdf', 22, 3.2);
+    floatText(G.armyX, G.camY + 18, L('WARD', 'PERISAI'), '#f3ecdf', 22, 3.2);
     sfx.power();
     ringT = 0; ringMat.color.set('#f3ecdf');
     return;
@@ -2433,7 +2452,9 @@ function dmgFlash() {
 }
 
 /* --- music ---
-   A 4-bar loop in A minor (Am F C G), shifted up a step per zone.
+   A 16-bar song in A minor, shifted per zone: A (Am F C G) twice, a B section
+   (F G Em Am) for lift, then A again with a pentatonic hook on top. Every
+   fourth bar ends on a little drum fill so the phrases breathe.
    Notes are scheduled on the audio clock a little ahead of time, so the
    groove doesn't wobble with frame hitches the way setInterval does.
    Layers: kick + clap + hats, a moving bassline, a soft chord stab, and
@@ -2441,14 +2462,17 @@ function dmgFlash() {
 let musTimer = null, musStep = 0, musNext = 0, musicHeat = 0;
 const STEP = 60 / 116 / 4;                    // 16th notes at 116 bpm
 const CHORDS = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];   // Am F C G as semitones from A
+const CHORDS_B = [[-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7]]; // F G Em Am
+/* the hook: A minor pentatonic, one bar long, answered a step lower on bars 2 and 4 */
+const HOOK = [12, null, 15, null, 17, null, 15, 12, null, 10, null, 12, null, null, 7, null];
 const BASSLINE = [0, null, 0, 12, null, 0, 7, null, 0, null, 12, 0, null, 7, 5, 3];
 const ZONE_KEY = [0, 2, -2, 3, 5];
 const hz = (semi) => 110 * Math.pow(2, semi / 12);
 function musicStep(step, at) {
   const calm = G.mode !== 'run';
-  const s16 = step % 16, bar = Math.floor(step / 16) % 4;
+  const s16 = step % 16, songBar = Math.floor(step / 16) % 16, bar = songBar % 4;
   const key = ZONE_KEY[Math.max(0, zoneIdx) % ZONE_KEY.length];
-  const ch = CHORDS[bar];
+  const ch = songBar >= 8 && songBar < 12 ? CHORDS_B[bar] : CHORDS[bar];
   const o = { at, mus: true };
   /* drums */
   /* boss on screen: double-time kick and a growl under the bass */
@@ -2456,6 +2480,8 @@ function musicStep(step, at) {
   if (!calm && (s16 % 4 === 0 || (bossy && s16 % 2 === 0))) { voice(150, 0.11, 'sine', 0.16, 42, o); }
   if (bossy && s16 % 4 === 2) voice(hz(key + ch[0] - 36), STEP * 1.8, 'sawtooth', 0.03, 0, o);
   if (!calm && (s16 === 4 || s16 === 12)) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
+  /* phrase-end fill: three quick claps rising into the next bar */
+  if (!calm && bar === 3 && (s16 === 13 || s16 === 14 || s16 === 15)) hiss(0.06, 0.035, 'bandpass', 1400 + (s16 - 13) * 500, 900, 0.9, o);
   if (!calm && s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
   /* bass: root of the bar's chord, sidestepping on the off-beats */
   const b = BASSLINE[s16];
@@ -2466,6 +2492,11 @@ function musicStep(step, at) {
   }
   /* chord stab on the "and" of beat 2 and 4 */
   if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012, mus: true });
+  /* the hook, in the last four bars of the song */
+  if (!calm && songBar >= 12) {
+    const h = HOOK[s16];
+    if (h !== null) voice(hz(key + h + (bar % 2 ? 10 : 12)), STEP * 1.7, 'triangle', 0.022, 0, { at, attack: 0.008, mus: true, verb: s16 === 4 });
+  }
   /* tension arpeggio */
   if (!calm && musicHeat > 0.5) {
     const n = ch[s16 % 3] + (s16 % 6 > 2 ? 24 : 12);
@@ -2541,13 +2572,13 @@ let edgeDanger = 0;
 function startGame() {
   G.mode = 'run'; G.camY = 0; G.speed = SPEED_BASE; shownArmy = -1;
   G.armyX = LW / 2; aimX = LW / 2; aimForm = 0; G.form = 0; formKey = ''; bodyN = 0; dragAxis = 0;
-  G.soldiers = 10 + META.up.army * 6; G.kills = 0; G.dist = 0; G.level = 1; G.peak = G.soldiers;
+  G.soldiers = 10 + META.up.army * 2; G.kills = 0; G.dist = 0; G.level = 1; G.peak = G.soldiers;
   G.tier = META.up.gun; G.upDmg = 0; G.upRate = 0; G.upSpread = 0;
   G.streak = 0; G.killChain = 0; G.killChainT = 0; G.mileIdx = 0;
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.rankUp = null; G.reserve = 0; G.reserveFlow = 0; G.reserveMsgT = -9; G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; skillDelay = 0; pendingZone = null; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
@@ -2564,7 +2595,7 @@ function startGame() {
   META.runs += 1;
   bestFlagPassed = G.best <= 0;
   camIntro = 1;
-  floatText(LW / 2, LH * 0.3, 'GO!', '#f3ecdf', 46, 2.2);
+  floatText(LW / 2, LH * 0.3, L('GO!', 'AYO!'), '#f3ecdf', 46, 2.2);
   sfx.power();
   musicStart();
 }
@@ -2664,6 +2695,8 @@ function missionHTML(showNew) {
       (live && !m.done ? `<div class="bar"><i style="width:0" data-w="${pct}%"></i></div>` : '') +
       `</div><div class="rw">+${missionReward(m)}${COIN}</div></div>`;
   }
+  /* a promotion earned this run is part of the mission coins: show it, or the sum doesn't add up */
+  if (live && G.rankUp) h += `<div class="ms done rank"><div class="mi">${icon('crown')}</div><div class="mt">${L('RANK UP: ', 'NAIK PANGKAT: ')}${RANKS[G.rankUp.rk]}</div><div class="rw">+${G.rankUp.rr}${COIN}</div></div>`;
   return h ? '<h3>' + L('MISSIONS', 'MISI') + '</h3>' + h : '';
 }
 function nextTxt(m) {
@@ -2689,7 +2722,7 @@ function gameOver() {
   const prevBest = G.best;
   const isBest = d > G.best;
   if (isBest) G.best = d;
-  const bonus = Math.floor(((G.dist - G.bonusPaid) / 20) * (1 + 0.75 * (G.skills.fortune || 0)) * coinMult());
+  const bonus = Math.floor(((G.dist - G.bonusPaid) / 10) * (1 + 0.75 * (G.skills.fortune || 0)) * coinMult());
   G.bonusPaid = G.dist;
   G.coins += bonus;
   G.coinsRun += bonus;
@@ -2713,7 +2746,7 @@ function gameOver() {
   while (META.hist.length > 10) META.hist.shift();
   const hmax = Math.max(1, ...META.hist);
   /* last runs, labelled: this run and the best one carry their distance */
-  const short = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v + 'm';
+  const short = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v + 'm';
   const topK = META.hist.lastIndexOf(hmax);
   const histHTML = META.hist.length > 1 ? `<div class="hist">${META.hist.map((v, k) => {
     const now = k === META.hist.length - 1, top = !now && k === topK;
@@ -3264,7 +3297,7 @@ function hurt(e, dmg) {
     /* combos pay: every 10 kills in a chain throws coins at the squad */
     if (G.killChain % 10 === 0) {
       const n = Math.min(6, G.killChain / 10);
-      floatText(e.x, e.wy, 'RAMPAGE ×' + G.killChain, '#e2b657', 22 + Math.min(10, n * 2), 3);
+      floatText(e.x, e.wy, L('RAMPAGE ×', 'MENGAMUK ×') + G.killChain, '#e2b657', 22 + Math.min(10, n * 2), 3);
       for (let i = 0; i < n && coins.length < MAXCOIN; i++)
         coins.push({ x: e.x + rnd(-20, 20), wy: e.wy + rnd(-10, 10), spin: rnd(0, 6), fly: 0.15 + i * 0.05 });
       if (n >= 3) tone(660 + n * 80, 0.12, 'square', 0.04);
@@ -3360,9 +3393,9 @@ function takePickup(kind, x) {
   sfx.power();
   if (kind === 'rate') { G.upRate += 0.02; floatText(x, G.camY, L('FIRE RATE +', 'TEMBAK CEPAT +'), '#7de8ff', 21, 3.5); }
   if (kind === 'dmg') { G.upDmg += 1; floatText(x, G.camY, 'DAMAGE +1', '#ffd75d', 21, 3.5); }
-  if (kind === 'spread') { G.upSpread = Math.min(3, G.upSpread + 1); floatText(x, G.camY, 'SPREAD +1', '#7dff9b', 21, 3.5); }
+  if (kind === 'spread') { G.upSpread = Math.min(3, G.upSpread + 1); floatText(x, G.camY, L('SPREAD +1', 'SEBARAN +1'), '#7dff9b', 21, 3.5); }
   if (kind === 'heal') { addSoldiers(G.soldiers + 15); floatText(x, G.camY, L('+15 SOLDIERS', '+15 PRAJURIT'), '#7dff9b', 21, 3.5); }
-  if (kind === 'ward') { G.shield = Math.min(5, G.shield + 1); floatText(x, G.camY, 'WARD +1', '#f3ecdf', 21, 3.5); }
+  if (kind === 'ward') { G.shield = Math.min(5, G.shield + 1); floatText(x, G.camY, L('WARD +1', 'PERISAI +1'), '#f3ecdf', 21, 3.5); }
   if (kind === 'gold') { const g = ri(10, 24); addSoldiers(G.soldiers + g); floatText(x, G.camY, '+' + g + L(' GOLD', ' EMAS'), '#ffd75d', 21, 3.5); }
   if (kind === 'weapon') weaponUp();
   if (kind === 'upgrade') { G.upRate += 0.015; G.upDmg += 1; floatText(x, G.camY, 'OVERCLOCK!', '#7de8ff', 23, 3.5); }
@@ -3602,6 +3635,7 @@ function update(dt) {
   const ramp = 1 - Math.exp(-Math.max(0, G.dist) / 1150);
   G.speed = Math.min(SPEED_CAP, SPEED_BASE + (SPEED_CAP - SPEED_BASE) * Math.pow(ramp, 1.22));
   G.camY += G.speed * dt;
+  stepReserve(dt);
   G.dist = G.camY / 40;
   G.level = 1 + Math.floor(G.dist / 150);
   if (!bestFlagPassed && G.best > 0 && G.dist > G.best) {
@@ -3632,6 +3666,8 @@ function update(dt) {
   if (zi !== zoneIdx) {
     zoneIdx = zi;
     tintProps();
+    /* the Salt Flats are pale: floating text gets a dark halo there */
+    document.body.classList.toggle('pale', zi === 3);
     /* the zones loop every five levels; later laps say so */
     const lap = Math.floor((G.level - 1) / ZONES.length);
     const zoneName = ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : '');
@@ -3950,7 +3986,7 @@ function update(dt) {
       if (ahead < sr * 0.45 && ahead > -(m.hd * 2 + sr) && Math.abs(m.x - G.armyX) < m.hw + sr * 0.55) {
         m.clash = true; m.tick = 0; m.clashN = Math.min(m.count, G.soldiers);
         G.shake = Math.max(G.shake, 7); sfx.bad(); vib(30);
-        floatText(m.x, G.camY + 40, 'CLASH!', '#ff8d6a', 24, 3);
+        floatText(m.x, G.camY + 40, L('CLASH!', 'BENTROK!'), '#ff8d6a', 24, 3);
       }
       if (m.wy < G.camY - 260) { m.label.remove(); mobs.splice(i, 1); continue; }
     }
@@ -4202,7 +4238,7 @@ function draw(now) {
   const z = ZONES[zi];
 
   /* zone color lerp */
-  const lp = Math.min(1, 0.04);
+  const lp = Math.min(1, FD * 2.4);   /* same blend speed at 60 or 120 Hz */
   curZone.bg.lerp(col3(z.bg), lp);
   curZone.ground.lerp(col3(z.ground), lp);
   curZone.road.lerp(col3(z.road), lp);
@@ -4517,7 +4553,8 @@ function draw(now) {
     }
   }
   soldierBody.count = shown;
-  soldierBody.visible = !(G.grace > 0 && G.mode === 'run' && Math.floor(t * 12) % 2 === 1);
+  /* grace blink: hidden a quarter of the time, so the revived squad still reads as there */
+  soldierBody.visible = !(G.grace > 0 && G.mode === 'run' && Math.floor(t * 10) % 4 === 3);
   setHat(G.skin);
   hatMesh.count = shown;
   if (hatFor && HATS[hatFor]) hatMesh.visible = soldierBody.visible;
@@ -4585,7 +4622,9 @@ function draw(now) {
       }
     }
     const labelY = e.boss ? s * 3.05 + 0.3 : s * d.labelY + 0.4;
-    setLabel(e.label, wx(e.x), labelY, zP, fmtNum(Math.ceil(e.hp)));
+    /* once the boss bar is up it carries the fight; a raw HP number on the body is noise */
+    if (e.boss && e.introduced) e.label.style.display = 'none';
+    else setLabel(e.label, wx(e.x), labelY, zP, fmtNum(Math.ceil(e.hp)));
     if (e.attacking) e.label.style.color = '#ffb0a0';
     else e.label.style.color = '';
   }
@@ -4919,13 +4958,19 @@ function draw(now) {
     const on = G.killChain >= 5 && G.mode === 'run';
     comboEl.style.opacity = on ? '1' : '0';
     if (on) {
-      comboEl.textContent = '×' + G.killChain + ' COMBO';
+      comboEl.textContent = '×' + G.killChain + L(' COMBO', ' KOMBO');
       comboEl.style.fontSize = (15 + Math.min(9, G.killChain / 6)) + 'px';
       comboEl.style.color = G.killChain >= 30 ? '#ff8d6a' : '#ffd75d';
     }
   }
 
   /* HUD: the army number rolls toward the real count, green up / red down */
+  if (hudReserve) {
+    const rs = G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' ? Math.round(G.reserve || 0) : 0;
+    const txt = rs > 0 ? '+' + fmtNum(rs) + ' ' + L('reserve', 'cadangan') : '';
+    if (hudReserve.textContent !== txt) hudReserve.textContent = txt;
+    hudReserve.style.display = txt ? '' : 'none';
+  }
   if (hudArmy) {
     if (shownArmy !== G.soldiers) {
       if (shownArmy >= 0) {

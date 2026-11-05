@@ -4,8 +4,8 @@ cd "$(dirname "$0")"
 fail=0
 for t in e2e regress regress3 settings rmotion i18n pausemenu tut mouse close mys records bestin sharenav offline layouts; do
   out=$(node "$t.js" 2>&1)
-  if echo "$out" | grep -qE "FAIL|PAGEERR|Error:"; then
-    echo "✗ $t"; echo "$out" | grep -E "FAIL|PAGEERR|Error" | head -5; fail=1
+  if echo "$out" | grep -qE "FAIL|PAGEERR|Error:|net::ERR"; then
+    echo "✗ $t"; echo "$out" | grep -E "FAIL|PAGEERR|Error|net::ERR" | head -5; fail=1
   else
     echo "✓ $t ($(echo "$out" | grep -c '^ok:') checks)"
   fi
