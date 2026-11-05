@@ -116,12 +116,11 @@
     border-radius:12px; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:0 3px 0 var(--ink);
     display:none; font-size:16px; line-height:0; }
   #pauseBtn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
-  #combo { top:calc(50px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); font-family:var(--disp);
+  #combo { top:calc(132px + env(safe-area-inset-top)); right:12px; text-align:right; font-family:var(--disp);
     font-size:17px; color:var(--yellow); opacity:0; transition:opacity .2s; text-shadow:var(--ol-drop); white-space:nowrap; }
   #bossBar { top:calc(48px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(60vw, 330px);
     text-align:center; opacity:0; transition:opacity .25s; }
   #bossBar.on { opacity:1; }
-  #bossBar.on ~ #combo { top:calc(84px + env(safe-area-inset-top)); }
   #bossBar b { font-family:var(--disp); font-weight:400; font-size:14px; letter-spacing:1px; color:#ffb3a0; text-shadow:var(--ol); }
   #bossTrack { height:14px; margin-top:2px; border-radius:8px; background:var(--ink); border:3px solid var(--ink); overflow:hidden; }
   #bossFill { height:100%; width:100%; border-radius:5px; background:linear-gradient(180deg,#ff8a7a,var(--red) 55%,#c4223a); transition:width .12s linear; }
@@ -347,6 +346,9 @@
   @keyframes pulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
 
   @media (max-width: 700px) {
+    #bossBar { width:min(44vw, 330px); top:calc(50px + env(safe-area-inset-top)); }
+    #bossBar b { font-size:11px; }
+    #hudSkills { max-width:36vw; }
     #hudArmy { font-size:34px; }
     #hudDist { font-size:20px; }
     #hudCoins { font-size:17px; }
@@ -365,7 +367,7 @@
   }
   @media (orientation: landscape) and (max-height: 480px) {
     #hudForm { display:none; }
-    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys, .hist { display:none; }
+    .overlay .missions, #quickBuy.on, .ribbon, .overlay .keys, .hist, #tut { display:none; }
     .logo span { font-size:58px; display:inline; }
     .logo span + span { margin-left:.2em; }
     #overOverlay h1 { font-size:40px; }

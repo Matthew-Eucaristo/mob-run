@@ -1573,7 +1573,8 @@ function floatText(x, wy, text, color, size, h) {
   let hh = h === undefined ? 2.5 : h;
   let busy = 0;
   for (const f of floats) if (f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90) busy++;
-  hh += busy * 1.15;
+  if (busy >= 4) { const old = floats.find((f) => f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90); if (old) { old.el.remove(); floats.splice(floats.indexOf(old), 1); busy--; } }
+  hh += Math.min(busy, 3) * 1.15;
   floats.push({ el, x, wy, h: hh, vh: 2.6, t: 0, life: 1.05 + busy * 0.12 });
   while (floats.length > 14) { floats[0].el.remove(); floats.shift(); }
 }
