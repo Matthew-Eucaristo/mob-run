@@ -290,6 +290,7 @@ const G = {
   form: 0, shield: 0, overT: 0, skillPicks: 0,
   skills: {},
   coinsPicked: 0, coinsPickedVal: 0, bonusTotal: 0, gunUps: 0, missionCoins: 0, coinFrac: 0, bonusPaid: 0,
+  rescued: 0,
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
@@ -339,7 +340,7 @@ const UPGRADES = [
   { id: 'fire', name: 'FIREPOWER', icon: 'bullet', col: '#ff6b3d', max: 50, desc: 'Every bullet hits harder. Keeps going', val: (l) => l ? '+' + l * 4 + '%' : 'normal', cost: (l) => Math.round(300 * Math.pow(1.12, l)) },
   { id: 'coin', name: 'COIN VALUE', icon: 'star', col: '#ff9f1c', max: 8, desc: 'Every coin is worth more', val: (l) => l ? '+' + l * 15 + '%' : 'normal', cost: (l) => Math.round(120 * Math.pow(1.5, l)) },
 ];
-const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt' };
+const MISSION_ICON = { dist: 'run', army: 'flag', mobs: 'skull', boss: 'crown', coins: 'star', walls: 'wall', gun: 'gun', streak: 'bolt', rescue: 'lock' };
 const MISSION_DEFS = {
   dist: { steps: [300, 500, 800, 1200, 1600, 2200, 3000, 4000], text: (n) => `Run ${n}m in one run` },
   army: { steps: [100, 250, 600, 1500, 4000, 10000, 20000], text: (n) => `Grow your army to ${n}` },
@@ -347,6 +348,7 @@ const MISSION_DEFS = {
   boss: { steps: [1, 2, 3, 5, 7, 10], text: (n) => `Defeat ${n} boss${n > 1 ? 'es' : ''} in one run` },
   coins: { steps: [40, 90, 160, 260, 400, 600], text: (n) => `Grab ${n} coins in one run` },
   walls: { steps: [2, 4, 7, 10, 15], text: (n) => `Break ${n} walls in one run` },
+  rescue: { steps: [10, 30, 80, 200, 500, 1200], text: (n) => `Free ${n} prisoners in one run` },
   gun: { steps: [1, 2, 3, 4, 5], text: (n) => `Upgrade your gun ${n} time${n > 1 ? 's' : ''} in one run` },
   streak: { steps: [4, 6, 8, 11, 15], text: (n) => `Take ${n} good gates in a row` },
 };
@@ -369,6 +371,7 @@ function missionValue(type) {
   if (type === 'boss') return G.bossKills;
   if (type === 'coins') return G.coinsPicked;
   if (type === 'walls') return G.wallsBroken;
+  if (type === 'rescue') return G.rescued;
   if (type === 'gun') return G.gunUps;
   if (type === 'streak') return G.gateStreakBest;
   return 0;
@@ -425,7 +428,7 @@ const SPEED_BASE = 148;
 const SPEED_CAP = 288;
 const MILES = [100, 250, 500, 1000, 2000, 4000];
 
-let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [];
+let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [], cages = [];
 let bullets = [], parts = [], floats = [], rewards = [], ebullets = [], coins = [], mobs = [];
 let firstMob = false, nextBand = 320;
 let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0;
@@ -1449,7 +1452,7 @@ function schedule() {
     else if (G.dist < 100) { if (chance(0.55)) spawnBarrels(nextY); else spawnPack(nextY); }
     else if (roll < gateP) spawnGate(nextY);
     else if (roll < packP) spawnPack(nextY);
-    else if (roll < barrelP) spawnBarrels(nextY);
+    else if (roll < barrelP) { if (G.dist > 70 && chance(0.35)) spawnCage(nextY); else spawnBarrels(nextY); }
     else if (roll < hordeP && G.dist > 220) spawnHorde(nextY);
     else if (roll < hazP && G.dist > 200) spawnHazard(nextY);
     else if (G.dist > 120) spawnWall(nextY);
@@ -1717,6 +1720,67 @@ function spawnBarrels(wy) {
     barrels.push(b);
   }
   for (const b of barrels) if (!b.maxhp) b.maxhp = b.hp;
+}
+
+/* --- prisoner cages: shoot the lock off and the prisoners join the squad.
+   Run into one unbroken and only half of them make it out. --- */
+const cageBarGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.0, 6);
+const cagePlateGeo = new THREE.CylinderGeometry(1.2, 1.25, 0.18, 14);
+const cageBarMat = new THREE.MeshStandardMaterial({ color: 0xb8c2d8, metalness: 0.6, roughness: 0.35 });
+const cagePlateMat = new THREE.MeshStandardMaterial({ color: 0x3a3060, roughness: 0.6 });
+const prisonerMat = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xc8d0e8, roughness: 0.7 });
+function spawnCage(wy) {
+  const d = G.level;
+  const n = Math.max(6, Math.round(G.soldiers * rnd(0.18, 0.32))) + d * 2;
+  const hp = Math.round((22 + d * 12) * rnd(0.9, 1.2) * Math.pow(Math.max(1, firepower()), 0.4));
+  const x = rnd(road.x0 + 46, road.x1 - 46);
+  const grp = new THREE.Group();
+  const base = new THREE.Mesh(cagePlateGeo, cagePlateMat); base.position.y = 0.09;
+  const top = new THREE.Mesh(cagePlateGeo, cagePlateMat); top.position.y = 2.1; top.scale.setScalar(0.96);
+  grp.add(base, top);
+  for (let k = 0; k < 11; k++) {
+    const a = (k / 11) * Math.PI * 2;
+    const bar = new THREE.Mesh(cageBarGeo, cageBarMat);
+    bar.position.set(Math.cos(a) * 1.08, 1.1, Math.sin(a) * 1.08);
+    grp.add(bar);
+  }
+  const lock = makeSprite('lock', '#ffcc33'); lock.position.set(0, 2.7, 0.3); lock.scale.set(1.1, 1.1, 1);
+  grp.add(lock);
+  const prisoners = [];
+  for (let k = 0; k < Math.min(5, n); k++) {
+    const m = new THREE.Mesh(soldierGeo, prisonerMat);
+    const a = (k / 5) * Math.PI * 2 + 0.4;
+    m.position.set(Math.cos(a) * 0.5, 0.18, Math.sin(a) * 0.45);
+    m.rotation.y = Math.PI;
+    m.scale.setScalar(1.15);
+    grp.add(m); prisoners.push(m);
+  }
+  grp.position.set(wx(x), 0, wz(wy));
+  scene.add(grp);
+  cages.push({ x, wy, hp, maxhp: hp, n, grp, prisoners, lock, label: mkLabel('cage'), pop: 0, hitT: 0, dead: false });
+}
+function hitCage(c, dmg) {
+  if (c.dead) return;
+  c.hp -= dmg;
+  c.hitT = 0.22;
+  if (c.hp <= 0) breakCage(c, false);
+}
+function breakCage(c, rammed) {
+  if (c.dead) return;
+  c.dead = true;
+  const freed = rammed ? Math.ceil(c.n / 2) : c.n;
+  G.rescued += freed;
+  addSoldiers(G.soldiers + freed);
+  scene.remove(c.grp);
+  c.label.remove();
+  floatText(c.x, c.wy, (rammed ? '+' + freed + ' (half got out)' : '+' + freed + ' FREED!'), rammed ? '#ffb089' : '#7ee081', rammed ? 20 : 28, 3);
+  const col = skinNow().body;
+  for (let k = 0; k < 22 && parts.length < MAXP - 4; k++)
+    parts.push({ x: c.x + rnd(-20, 20), wy: c.wy + rnd(-10, 10), h: rnd(0.4, 1.8), vx: (G.armyX - c.x) * rnd(0.8, 1.6), vwy: (G.camY - c.wy) * rnd(0.8, 1.4),
+      vh: rnd(2, 4), t: 0, life: rnd(0.5, 0.8), color: k % 3 ? col : '#ffcc33' });
+  for (let k = 0; k < 10 && parts.length < MAXP - 4; k++) parts.push(mkPart(c.x, c.wy, '#b8c2d8'));
+  (rammed ? sfx.good : sfx.great)();
+  G.shake = Math.max(G.shake, 5); vib(25);
 }
 
 function spawnPickup(wy) {
@@ -2008,7 +2072,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = META.runs < 3 ? 4.5 : 0; zoneIdx = -1;
@@ -2089,6 +2153,8 @@ function clearWorld() {
   for (const w of walls) { scene.remove(w.mesh); w.label.remove(); }
   for (const e of enemies) { e.label.remove(); if (e.aura) scene.remove(e.aura); }
   for (const b of barrels) { scene.remove(b.grp); b.label.remove(); }
+  for (const c of cages) { scene.remove(c.grp); c.label.remove(); }
+  cages = [];
   for (const p of pickups) scene.remove(p.mesh);
   for (const r of rewards) scene.remove(r.mesh);
   for (const h of hazards) scene.remove(h.grp);
@@ -2920,6 +2986,13 @@ function update(dt) {
       const d = Math.hypot(e.x - mx, dy);
       if (d < best) { best = d; tgt = { x: e.x, wy: e.wy }; }
     }
+    for (const c of cages) {
+      if (c.dead) continue;
+      const dy = c.wy - muzzleWy;
+      if (dy < -60 || dy > 1400) continue;
+      const d = Math.hypot(c.x - mx, dy) * 0.8;
+      if (d < best) { best = d; tgt = { x: c.x, wy: c.wy }; }
+    }
     for (const b of barrels) {
       if (b._dead) continue;
       const dy = b.wy - muzzleWy;
@@ -3051,6 +3124,11 @@ function update(dt) {
     if (!hit) for (const m of mobs) {
       if (m.dead) continue;
       if (Math.abs(b.x - m.x) < m.hw && Math.abs(b.wy - m.wy) < m.hd + 6) { hurtMob(m, b.dmg); hit = true; break; }
+    }
+    if (!hit) for (const c of cages) {
+      if (c.dead) continue;
+      const dx = b.x - c.x, dy = b.wy - c.wy;
+      if (dx * dx + dy * dy < 30 * 30) { hitCage(c, b.dmg); hit = true; break; }
     }
     if (!hit) for (const bar of barrels) {
       if (bar._dead) continue;
@@ -3350,6 +3428,15 @@ function update(dt) {
     if (k >= 1 || Math.hypot(G.armyX - r.x, G.camY + 10 - r.wy) < 24) {
       takePickup(r.kind, G.armyX); scene.remove(r.mesh); rewards.splice(i, 1);
     }
+  }
+
+  /* cages: ram one and half the prisoners get out; leave it behind and they stay */
+  for (let i = cages.length - 1; i >= 0; i--) {
+    const c = cages[i];
+    c.pop = Math.min(1, c.pop + dt * 4);
+    if (c.hitT > 0) c.hitT -= dt;
+    if (!c.dead && Math.abs(c.wy - G.camY) < 26 && Math.abs(c.x - G.armyX) < sr * 0.6 + 30) breakCage(c, true);
+    if (c.dead || c.wy < G.camY - 200) { if (!c.dead) { scene.remove(c.grp); c.label.remove(); } cages.splice(i, 1); }
   }
 
   /* barrels pop-in / cleanup */
@@ -3923,6 +4010,21 @@ function draw(now) {
     }
   }
 
+  /* cages */
+  for (const c of cages) {
+    const zP = wz(c.wy);
+    c.grp.visible = zP < 14;
+    c.grp.position.set(wx(c.x) + (c.hitT > 0 ? Math.sin(c.hitT * 60) * c.hitT * 0.5 : 0), -(1 - c.pop) * 2.4, zP);
+    for (let k = 0; k < c.prisoners.length; k++) {
+      const pm = c.prisoners[k];
+      pm.position.y = 0.18 + Math.abs(Math.sin(t * 7 + k * 1.3)) * 0.22;
+      pm.rotation.z = Math.sin(t * 5 + k) * 0.12;
+    }
+    c.lock.material.rotation = Math.sin(t * 3) * 0.15;
+    setLabel(c.label, wx(c.x), 3.6, zP, '+' + c.n);
+    c.label.style.setProperty('--hp', Math.max(0, 100 * c.hp / c.maxhp).toFixed(0) + '%');
+  }
+
   /* barrels */
   for (const b of barrels) {
     if (b._dead) continue;
@@ -4126,7 +4228,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels,
+    G, SIM, META, UPGRADES, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
