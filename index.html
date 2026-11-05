@@ -96,6 +96,16 @@
     box-shadow:0 3px 0 var(--ink); z-index:5; pointer-events:none; opacity:0; transition:opacity .6s; text-align:center;
     max-width:min(92vw, 520px); line-height:1.3; }
   #hudForm { bottom:calc(16px + env(safe-area-inset-bottom)); left:12px; }
+  #tut { position:fixed; left:50%; bottom:calc(3% + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:5;
+    pointer-events:none; text-align:center; opacity:0; transition:opacity .3s; width:240px; }
+  #tut.on { opacity:1; }
+  #tut .hand { font-size:54px; color:#fff; filter:drop-shadow(0 3px 0 var(--ink)) drop-shadow(0 0 2px var(--ink)); height:60px;
+    animation:swipe 1.5s ease-in-out infinite; }
+  #tut b { display:inline-block; margin-top:8px; font-family:var(--disp); font-weight:400; font-size:18px; letter-spacing:1px;
+    color:#fff; text-shadow:var(--ol-drop); }
+  #tut::before { content:''; position:absolute; left:28px; right:28px; top:40px; height:6px; border-radius:3px;
+    background:rgba(255,255,255,.25); box-shadow:0 0 0 2px rgba(27,20,48,.5); }
+  @keyframes swipe { 0%,100% { transform:translateX(-70px) rotate(-12deg); } 50% { transform:translateX(70px) rotate(12deg); } }
   #hudForm .t { font-size:10px; letter-spacing:1.5px; color:#fff; text-shadow:var(--ol); }
   #formLabel { font-family:var(--disp); font-size:15px; letter-spacing:.5px; text-shadow:var(--ol); }
   #formTrack { width:92px; height:8px; margin-top:4px; background:var(--ink); border-radius:4px; position:relative; }
@@ -373,6 +383,7 @@
 <div class="hud" id="combo"></div>
 <div id="vignette"></div>
 <div id="hint"></div>
+<div id="tut"></div>
 <div class="hud" id="hudForm"><div class="t">FORMATION</div><div id="formLabel">SQUARE</div><div id="formTrack"><div id="formFill"></div></div></div>
 <div id="formBtns">
   <button type="button" id="btnCol">COLUMN</button>

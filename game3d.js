@@ -53,6 +53,10 @@ const bossBar = document.getElementById('bossBar');
 const bossName = document.getElementById('bossName');
 const bossFill = document.getElementById('bossFill');
 const pauseOv = document.getElementById('pauseOverlay');
+{
+  const tt = document.getElementById('tut');
+  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? 'SWIPE TO STEER' : 'DRAG OR ← → TO STEER'}</b>`;
+}
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
 if (pauseBtn) pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); setPause(true); });
@@ -291,7 +295,7 @@ const G = {
   form: 0, shield: 0, overT: 0, skillPicks: 0,
   skills: {},
   coinsPicked: 0, coinsPickedVal: 0, bonusTotal: 0, gunUps: 0, missionCoins: 0, coinFrac: 0, bonusPaid: 0,
-  rescued: 0, grace: 0,
+  rescued: 0, grace: 0, steered: false,
   time: 0, cause: '', mobsBeaten: 0, bossKills: 0, wallsBroken: 0, gateStreakBest: 0,
 };
 const SKILLS = [
@@ -478,6 +482,7 @@ function move(x, y) {
   }
   lastPX = x; lastPY = y;
   if (dragAxis === 1) {
+    if (!G.steered && G.mode === 'run') onFirstSteer();
     const span = Math.max(80, road.x1 - road.x0);
     const sens = (span * 0.46) / Math.max(150, W * 0.42);
     aimX = clampAim(aimX + dx * sens);
@@ -1999,6 +2004,16 @@ function tutorialHint(kind) {
   showHint(T[kind], 3.6);
   saveSave();
 }
+/* first runs: an animated hand shows the swipe until the player steers once,
+   then the formation tip takes over */
+const tutEl = document.getElementById('tut');
+function onFirstSteer() {
+  G.steered = true;
+  if (META.runs <= 3) {
+    const touch = document.body.classList.contains('touch');
+    showHint(touch ? 'Nice! Swipe up for a column, down to spread wide' : 'Nice! ↑ for a column, ↓ to spread wide', 3.2);
+  }
+}
 function showHint(text, secs) {
   if (!hintEl) return;
   hintEl.textContent = text;
@@ -2158,10 +2173,10 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
-  hintT = META.runs < 3 ? 4.5 : 0; zoneIdx = -1;
+  hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
   if (vigEl) { vigEl.classList.remove('doom'); vigEl.style.opacity = '0'; }
@@ -2995,7 +3010,7 @@ function update(dt) {
   syncRoad();
   const keyX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   const keyY = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-  if (keyX) aimX = clampAim(aimX + keyX * latMax() * dt);
+  if (keyX) { aimX = clampAim(aimX + keyX * latMax() * dt); if (!G.steered) onFirstSteer(); }
   if (keyY) aimForm = clamp(aimForm + keyY * 0.95 * dt, -1, 1);
   aimX = clampAim(aimX);
   const maxStep = latMax() * dt;
@@ -4352,6 +4367,7 @@ function draw(now) {
   const formHud = document.getElementById('hudForm');
   if (formHud) formHud.style.opacity = (G.mode === 'run' || G.mode === 'pick') ? '1' : '0';
   hintEl.style.opacity = hintT > 0 && G.mode === 'run' ? '0.9' : '0';
+  if (tutEl) tutEl.classList.toggle('on', G.mode === 'run' && !G.steered && META.runs <= 3 && G.time > 0.6 && G.time < 14);
   labelsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
   floatsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
 
