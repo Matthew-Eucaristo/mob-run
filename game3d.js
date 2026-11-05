@@ -361,7 +361,7 @@ const SKILLS = [
   { id: 'hoard', name: 'HOARD', icon: 'magnet', col: '#ffb400', desc: L('Grab coins from farther out.', 'Ambil koin dari lebih jauh.'), max: 2 },
 ];
 const SKINS = [
-  { id: 'recruit', name: 'RECRUIT', price: 0, body: '#3d7bff', lead: '#ffd75d' },
+  { id: 'recruit', name: 'CLASSIC', price: 0, body: '#3d7bff', lead: '#ffd75d' },
   { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#1fc8f5', lead: '#f4fbff', hat: L('Beret', 'Baret') },
   { id: 'ember', name: 'EMBER', price: 400, body: '#ff5418', lead: '#ffd27a', hat: L('Flame crest', 'Jambul api') },
   { id: 'toxic', name: 'TOXIC', price: 900, body: '#22dd60', lead: '#e8ff8a', hat: L('Gas mask', 'Masker gas') },
@@ -961,6 +961,44 @@ function setHat(id) {
   hatMesh.geometry = hatGeoCache[id] || (hatGeoCache[id] = HATS[id]());
   hatMesh.visible = true;
 }
+/* shop portraits: each squad color rendered once, hat and all, into a small image */
+const portraitCache = {};
+let portraitRig = null;
+function skinPortrait(sk) {
+  if (portraitCache[sk.id]) return portraitCache[sk.id];
+  try {
+    if (!portraitRig) {
+      const sc = new THREE.Scene();
+      sc.add(new THREE.HemisphereLight(0xeef2ff, 0x4a4060, 2.1));
+      const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(-2, 3, -3); sc.add(key);
+      const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+      cam.position.set(0.95, 1.05, -2.3); cam.lookAt(0, 0.52, 0);
+      const body = new THREE.Mesh(soldierGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.08 }));
+      const hat = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15 }));
+      body.rotation.y = 0.35; hat.rotation.y = 0.35;
+      sc.add(body, hat);
+      const rt = new THREE.WebGLRenderTarget(128, 128, { samples: 4 });
+      rt.texture.colorSpace = THREE.SRGBColorSpace;
+      portraitRig = { sc, cam, body, hat, rt, px: new Uint8Array(128 * 128 * 4) };
+    }
+    const R = portraitRig;
+    R.body.material.color.set(sk.body);
+    R.hat.visible = !!HATS[sk.id];
+    if (HATS[sk.id]) R.hat.geometry = hatGeoCache[sk.id] || (hatGeoCache[sk.id] = HATS[sk.id]());
+    const prevAlpha = renderer.getClearAlpha(), prevCol = new THREE.Color(); renderer.getClearColor(prevCol);
+    renderer.setRenderTarget(R.rt);
+    renderer.setClearColor(0x000000, 0); renderer.clear();
+    renderer.render(R.sc, R.cam);
+    renderer.readRenderTargetPixels(R.rt, 0, 0, 128, 128, R.px);
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(prevCol, prevAlpha);
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d'); const img = g.createImageData(128, 128);
+    for (let y = 0; y < 128; y++) img.data.set(R.px.subarray((127 - y) * 512, (128 - y) * 512), y * 512);
+    g.putImageData(img, 0, 0);
+    return (portraitCache[sk.id] = c.toDataURL('image/png'));
+  } catch (e) { return ''; }
+}
 const muzzleMesh = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.1, 0.1, 0.12),
   new THREE.MeshBasicMaterial({ color: 0xffe97d }), MAXS);
@@ -1025,11 +1063,24 @@ function enemyGeo(kind) {
     horn(0.2, 1.22, 0.12, 0.7, -0.35, 0.07, 0.38);
     arm(-0.32, 0.85, -0.16, -1.1); arm(0.32, 0.85, -0.16, 1.1);
   } else if (kind === 'boss') {
-    body(0.85, 1.6, 1.7, 1, 1, 0.9);
-    horn(-0.7, 2.75, 0, 0, 0.5, 0.24, 0.9); horn(0.7, 2.75, 0, 0, -0.5, 0.24, 0.9);
-    horn(-0.95, 2.2, 0, 0, 1.2, 0.15, 0.5); horn(0.95, 2.2, 0, 0, -1.2, 0.15, 0.5);
-    parts.push({ geo: SPH(0.34), m: M4(0, 1.15, 0.5), c: '#f0b0a0' });           // chest glow spot
-    parts.push({ geo: CONE(0.2, 0.6, 5), m: M4(0, 2.85, 0.25, 0.5, 0, 0), c: HORN }); // nose horn
+    /* a hulking ogre: stubby legs, barrel chest, a head sunk between huge shoulders,
+       knuckles near the ground. The face (eyes, mouth) sits on the head's front */
+    const W = '#ffffff', PALE = '#f0b8a8', TUSK = '#fff6e0';
+    for (const sx of [-1, 1]) {
+      parts.push({ geo: CAP(0.3, 0.42), m: M4(sx * 0.5, 0.48, 0), c: W });                              // leg
+      parts.push({ geo: BOX(0.5, 0.18, 0.62), m: M4(sx * 0.5, 0.09, 0.12), c: HORN });                // foot
+      parts.push({ geo: SPH(0.5), m: M4(sx * 1.12, 2.0, -0.1, 0, 0, 0, 1, 0.9, 1), c: W });           // shoulder
+      parts.push({ geo: CONE(0.13, 0.42), m: M4(sx * 1.22, 2.46, -0.12, 0, 0, -sx * 0.45), c: HORN });  // shoulder spike
+      parts.push({ geo: CONE(0.1, 0.32), m: M4(sx * 0.92, 2.42, -0.3, -0.3, 0, -sx * 0.25), c: HORN });
+      parts.push({ geo: CAP(0.26, 0.75), m: M4(sx * 1.38, 1.32, 0, 0, 0, sx * 0.18), c: W });          // arm
+      parts.push({ geo: SPH(0.4), m: M4(sx * 1.52, 0.72, 0.12), c: W });                               // fist
+      parts.push({ geo: CONE(0.21, 0.9), m: M4(sx * 0.52, 2.98, -0.05, 0, 0, -sx * 0.55), c: HORN });   // horn
+      parts.push({ geo: CONE(0.07, 0.28), m: M4(sx * 0.3, 2.02, 0.68), c: TUSK });                      // tusk
+    }
+    parts.push({ geo: SPH(1.0), m: M4(0, 1.32, -0.12, 0, 0, 0, 1.3, 1.0, 0.95), c: W });                 // torso
+    parts.push({ geo: SPH(0.55), m: M4(0, 1.05, 0.62, 0, 0, 0, 1.1, 0.9, 0.45), c: PALE });            // belly
+    parts.push({ geo: SPH(0.72), m: M4(0, 2.3, 0.06), c: W });                                         // head
+    parts.push({ geo: BOX(0.9, 0.12, 0.3), m: M4(0, 2.86, 0.42, -0.25, 0, 0), c: HORN });              // brow
   } else {
     body(0.5, 1.0, 1.05);
     horn(-0.4, 2.0, 0, 0, 0.4, 0.15, 0.5); horn(0.4, 2.0, 0, 0, -0.4, 0.15, 0.5);
@@ -1985,7 +2036,7 @@ function bossBits(boss) {
     for (const sx of [-1, 1]) { const c = new THREE.Mesh(cannonGeo, cannonMat); c.position.set(sx * 1.0, 2.45, 0.1); g.add(c); }
   } else if (boss.splitter) {
     for (const [x, y] of [[0, 1.35], [-0.38, 1.85], [0.38, 1.85]]) {
-      const c = new THREE.Mesh(coreGeo, coreMat); c.position.set(x, y, 0.78); g.add(c);
+      const c = new THREE.Mesh(coreGeo, coreMat); c.position.set(x, y - 0.25, 0.9); g.add(c);
     }
   } else return null;
   g.visible = false;   /* shown once the draw loop has placed it */
@@ -2984,9 +3035,15 @@ function refreshBadges() {
     if (b) b.classList.toggle('on', can);
   }
 }
+/* your squad on the menu: its portrait and name, a tap away from the armory */
+function squadChipHTML() {
+  const sk = skinNow(), por = skinPortrait(sk);
+  return `<button type="button" class="chip squadChip">${por ? `<img src="${por}" alt="">` : icon('run')}${sk.name}</button>`;
+}
+if (bestLine) bestLine.addEventListener('pointerdown', (e) => { if (e.target.closest('.squadChip')) openShop(e); });
 function refreshMeta() {
   if (bestLine) bestLine.innerHTML = `<span class="chip">${icon('crown')}${G.best ? L('best ', 'rekor ') + G.best + 'm' : L('no best yet', 'belum ada rekor')}</span>` +
-    `<span class="chip">${COIN}${fmtNum(G.coins)}</span>`;
+    `<span class="chip">${COIN}${fmtNum(G.coins)}</span>` + squadChipHTML();
   if (hudCoins) hudCoins.innerHTML = COIN + fmtNum(G.coins);
   refreshBadges();
 }
@@ -3112,7 +3169,8 @@ function renderShop() {
     card.type = 'button';
     card.className = 'skinCard' + (on ? ' on' : '') + (!owned && G.coins < sk.price ? ' broke' : '');
     const act = on ? L('ON', 'DIPAKAI') : owned ? L('USE', 'PAKAI') : sk.price + COIN;
-    card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><small>${sk.hat || L('Standard kit', 'Seragam biasa')}</small><span>${act}</span>`;
+    const por = skinPortrait(sk);
+    card.innerHTML = `${por ? `<img class="por" src="${por}" alt="">` : `<i style="color:${sk.body}">${icon('run')}</i>`}<b>${sk.name}</b><small>${sk.hat || L('Standard kit', 'Seragam biasa')}</small><span>${act}</span>`;
     card.addEventListener('click', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       audio();
@@ -4471,7 +4529,7 @@ function draw(now) {
     if (zP > 14) { e.label.style.display = 'none'; if (e.aura) e.aura.visible = false; if (e.acc) e.acc.visible = false; continue; }
     const d = EDEF[e.kind] || EDEF.normal;
     let s = e.r * K * (e.boss ? 1.7 : 1.8) * Math.max(e.boss ? 0.45 : 0, e.pop) * (e.boss ? 1 : (e.attacking ? 1 + Math.sin(t * 14) * 0.08 : 1));
-    if (e.boss) s = Math.max(1.35, Math.min(1.85, s));
+    if (e.boss) s = Math.max(1.1, Math.min(1.45, s));   /* the ogre is broad: keep it from walling off the road */
     if (s < 0.01) s = 0.01;
     if (e.roar) s *= e.boss ? 1 + e.roar * 0.2 : 1 + e.roar * 0.28 * Math.sin(t * 26);
     e._s = s;
