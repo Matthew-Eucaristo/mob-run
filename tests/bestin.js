@@ -1,0 +1,20 @@
+const { chromium } = require('playwright');
+const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode = 1; } else console.log('ok:', m); };
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+  p.on('pageerror', e => console.log('PAGEERR', e.message));
+  await p.addInitScript(() => localStorage.setItem('mobrun_save', JSON.stringify({ bank: 0, best: 120 })));
+  await p.goto('http://localhost:8787/index.html?debug');
+  await p.waitForTimeout(600);
+  await p.click('#playBtn');
+  await p.evaluate(() => { const M = window.__mob; M.SIM.on = true; while (M.G.dist < 40) { M.update(1 / 60); if (M.G.mode === 'pick') M.chooseSkill('dmg'); } M.SIM.on = false; });
+  await p.waitForTimeout(400);
+  const t1 = await p.evaluate(() => { const e = document.getElementById('bestIn'); return [e.classList.contains('on'), e.textContent]; });
+  assert(t1[0] && /BEST IN \d+m/.test(t1[1]), 'countdown shows near the record: ' + t1[1]);
+  await p.screenshot({ path: 'bestin.png', clip: { x: 230, y: 0, width: 160, height: 140 } });
+  await p.evaluate(() => { const M = window.__mob; M.SIM.on = true; while (M.G.dist < 125) { M.update(1 / 60); if (M.G.mode === 'pick') M.chooseSkill('dmg'); } M.SIM.on = false; });
+  await p.waitForTimeout(300);
+  assert(!(await p.evaluate(() => document.getElementById('bestIn').classList.contains('on'))), 'countdown hides once the record is beaten');
+  await b.close();
+})();

@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode = 1; } else console.log('ok:', m); };
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  p.on('pageerror', e => console.log('PAGEERR', e.message));
+  await p.goto('http://localhost:8787/index.html?debug');
+  await p.waitForTimeout(600);
+  await p.click('#playBtn');
+  await p.waitForTimeout(500);
+  await p.mouse.move(1100, 500, { steps: 5 });
+  await p.waitForTimeout(500);
+  const r = await p.evaluate(() => ({ x: window.__mob.G.armyX, x1: window.__mob.road.x1, steered: window.__mob.G.steered }));
+  assert(r.x > 260 && r.steered, 'mouse right steers right (' + r.x.toFixed(0) + ' of ' + r.x1.toFixed(0) + ')');
+  await p.mouse.move(150, 500, { steps: 5 });
+  await p.waitForTimeout(500);
+  const l = await p.evaluate(() => window.__mob.G.armyX);
+  assert(l < 140, 'mouse left steers left (' + l.toFixed(0) + ')');
+  await p.mouse.wheel(0, 120); await p.waitForTimeout(80); await p.mouse.wheel(0, 120);
+  await p.waitForTimeout(700);
+  const f = await p.evaluate(() => window.__mob.G.form);
+  assert(f > 0.5, 'wheel down spreads wide (' + f.toFixed(2) + ')');
+  await b.close();
+})();
