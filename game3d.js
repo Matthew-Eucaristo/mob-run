@@ -277,10 +277,10 @@ const curZone = { bg: new THREE.Color(ZONES[0].bg), ground: new THREE.Color(ZONE
 const WT = [
   { name: 'PISTOL', dmg: 1, rate: 0.24, spread: 1, col: '#ffe97d', tl: 1.0 },
   { name: 'SMG', dmg: 1, rate: 0.15, spread: 1, col: '#7de8ff', tl: 1.25 },
-  { name: 'RIFLE', dmg: 2, rate: 0.13, spread: 2, col: '#a8ffb0', tl: 1.7 },
+  { name: 'RIFLE', dmg: 2, rate: 0.13, spread: 2, col: '#a8ffb0', tl: 1.5 },
   { name: 'SHOTGUN', dmg: 3, rate: 0.19, spread: 3, col: '#ff9d5d', tl: 0.8, tw: 1.5 },
-  { name: 'MINIGUN', dmg: 2, rate: 0.065, spread: 3, col: '#f0c14a', tl: 3.0 },
-  { name: 'ANNIHILATOR', dmg: 5, rate: 0.11, spread: 3, col: '#ff4040', tl: 3.6, tw: 1.9 },
+  { name: 'MINIGUN', dmg: 2, rate: 0.065, spread: 3, col: '#f0c14a', tl: 2.1 },
+  { name: 'ANNIHILATOR', dmg: 5, rate: 0.11, spread: 3, col: '#ff5a4a', tl: 2.4, tw: 1.35 },
 ];
 
 /* ---------------- state ---------------- */
@@ -2174,7 +2174,10 @@ function musicStep(step, at) {
   const ch = CHORDS[bar];
   const o = { at, mus: true };
   /* drums */
-  if (s16 % 4 === 0) { voice(150, 0.11, 'sine', 0.16, 42, o); }
+  /* boss on screen: double-time kick and a growl under the bass */
+  const bossy = musicHeat >= 1.5;
+  if (s16 % 4 === 0 || (bossy && s16 % 2 === 0)) { voice(150, 0.11, 'sine', 0.16, 42, o); }
+  if (bossy && s16 % 4 === 2) voice(hz(key + ch[0] - 36), STEP * 1.8, 'sawtooth', 0.03, 0, o);
   if (s16 === 4 || s16 === 12) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
   if (s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
   /* bass: root of the bar's chord, sidestepping on the off-beats */
