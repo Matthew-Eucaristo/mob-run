@@ -253,13 +253,14 @@ const sfx = {
     hiss(0.045, 0.05, 'bandpass', 2600 - heavy * 1300, 900, 1.2);
     voice(170 - heavy * 50, 0.05, 'sine', 0.05, 60);
   },
-  good: () => {
+  /* k raises the pitch: a bigger gain rings higher */
+  good: (k = 1) => {
     hiss(0.22, 0.06, 'bandpass', 500, 3800, 0.9);
-    voice(659, 0.12, 'triangle', 0.09); voice(988, 0.16, 'triangle', 0.08, 0, { at: 0.06 });
+    voice(659 * k, 0.12, 'triangle', 0.09); voice(988 * k, 0.16, 'triangle', 0.08, 0, { at: 0.06 });
   },
-  great: () => {
+  great: (k = 1) => {
     hiss(0.26, 0.07, 'bandpass', 400, 4200, 0.9);
-    [523, 659, 784, 1047].forEach((f, k) => voice(f, 0.16, 'triangle', 0.09, 0, { at: k * 0.05, verb: k === 3 }));
+    [523, 659, 784, 1047].forEach((f, j) => voice(f * k, 0.16, 'triangle', 0.09, 0, { at: j * 0.05, verb: j === 3 }));
   },
   bad: () => { voice(220, 0.28, 'sawtooth', 0.08, 70); hiss(0.2, 0.08, 'lowpass', 700, 120); },
   /* a little "pop": falling sine plus a click */
@@ -2227,7 +2228,9 @@ function applyGate(g) {
   const tag = split ? (gateLabel(lp) + ' | ' + gateLabel(rp) + '  ') : '';
   floatText(G.armyX, G.camY + 10, tag + lab,
     good ? '#ffd75d' : '#ff5d6a', split || gunUp ? 26 : 24, 3.4);
-  if (good) (delta > army || gunUp ? sfx.great : sfx.good)();
+  /* up to a fifth higher for a big multiplier, in semitones so it stays musical */
+  const semis = clamp(Math.round(Math.log2(Math.max(1, after) / Math.max(1, army)) * 4), 0, 7);
+  if (good) (delta > army || gunUp ? sfx.great : sfx.good)(Math.pow(2, semis / 12));
   else sfx.bad();
   g.punch = 1;
   G.shake = Math.min(16, Math.max(G.shake, split ? 6 : 4));
@@ -2525,7 +2528,9 @@ function skillLine() {
 }
 function offerSkills() {
   if (!skillOv || !skillCards) return;
-  const pool = SKILLS.filter(s => (G.skills[s.id] || 0) < s.max);
+  /* thirteen distinct picks: the near-duplicates stay in the code for old saves but are no longer offered */
+  const RETIRED = ['hoard', 'scavenge', 'magnet', 'fortune', 'quickstep', 'rally', 'bulwark', 'steady', 'focus'];
+  const pool = SKILLS.filter(s => !RETIRED.includes(s.id) && (G.skills[s.id] || 0) < s.max);
   if (!pool.length) return;
   const bag = pool.slice();
   const picks = [];
@@ -2703,10 +2708,12 @@ function gameOver() {
   if (META.runs >= 3 || (isBest && META.runs >= 2)) maybeOfferInstall(); else if (installCard) installCard.style.display = 'none';
   vib(30);
 }
+/* the last moment hangs in slow motion while the camera closes in, then the results */
+const DEATH_T = 1.35;
 function beginDeath() {
   if (G.mode === 'dying' || G.mode === 'over') return;
   G.mode = 'dying';
-  deathT = 0.78;
+  deathT = DEATH_T;
   skillDelay = 0;
   G.shake = 18;
   G.slow = 0;
@@ -4123,7 +4130,7 @@ let lastDraw = performance.now(), camIntro = 0, deathCam = 0;
 function draw(now) {
   const t = now * 0.001;
   /* real frame time: animations run the same speed at 60, 90 or 120 Hz */
-  const FD = Math.min(0.05, Math.max(0.001, (now - lastDraw) / 1000)) * (G.slow > 0 && G.mode === 'run' ? 0.35 : 1);
+  const FD = Math.min(0.05, Math.max(0.001, (now - lastDraw) / 1000)) * (G.slow > 0 && G.mode === 'run' ? 0.35 : G.mode === 'dying' && deathT > 0.5 ? 0.4 : 1);
   lastDraw = now;
   const zi = Math.max(0, zoneIdx);
   const z = ZONES[zi];
@@ -4184,7 +4191,7 @@ function draw(now) {
   if (camIntro > 0) camIntro = Math.max(0, camIntro - FD / 0.9);
   const swoop = camIntro * camIntro * (3 - 2 * camIntro);
   /* dying: ease the camera in on the squad as it falls apart */
-  const doomK = G.mode === 'dying' ? clamp(1 - deathT / 0.78, 0, 1) : G.mode === 'over' ? 1 : 0;
+  const doomK = G.mode === 'dying' ? clamp(1 - deathT / DEATH_T, 0, 1) : G.mode === 'over' ? 1 : 0;
   deathCam += (doomK - deathCam) * Math.min(1, FD * 6);
   const push = deathCam * deathCam * (3 - 2 * deathCam);
   camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9 - push * 4.2, 12.5 + camZoom + swoop * 7 - push * 5.5);
