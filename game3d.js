@@ -2422,16 +2422,58 @@ if (againBtn) againBtn.addEventListener('pointerdown', (e) => {
 });
 const shareBtn = document.getElementById('shareBtn');
 if (shareBtn) shareBtn.innerHTML = icon('share');
+/* share card: a 4:5 branded image of the run, shared as a file where the
+   platform allows it, downloaded otherwise */
+function shareCard() {
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1350;
+  const g = c.getContext('2d');
+  const bg = g.createRadialGradient(540, 420, 80, 540, 600, 900);
+  bg.addColorStop(0, '#4a3a80'); bg.addColorStop(1, '#1b1430');
+  g.fillStyle = bg; g.fillRect(0, 0, 1080, 1350);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  const word = (t, x, y, size, fill, rot) => {
+    g.save(); g.translate(x, y); g.rotate(rot || 0);
+    g.font = `${size}px "Lilita One", sans-serif`;
+    g.lineWidth = size * 0.2; g.strokeStyle = INK;
+    g.strokeText(t, 0, size * 0.07); g.strokeText(t, 0, 0);
+    g.fillStyle = fill; g.fillText(t, 0, 0);
+    g.restore();
+  };
+  word('MOB', 540, 210, 190, '#ffcc33', -0.06);
+  word('RUN', 590, 380, 190, '#ffffff', -0.06);
+  const d = Math.floor(G.dist);
+  word(d + 'm', 540, 650, 230, '#ffffff', 0);
+  if (d >= G.best && d > 0) word('NEW BEST!', 540, 820, 90, '#ffcc33', -0.04);
+  else word('best ' + G.best + 'm', 540, 820, 70, '#b9a9d4', 0);
+  word('peak army ' + fmtNum(G.peak) + '  ·  ' + G.mobsBeaten + ' mobs', 540, 935, 58, '#7ee081', 0);
+  const cols = ['#4aa3ff', '#5ee0ff', '#4aa3ff', '#7ab8ff', '#4aa3ff', '#5ee0ff', '#4aa3ff'];
+  for (let k = 0; k < 7; k++) drawIcon(g, 'run', 180 + k * 120, 1095, 120, cols[k]);
+  g.font = '44px Nunito, sans-serif'; g.fillStyle = '#b9a9d4';
+  g.fillText(location.host || 'mob-run.pages.dev', 540, 1260);
+  return new Promise((res) => c.toBlob(res, 'image/png'));
+}
 if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
   e.stopPropagation(); e.preventDefault();
   const d = Math.floor(G.dist);
   const text = `I ran ${d}m in MOB RUN with a peak army of ${G.peak}. Beat that:`;
   const url = location.origin + location.pathname.replace(/index\.html$/, '');
+  const done = () => { shareBtn.innerHTML = icon('check'); setTimeout(() => { shareBtn.innerHTML = icon('share'); }, 1500); };
   try {
+    const blob = await shareCard();
+    const file = blob && new File([blob], `mobrun-${d}m.png`, { type: 'image/png' });
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'MOB RUN', text: text + ' ' + url });
+      return;
+    }
     if (navigator.share) { await navigator.share({ title: 'MOB RUN', text, url }); return; }
-    await navigator.clipboard.writeText(text + ' ' + url);
-    shareBtn.innerHTML = icon('check');
-    setTimeout(() => { shareBtn.innerHTML = icon('share'); }, 1500);
+    if (blob) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `mobrun-${d}m.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }
+    try { await navigator.clipboard.writeText(text + ' ' + url); } catch (err) { }
+    done();
   } catch (err) { }
 });
 /* results screen: offer the cheapest upgrade you can afford, one tap to buy */
@@ -4392,7 +4434,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, draw, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
