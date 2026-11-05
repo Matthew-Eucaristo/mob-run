@@ -579,6 +579,9 @@ function snapForm(v, e) {
 }
 if (btnCol) btnCol.addEventListener('pointerdown', (e) => snapForm(-1, e));
 if (btnWide) btnWide.addEventListener('pointerdown', (e) => snapForm(1, e));
+/* the formation chip is a button too: square -> column -> wide -> square */
+const formChip = document.getElementById('hudForm');
+if (formChip) formChip.addEventListener('pointerdown', (e) => snapForm(G.form < -0.34 ? 1 : G.form > 0.34 ? 0 : -1, e));
 const shopBtn = document.getElementById('shopBtn');
 const shopBtnOver = document.getElementById('shopBtnOver');
 if (shopBtn) shopBtn.addEventListener('pointerdown', (e) => openShop(e));
@@ -3156,7 +3159,7 @@ function hurt(e, dmg) {
   /* a boss shrugs off shots until it makes its entrance: the fight happens up close, not on the horizon */
   if (e.boss && !e.introduced) return;
   if (e.boss && G.skills.execution) dmg *= 1 + G.skills.execution * 0.4;
-  /* a boss soaks at most a quarter of its health a second, so even a monster squad
+  /* a boss soaks at most about a fifth of its health a second, so even a monster squad
      gets a few seconds of showdown instead of a pop on the horizon */
   if (e.boss && !e.attacking) { const bud = e.budget ?? e.maxhp * 0.25; dmg = Math.min(dmg, Math.max(0, bud)); e.budget = bud - dmg; }
   e.hp -= dmg;
@@ -4890,7 +4893,7 @@ function draw(now) {
   }
   if (pauseBtn) pauseBtn.style.display = G.mode === 'run' ? 'block' : 'none';
   const formHud = document.getElementById('hudForm');
-  if (formHud) formHud.style.opacity = (G.mode === 'run' || G.mode === 'pick') ? '1' : '0';
+  if (formHud) { const on = G.mode === 'run' || G.mode === 'pick'; formHud.style.opacity = on ? '1' : '0'; formHud.style.pointerEvents = on ? 'auto' : 'none'; }
   hintEl.style.opacity = hintT > 0 && G.mode === 'run' ? '0.9' : '0';
   if (tutEl) tutEl.classList.toggle('on', G.mode === 'run' && !G.steered && META.runs <= 3 && G.time > 0.6 && G.time < 14);
   labelsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
