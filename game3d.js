@@ -361,14 +361,14 @@ const SKILLS = [
 ];
 const SKINS = [
   { id: 'recruit', name: 'RECRUIT', price: 0, body: '#3d7bff', lead: '#ffd75d' },
-  { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#1fc8f5', lead: '#f4fbff' },
-  { id: 'ember', name: 'EMBER', price: 400, body: '#ff5418', lead: '#ffd27a' },
-  { id: 'toxic', name: 'TOXIC', price: 900, body: '#22dd60', lead: '#e8ff8a' },
-  { id: 'royal', name: 'OXBLOOD', price: 1600, body: '#a82c26', lead: '#f2d48a' },
-  { id: 'void', name: 'ASH', price: 3000, body: '#4a453c', lead: '#f4efe4' },
-  { id: 'camo', name: 'JUNGLE', price: 5000, body: '#5f8a3a', lead: '#e6d38a' },
-  { id: 'neon', name: 'NEON', price: 8000, body: '#ff3df2', lead: '#3dfff0' },
-  { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffb81a', lead: '#fff6d0' },
+  { id: 'vanguard', name: 'VANGUARD', price: 150, body: '#1fc8f5', lead: '#f4fbff', hat: L('Beret', 'Baret') },
+  { id: 'ember', name: 'EMBER', price: 400, body: '#ff5418', lead: '#ffd27a', hat: L('Flame crest', 'Jambul api') },
+  { id: 'toxic', name: 'TOXIC', price: 900, body: '#22dd60', lead: '#e8ff8a', hat: L('Gas mask', 'Masker gas') },
+  { id: 'royal', name: 'OXBLOOD', price: 1600, body: '#a82c26', lead: '#f2d48a', hat: L('Plume', 'Bulu jambul') },
+  { id: 'void', name: 'ASH', price: 3000, body: '#4a453c', lead: '#f4efe4', hat: L('Headband', 'Ikat kepala') },
+  { id: 'camo', name: 'JUNGLE', price: 5000, body: '#5f8a3a', lead: '#e6d38a', hat: L('Bush hat', 'Topi rimba') },
+  { id: 'neon', name: 'NEON', price: 8000, body: '#ff3df2', lead: '#3dfff0', hat: L('Visor + cans', 'Visor + headset') },
+  { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffb81a', lead: '#fff6d0', hat: L('Crown', 'Mahkota') },
 ];
 /* ---------------- meta progression (persists between runs) ----------------
    Upgrades make the next run go further, missions give a reason to try a
@@ -899,6 +899,64 @@ const soldierBody = new THREE.InstancedMesh(soldierGeo,
   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.08 }), MAXS);
 soldierBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(soldierBody);
+/* --- headgear: each squad color wears something of its own, drawn with the same matrices --- */
+const CYL = (r1, r2, h, n) => new THREE.CylinderGeometry(r1, r2, h, n || 10);
+const HATS = {
+  vanguard: () => mergeParts([
+    { geo: CYL(0.17, 0.15, 0.06, 12), m: M4(0.03, 0.88, 0.01, 0, 0, -0.32), c: '#1fc8f5' },
+    { geo: SPH(0.03, 5), m: M4(0.07, 0.92, 0.0), c: '#f4fbff' },
+  ]),
+  ember: () => mergeParts([
+    { geo: CONE(0.07, 0.24), m: M4(0, 0.98, 0.0), c: '#ffd27a' },
+    { geo: CONE(0.06, 0.2), m: M4(0, 0.95, 0.09, -0.5, 0, 0), c: '#ff9a2a' },
+    { geo: CONE(0.06, 0.2), m: M4(0, 0.95, -0.09, 0.5, 0, 0), c: '#ff5418' },
+  ]),
+  toxic: () => mergeParts([
+    { geo: CYL(0.07, 0.08, 0.1, 10), m: M4(0, 0.7, -0.17, Math.PI / 2, 0, 0), c: '#2a2d3a' },
+    { geo: CYL(0.05, 0.05, 0.03, 10), m: M4(0, 0.7, -0.23, Math.PI / 2, 0, 0), c: '#8aff5a' },
+    { geo: SPH(0.045, 6), m: M4(-0.06, 0.79, -0.12), c: '#e8ff8a' },
+    { geo: SPH(0.045, 6), m: M4(0.06, 0.79, -0.12), c: '#e8ff8a' },
+  ]),
+  royal: () => mergeParts([
+    { geo: SPH(0.06, 7), m: M4(0, 1.0, 0.06, 0.6, 0, 0, 0.7, 2.4, 0.8), c: '#f2d48a' },
+    { geo: SPH(0.05, 7), m: M4(0, 0.97, 0.1, 0.9, 0, 0, 0.6, 2.0, 0.7), c: '#d8403a' },
+  ]),
+  void: () => mergeParts([
+    { geo: CYL(0.152, 0.152, 0.05, 14), m: M4(0, 0.8, 0), c: '#f4efe4' },
+    { geo: BOX(0.03, 0.03, 0.2), m: M4(0.04, 0.78, 0.22, 0.5, 0.25, 0), c: '#f4efe4' },
+    { geo: BOX(0.03, 0.03, 0.18), m: M4(-0.04, 0.76, 0.21, 0.7, -0.25, 0), c: '#f4efe4' },
+  ]),
+  camo: () => mergeParts([
+    { geo: CYL(0.25, 0.25, 0.025, 14), m: M4(0, 0.84, 0), c: '#7a6a3a' },
+    { geo: CYL(0.13, 0.15, 0.11, 12), m: M4(0, 0.9, 0), c: '#8a7a45' },
+    { geo: CYL(0.152, 0.152, 0.025, 12), m: M4(0, 0.86, 0), c: '#3f5a25' },
+  ]),
+  neon: () => mergeParts([
+    { geo: BOX(0.24, 0.05, 0.05), m: M4(0, 0.77, -0.13), c: '#3dfff0' },
+    { geo: CYL(0.05, 0.05, 0.05, 10), m: M4(-0.16, 0.76, 0, 0, 0, Math.PI / 2), c: '#1a1530' },
+    { geo: CYL(0.05, 0.05, 0.05, 10), m: M4(0.16, 0.76, 0, 0, 0, Math.PI / 2), c: '#1a1530' },
+    { geo: BOX(0.3, 0.025, 0.03), m: M4(0, 0.9, 0), c: '#ff3df2' },
+  ]),
+  gold: () => mergeParts([
+    { geo: CYL(0.13, 0.12, 0.08, 12), m: M4(0, 0.89, 0), c: '#ffd84a' },
+    ...[0, 1, 2, 3, 4].map((k) => ({ geo: CONE(0.03, 0.09), m: M4(Math.cos(k * 1.2566) * 0.11, 0.97, Math.sin(k * 1.2566) * 0.11), c: '#ffe98a' })),
+    { geo: SPH(0.025, 5), m: M4(0, 0.89, -0.125), c: '#ff4d5e' },
+  ]),
+};
+const hatGeoCache = {};
+const hatMesh = new THREE.InstancedMesh(new THREE.BufferGeometry(),
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15 }), MAXS);
+hatMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+hatMesh.count = 0;
+scene.add(hatMesh);
+let hatFor = '';
+function setHat(id) {
+  if (hatFor === id) return;
+  hatFor = id;
+  if (!HATS[id]) { hatMesh.visible = false; return; }
+  hatMesh.geometry = hatGeoCache[id] || (hatGeoCache[id] = HATS[id]());
+  hatMesh.visible = true;
+}
 const muzzleMesh = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.1, 0.1, 0.12),
   new THREE.MeshBasicMaterial({ color: 0xffe97d }), MAXS);
@@ -1185,7 +1243,7 @@ document.getElementById('labels').appendChild(bestLabel);
 const MAXB = 500;
 const BULLET_CAP = Q.low ? 140 : Q.phone ? 260 : MAXB;
 const bulletMesh = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.07, 0.07, 0.55),
+  new THREE.BoxGeometry(0.12, 0.12, 0.78),
   new THREE.MeshBasicMaterial({ color: 0xffffff }), MAXB);
 bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(bulletMesh);
@@ -1633,7 +1691,7 @@ function schedule() {
     const hordeP = barrelP + heat * 0.1;
     const hazP = hordeP + 0.08 + heat * 0.09;
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
-    if (G.dist > nextBand) { nextBand += 350; spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
+    if (G.dist > nextBand) { nextBand += Math.max(170, 350 - Math.max(0, G.dist - 900) * 0.2); spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
     if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
     /* early rules go by where the event lands (the schedule runs ~65m ahead), not where you are */
     const at = nextY / 40;
@@ -1655,7 +1713,10 @@ function schedule() {
     if (G.dist > 380 && chance((0.08 + heat * 0.1) * (zoneIdx % 5 === 2 ? 2 : 1))) spawnMeteor(nextY + rnd(-120, 240));
     /* something every few seconds: tighter early, when the player has the least going on */
     const early = clamp(1 - G.dist / 400, 0, 1);
-    nextY += rnd(600, 860) - heat * 200 - early * 150;
+    const step = rnd(600, 860) - heat * 200 - early * 150;
+    /* later on, a long stretch gets a little something halfway: a few runners or barrels to shoot */
+    if (G.dist > 400 && step > 640 && chance(0.55)) { if (chance(0.6)) spawnPack(nextY + step * 0.5); else spawnBarrels(nextY + step * 0.5); }
+    nextY += step;
     bossCounter += 1;
     if (bossCounter >= (G.dist < 450 ? 10 : 6)) { bossCounter = 0; spawnBoss(nextY + 140); nextY += 900; }
   }
@@ -1832,6 +1893,10 @@ function spawnMob(wy, scale, band) {
   let n = band
     ? Math.max(threatBase(d) * 2, (P * (0.55 + 0.5 * clamp((d - 300) / 1300, 0, 1)) + S * 0.2) * rnd(0.9, 1.1))
     : Math.max(threatBase(d), P * threatRatio(d) + S * 0.12) * rnd(0.8, 1.15) * (scale || 1);
+  /* never a flat wall of arithmetic: a band stays just under the army cap, so a
+     full army can always win the clash. The late game is about rebuilding in time
+     for the next one, which comes sooner the further you get */
+  n = Math.min(n, band ? ARMY_CAP * 0.95 : ARMY_CAP * 0.6);
   n = Math.max(4, Math.round(n));
   const uh = unitHp(d);
   const vis = Math.min(n, MOB_VIS);
@@ -1854,7 +1919,8 @@ function spawnMob(wy, scale, band) {
   const m = { x: band ? (road.x0 + road.x1) / 2 : x, band: !!band, wy, count: n, start: n, hp: n * uh, uh, units, hw, hd: ((rows - 1) * gap * 0.9) / 2 + 10,
     clash: false, tick: 0, hitT: 0, pop: 0, dead: false, deadT: 0, label: mkLabel('mob') };
   mobs.push(m);
-  if (band) bannerFlash(L('WAR BAND AHEAD', 'PASUKAN PERANG!'), '#ff5d6a');
+  /* one banner at a time: if something else is being announced, the band's own label does the job */
+  if (band && performance.now() > bannerUntil) bannerFlash(L('WAR BAND AHEAD', 'PASUKAN PERANG!'), '#ff5d6a');
   if (!META.seenMob) { META.seenMob = true; showHint(L('RED MOB AHEAD · shoot it down, then outnumber it on contact', 'GEROMBOLAN MERAH · tembak dulu, lalu kalahkan jumlahnya'), 4.5); }
   return m;
 }
@@ -2095,22 +2161,32 @@ function applyGate(g) {
   const mid = gateMid(g);
   const army = G.soldiers;
   const shown = Math.min(army, 180);
-  let left = 0, counted = 0;
+  let left = 0, counted = 0, seam = 0;
+  /* the middle post: soldiers who run straight into it don't make it through */
+  const SEAM = 11;
   if (bodyN > 1) {
     counted = bodyN;
-    for (let i = 0; i < bodyN; i++) if (G.armyX + bodyX[i] < mid) left++;
+    for (let i = 0; i < bodyN; i++) { const x = G.armyX + bodyX[i]; if (x < mid) left++; if (Math.abs(x - mid) < SEAM) seam++; }
   } else {
     const offs = formation(shown);
     counted = offs.length;
-    for (const o of offs) if (G.armyX + o.x < mid) left++;
+    for (const o of offs) { const x = G.armyX + o.x; if (x < mid) left++; if (Math.abs(x - mid) < SEAM) seam++; }
   }
   let lFrac = left / counted, rFrac = 1 - lFrac;
   /* a few stragglers on the other side follow the crowd: aiming at a panel gets you that panel */
   if (lFrac < 0.2) { lFrac = 0; rFrac = 1; }
   else if (rFrac < 0.2) { rFrac = 0; lFrac = 1; }
   const lp = g.panels[0], rp = g.panels[1];
-  let nl = transformCount(army * lFrac, lp);
-  let nr = transformCount(army * rFrac, rp);
+  /* only a squad that straddles the gate pays for the post */
+  const postLoss = lFrac > 0 && rFrac > 0 && G.dist > 60 ? Math.min(army - 1, Math.round(army * seam / counted)) : 0;
+  const thru = army - postLoss;
+  if (postLoss > 0) {
+    floatText(mid, G.camY + 20, '-' + fmtNum(postLoss) + L(' POST!', ' TIANG!'), '#ff6b6b', 20, 3.2);
+    for (let k = 0; k < 8 && parts.length < MAXP - 2; k++) parts.push(mkPart(mid + rnd(-6, 6), G.camY + 8, '#dfe9ff'));
+    sfx.hurt(); vib(30);
+  }
+  let nl = transformCount(thru * lFrac, lp);
+  let nr = transformCount(thru * rFrac, rp);
   let gunUp = false;
   if (lp.t === 'gun' && lFrac > 0) gunUp = true;
   if (rp.t === 'gun' && rFrac > 0) gunUp = true;
@@ -2118,7 +2194,7 @@ function applyGate(g) {
   /* the first stretch is a tutorial: a wrong gate hurts but never ends the run */
   if (G.dist < 250 && after < 5) after = Math.min(army, 5);
   const delta = after - army;
-  if (after < army) G.cause = 'A BAD GATE';
+  if (after < army) G.cause = postLoss > army * 0.5 ? 'CLIPPED A GATE POST' : 'A BAD GATE';
   addSoldiers(after);
   const split = lFrac > 0.08 && rFrac > 0.08;
   const good = gunUp || delta >= 0;
@@ -2530,7 +2606,7 @@ function nextTxt(m) {
   return l < d.steps.length ? L(' Next up: ', ' Berikutnya: ') + d.text(d.steps[l]).toLowerCase() : '';
 }
 const CAUSE_ID = {
-  'A BAD GATE': 'GERBANG YANG SALAH', 'FELL OFF THE ROAD': 'JATUH DARI JALAN', 'BOSS FIREBALL': 'BOLA API BOS',
+  'A BAD GATE': 'GERBANG YANG SALAH', 'CLIPPED A GATE POST': 'MENABRAK TIANG GERBANG', 'FELL OFF THE ROAD': 'JATUH DARI JALAN', 'BOSS FIREBALL': 'BOLA API BOS',
   'OUTNUMBERED BY A MOB': 'KALAH JUMLAH DARI GEROMBOLAN', 'METEOR STRIKE': 'TERTIMPA METEOR', 'FELL IN A PIT': 'JATUH KE LUBANG',
   'BURNED IN LAVA': 'TERBAKAR LAVA', 'CRUSHED IN A CHOKEPOINT': 'TERJEPIT DI CELAH', 'SHREDDED BY A SAW': 'TERCINCANG GERGAJI',
   'CRUSHED BY A BOSS': 'DIHANCURKAN BOS', 'OVERRUN BY MONSTERS': 'DIKEROYOK MONSTER', 'SMASHED INTO A WALL': 'MENABRAK TEMBOK',
@@ -3015,7 +3091,7 @@ function renderShop() {
     card.type = 'button';
     card.className = 'skinCard' + (on ? ' on' : '') + (!owned && G.coins < sk.price ? ' broke' : '');
     const act = on ? L('ON', 'DIPAKAI') : owned ? L('USE', 'PAKAI') : sk.price + COIN;
-    card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><span>${act}</span>`;
+    card.innerHTML = `<i style="color:${sk.body}">${icon('run')}</i><b>${sk.name}</b><small>${sk.hat || L('Standard kit', 'Seragam biasa')}</small><span>${act}</span>`;
     card.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation(); ev.preventDefault();
       audio();
@@ -4325,6 +4401,7 @@ function draw(now) {
     dummy.scale.setScalar((lead ? 1.65 * Math.max(1, crowdS * 0.92) : 1.3 * bulk * crowdS) * born);
     dummy.updateMatrix();
     soldierBody.setMatrixAt(i, dummy.matrix);
+    if (i < MAXS) hatMesh.setMatrixAt(i, dummy.matrix);
     if (lead) {
       leaderFlag.position.set(bx, 1.15 + bob, bz + 0.05);
       leaderFlag.rotation.set(0, 0, Math.sin(bobT * 6) * 0.25);
@@ -4350,6 +4427,10 @@ function draw(now) {
   }
   soldierBody.count = shown;
   soldierBody.visible = !(G.grace > 0 && G.mode === 'run' && Math.floor(t * 12) % 2 === 1);
+  setHat(G.skin);
+  hatMesh.count = shown;
+  if (hatFor && HATS[hatFor]) hatMesh.visible = soldierBody.visible;
+  hatMesh.instanceMatrix.needsUpdate = true;
   muzzleMesh.count = muzzleGlow > 0.4 ? Math.min(shown, 16) : 0;
   soldierBody.instanceMatrix.needsUpdate = true;
   muzzleMesh.instanceMatrix.needsUpdate = true;
@@ -4635,8 +4716,10 @@ function draw(now) {
     if (zP > 6 || zP < -85) continue;
     const lift = c.fly !== undefined && c.fly > 0 ? Math.sin(Math.min(1, c.fly * 3) * Math.PI) * 1.6 + 0.6 : 0;
     dummy.position.set(wx(c.x), 1.05 + lift + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
-    dummy.rotation.set(0, t * 3.4 + c.spin, 0);
-    const sc = 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
+    /* a coin in flight turns its face to you instead of flashing edge-on */
+    const flying = c.fly !== undefined;
+    dummy.rotation.set(0, flying ? Math.sin(t * 9 + c.spin) * 0.35 : t * 3.4 + c.spin, 0);
+    const sc = (flying ? 1.12 : 1) * 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
     dummy.scale.set(sc, sc, sc);
     dummy.updateMatrix();
     if (coinI < MAXCOIN) coinMesh.setMatrixAt(coinI++, dummy.matrix);
