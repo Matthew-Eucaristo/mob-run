@@ -1423,6 +1423,10 @@ function spawnMeteor(wy) {
 function spawnHazard(wy) {
   const d = G.level;
   let roll = Math.random();
+  /* each zone leans on its own hazard: pits in Toxic Flats, lava in Ember Ridge,
+     saws on the Salt Flats, chokepoints in Deep Run */
+  const sig = [null, 0.86, 0.12, 0.4, 0.62][Math.max(0, zoneIdx) % 5];
+  if (sig !== null && chance(0.45)) roll = sig;
   if (G.dist < 220 && roll > 0.62) roll = Math.random() * 0.62;
   if (roll < 0.28) {
     /* lava pool(s) anchored to a road edge — steer to the free side */
@@ -1589,7 +1593,7 @@ function schedule() {
     const packP = gateP + 0.2;
     const barrelP = packP + 0.1;
     const hordeP = barrelP + heat * 0.1;
-    const hazP = hordeP + 0.05 + heat * 0.09;
+    const hazP = hordeP + 0.08 + heat * 0.09;
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += 350; spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
     if (G.dist > 60 && !firstMob) { firstMob = true; spawnMob(nextY, 0.7); }
@@ -1605,7 +1609,7 @@ function schedule() {
     else spawnGate(nextY);
     if (chance(0.12)) spawnPickup(nextY + rnd(-150, 150));
     if (gatesSpawned <= 3 || chance(0.7)) spawnCoinLine(nextY + rnd(70, 200));
-    if (G.dist > 380 && chance(0.08 + heat * 0.1)) spawnMeteor(nextY + rnd(-120, 240));
+    if (G.dist > 380 && chance((0.08 + heat * 0.1) * (zoneIdx % 5 === 2 ? 2 : 1))) spawnMeteor(nextY + rnd(-120, 240));
     /* something every few seconds: tighter early, when the player has the least going on */
     const early = clamp(1 - G.dist / 400, 0, 1);
     nextY += rnd(600, 860) - heat * 200 - early * 150;
