@@ -348,7 +348,7 @@ const MISSION_DEFS = {
 };
 const META = {
   up: { army: 0, gun: 0, armor: 0, coin: 0, magnet: 0, lucky: 0 },
-  mlv: {}, missions: [], done: 0, seenMob: false,
+  mlv: {}, missions: [], done: 0, seenMob: false, seen: {},
   daily: { last: '', streak: 0 },
   runs: 0,
 };
@@ -1825,6 +1825,24 @@ function bannerFlash(text, color) {
   setTimeout(() => { if (zoneBanner.style.opacity === '0') zoneBanner.style.color = ''; }, 1900);
 }
 let bannerT = null;
+/* the first time each hazard shows up, say what to do about it, once ever */
+function tutorialHint(kind) {
+  if (META.seen[kind]) return;
+  const touch = document.body.classList.contains('touch');
+  const T = {
+    choke: touch ? 'CHOKEPOINT! Swipe up to squeeze into a column' : 'CHOKEPOINT! Hold ↑ to squeeze into a column',
+    saw: 'SAW BLADE! Time it and steer around',
+    lava: 'LAVA! Keep the squad on the dark side',
+    gap: 'PIT! Steer around the hole',
+    meteor: 'METEOR! Get out of the red circle',
+    wall: 'WALL! Shoot it down or go around the gap',
+    band: 'WAR BAND! As big as your army. Shoot it down first',
+  };
+  if (!T[kind]) return;
+  META.seen[kind] = true;
+  showHint(T[kind], 3.6);
+  saveSave();
+}
 function showHint(text, secs) {
   if (!hintEl) return;
   hintEl.textContent = text;
@@ -2327,6 +2345,7 @@ function loadSave() {
       if (s && typeof s.done === 'number') META.done = s.done | 0;
       if (s && typeof s.runs === 'number') META.runs = s.runs | 0;
       if (s && s.seenMob) META.seenMob = true;
+      if (s && s.seen && typeof s.seen === 'object') for (const k in s.seen) META.seen[k] = !!s.seen[k];
     }
     const legacy = parseInt(localStorage.getItem('mobrun_best') || '0', 10) || 0;
     if (legacy > G.best) G.best = legacy;
@@ -2342,7 +2361,7 @@ function saveSave() {
   try {
     localStorage.setItem('mobrun_save', JSON.stringify({
       bank: G.coins | 0, skin: G.skin, owned: G.owned, best: G.best | 0,
-      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob,
+      up: META.up, mlv: META.mlv, done: META.done, runs: META.runs, daily: META.daily, seenMob: META.seenMob, seen: META.seen,
       missions: META.missions.map((m) => ({ type: m.type, done: m.done })),
     }));
     localStorage.setItem('mobrun_best', String(G.best | 0));
@@ -3102,6 +3121,7 @@ function update(dt) {
     if (m.hitCD > 0) m.hitCD -= dt;
     m.hw = mobHalfW(m);
     const ahead = m.wy - m.hd - G.camY;
+    if (m.band && !m.hinted && ahead < 760) { m.hinted = true; tutorialHint('band'); }
     if (!m.clash) {
       m.wy -= 34 * dt;
       if (ahead < 620) {
@@ -3147,6 +3167,7 @@ function update(dt) {
     }
     if (h.wy < G.camY - (h.len || 0) / 2 - 240) { scene.remove(h.grp); hazards.splice(i, 1); continue; }
     if (h.wy - G.camY > 1500 || h.wy < G.camY - 200) continue;
+    if (!h.hinted && h.wy - (h.len || 0) / 2 - G.camY < 720) { h.hinted = true; tutorialHint(h.kind); }
     if (h.kind === 'lava' && Math.random() < 0.3 && parts.length < MAXP - 6)
       parts.push({ x: h.x + rnd(-h.w / 2, h.w / 2), wy: h.wy + rnd(-h.len / 2, h.len / 2), h: 0.1,
         vx: 0, vwy: rnd(-8, 8), vh: rnd(1.5, 3.5), t: 0, life: rnd(0.4, 0.8), color: '#ff7a3d' });
@@ -3223,6 +3244,7 @@ function update(dt) {
   /* walls */
   for (let i = walls.length - 1; i >= 0; i--) {
     const w = walls[i];
+    if (!w.dead && !w.hinted && w.wy - G.camY < 720) { w.hinted = true; tutorialHint('wall'); }
     if (w.dead) {
       w.deadT += dt;
       if (w.deadT > 0.75) { scene.remove(w.mesh); w.label.remove(); walls.splice(i, 1); }
@@ -3395,7 +3417,9 @@ function draw(now) {
   camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9, 12.5 + camZoom + swoop * 7);
   camera.lookAt(axw * 0.35, 1.0 - swoop * 0.5, -12 - swoop * 10);
   camera.rotateZ(bank);
-  const fovT = 62 + fovKick + Math.max(0, G.speed - SPEED_BASE) * 0.02;
+  /* wide screens see too much empty roadside at 62deg: tighten so the road fills the frame */
+  const baseFov = W / H > 1.25 ? 50 : 62;
+  const fovT = baseFov + fovKick + Math.max(0, G.speed - SPEED_BASE) * 0.02;
   if (Math.abs(camera.fov - fovT) > 0.01) { camera.fov += (fovT - camera.fov) * 0.12; camera.updateProjectionMatrix(); }
   starMat.opacity += (ZONE_STARS[zi] - starMat.opacity) * 0.05;
   warm.intensity = 26 + muzzleGlow * 46; muzzleGlow *= 0.8;
