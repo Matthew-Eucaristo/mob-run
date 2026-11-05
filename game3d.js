@@ -55,7 +55,7 @@ const bossFill = document.getElementById('bossFill');
 const pauseOv = document.getElementById('pauseOverlay');
 {
   const tt = document.getElementById('tut');
-  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? 'SWIPE TO STEER' : 'DRAG OR ← → TO STEER'}</b>`;
+  if (tt) tt.innerHTML = `<div class="hand">${icon('hand')}</div><b>${window.matchMedia('(pointer: coarse)').matches ? 'SWIPE TO STEER' : 'MOVE THE MOUSE TO STEER'}</b>`;
 }
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
@@ -142,7 +142,7 @@ window.addEventListener('resize', resize);
    Everything goes through one bus: a compressor glues the mix and keeps a
    busy fight from clipping, and a short synthetic room adds a tail to the
    big moments. Noise comes from one shared buffer. */
-let AC = null, muted = false, musicOff = false, vibOff = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
+let AC = null, muted = false, musicOff = false, vibOff = false, shakeOff = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
 function audio() {
   if (!AC) {
     try {
@@ -498,7 +498,20 @@ function syncRoad() {
   roadHalf = halfPx * K;
 }
 cv.addEventListener('pointerdown', e => press(e.clientX, e.clientY));
-cv.addEventListener('pointermove', e => move(e.clientX, e.clientY));
+cv.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse' && !dragging && G.mode === 'run') {
+    const f = clamp((e.clientX / Math.max(1, W) - 0.18) / 0.64, 0, 1);
+    const nx = clampAim(road.x0 + f * (road.x1 - road.x0));
+    if (Math.abs(nx - aimX) > 2) { aimX = nx; if (!G.steered) onFirstSteer(); }
+    return;
+  }
+  move(e.clientX, e.clientY);
+});
+cv.addEventListener('wheel', (e) => {
+  if (G.mode !== 'run') return;
+  e.preventDefault();
+  aimForm = clamp(aimForm + clamp(e.deltaY, -100, 100) * 0.005, -1, 1);
+}, { passive: false });
 cv.addEventListener('pointerup', release);
 cv.addEventListener('pointercancel', release);
 startOv.addEventListener('pointerdown', () => press());
@@ -2011,7 +2024,7 @@ function onFirstSteer() {
   G.steered = true;
   if (META.runs <= 3) {
     const touch = document.body.classList.contains('touch');
-    showHint(touch ? 'Nice! Swipe up for a column, down to spread wide' : 'Nice! ↑ for a column, ↓ to spread wide', 3.2);
+    showHint(touch ? 'Nice! Swipe up for a column, down to spread wide' : 'Nice! Scroll or ↑ ↓ to squeeze or spread the squad', 3.2);
   }
 }
 function showHint(text, secs) {
@@ -2452,7 +2465,7 @@ if (quickBuy) quickBuy.addEventListener('pointerdown', (e) => {
   if (reviveBtn) reviveBtn.disabled = G.coins < reviveCost();
 });
 function saveSettings() {
-  try { localStorage.setItem('mobrun_settings', JSON.stringify({ sfx: !muted, music: !musicOff, vib: !vibOff })); } catch (e) { }
+  try { localStorage.setItem('mobrun_settings', JSON.stringify({ sfx: !muted, music: !musicOff, vib: !vibOff, shake: !shakeOff })); } catch (e) { }
 }
 function toggleMute() {
   const off = !(muted && musicOff);
@@ -2462,7 +2475,7 @@ function toggleMute() {
 const setOv = document.getElementById('settingsOverlay');
 function renderSettings() {
   if (!setOv) return;
-  const rows = [['sfx', 'sound', 'SOUND EFFECTS', !muted], ['music', 'music', 'MUSIC', !musicOff], ['vib', 'phone', 'VIBRATION', !vibOff]];
+  const rows = [['sfx', 'sound', 'SOUND EFFECTS', !muted], ['music', 'music', 'MUSIC', !musicOff], ['vib', 'phone', 'VIBRATION', !vibOff], ['shake', 'crosshair', 'SCREEN SHAKE', !shakeOff]];
   const list = document.getElementById('setList');
   if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
     `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('');
@@ -2476,6 +2489,7 @@ if (setOv) {
       if (k === 'sfx') muted = !muted;
       if (k === 'music') musicOff = !musicOff;
       if (k === 'vib') { vibOff = !vibOff; vib(30); }
+      if (k === 'shake') shakeOff = !shakeOff;
       audio(); if (!muted) sfx.power();
       saveSettings(); renderSettings();
       return;
@@ -2595,7 +2609,7 @@ function loadSave() {
     const legacy = parseInt(localStorage.getItem('mobrun_best') || '0', 10) || 0;
     if (legacy > G.best) G.best = legacy;
     const st = JSON.parse(localStorage.getItem('mobrun_settings') || 'null');
-    if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; }
+    if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; shakeOff = st.shake === false; }
     else if (localStorage.getItem('mobrun_mute') === '1') { muted = true; musicOff = true; }
   } catch (e) { }
   /* finished-but-unrolled missions (tab closed mid-run) roll now */
@@ -3676,8 +3690,9 @@ function draw(now) {
 
   /* camera chase + shake + fov kick + bank */
   const axw = wx(G.armyX);
-  const shx = (Math.random() - 0.5) * G.shake * 0.02;
-  const shy = (Math.random() - 0.5) * G.shake * 0.02;
+  const shk = shakeOff ? 0 : G.shake;
+  const shx = (Math.random() - 0.5) * shk * 0.02;
+  const shy = (Math.random() - 0.5) * shk * 0.02;
   const camZoom = Math.max(0, squadRadius() * K - 1.2) * 0.55;
   /* run start: the camera swoops down from a high wide shot into the chase cam */
   if (camIntro > 0) camIntro = Math.max(0, camIntro - FD / 0.9);
@@ -3691,7 +3706,7 @@ function draw(now) {
   camera.rotateZ(bank);
   /* wide screens see too much empty roadside at 62deg: tighten so the road fills the frame */
   const baseFov = W / H > 1.25 ? 50 : 62;
-  const fovT = baseFov + fovKick + Math.max(0, G.speed - SPEED_BASE) * 0.02;
+  const fovT = baseFov + (shakeOff ? 0 : fovKick) + Math.max(0, G.speed - SPEED_BASE) * 0.02;
   if (Math.abs(camera.fov - fovT) > 0.01) { camera.fov += (fovT - camera.fov) * 0.12; camera.updateProjectionMatrix(); }
   starMat.opacity += (ZONE_STARS[zi] - starMat.opacity) * 0.05;
   warm.intensity = 26 + muzzleGlow * 46; muzzleGlow *= 0.8;
