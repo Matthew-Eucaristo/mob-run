@@ -1987,9 +1987,24 @@ function squadRadius() {
   return clamp(halfPxCache * 0.82 + bulk, 20, 200);
 }
 
+/* past the army cap, extra recruits aren't wasted: they turn into coins,
+   and every ~2000 of overflow sharpens the guns, so big gates still pay */
+const ARMY_CAP = 20000;
+function overflow(extra) {
+  /* logarithmic: a x3 gate at the cap is worth a little more than a +500, not 20x more */
+  const coinsN = Math.min(14, Math.max(1, Math.round(Math.log2(1 + extra / 500) * 2)));
+  for (let i = 0; i < coinsN && coins.length < MAXCOIN; i++)
+    coins.push({ x: G.armyX + rnd(-40, 40), wy: G.camY + 40 + rnd(-10, 20), spin: rnd(0, 6), fly: 0.1 + i * 0.03 });
+  const dmg = extra >= 20000 ? 2 : extra >= 3000 ? 1 : 0;
+  G.upDmg += dmg;
+  const txt = dmg ? L('MAX ARMY! GUN DMG +', 'PASUKAN PENUH! DAMAGE +') + dmg : L('MAX ARMY!', 'PASUKAN PENUH!');
+  if (G.time - (G.overflowMsgT || -9) > 1.2) { G.overflowMsgT = G.time; floatText(G.armyX, G.camY + 66, txt, '#ffcc33', 24, 4.6); }
+}
 function addSoldiers(n) {
   const prevPeak = G.peak;
-  G.soldiers = clamp(Math.round(n), 0, 20000);
+  n = Math.round(n);
+  if (n > ARMY_CAP && G.mode === 'run') { const extra = n - Math.max(G.soldiers, ARMY_CAP); if (extra > 0) overflow(extra); }
+  G.soldiers = clamp(n, 0, ARMY_CAP);
   G.peak = Math.max(G.peak, G.soldiers);
   while (G.mileIdx < MILES.length && G.peak >= MILES[G.mileIdx]) {
     if (MILES[G.mileIdx] > prevPeak) {
@@ -2328,7 +2343,7 @@ function startGame() {
   G.shake = 0; G.slow = 0;
   G.shield = 0; G.overT = 0; G.skillPicks = 0; G.skills = {};
   armyRoll = G.soldiers;
-  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
+  G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
   nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
