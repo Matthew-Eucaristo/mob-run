@@ -474,7 +474,7 @@ const MILES = [100, 250, 500, 1000, 2000, 4000];
 
 let gates = [], enemies = [], walls = [], pickups = [], barrels = [], hazards = [], cages = [];
 let bullets = [], parts = [], floats = [], rewards = [], ebullets = [], coins = [], mobs = [];
-let firstMob = false, nextBand = 320, skillDelay = 0;
+let firstMob = false, nextBand = 320, nextWall = 170, skillDelay = 0;
 let nextY = 400, bossCounter = 0, gatesSpawned = 0, gateSeq = 0;
 let fireAcc = 0, drainAcc = 0, shootSfxAcc = 0, fallAcc = 0, edgeWarn = 0;
 let hintT = 0, zoneIdx = -1, fovKick = 0, muzzleGlow = 0, distMark = 0, revived = false, lastLevel = 1;
@@ -1590,8 +1590,8 @@ function floatText(x, wy, text, color, size, h) {
   let hh = h === undefined ? 2.5 : h;
   let busy = 0;
   for (const f of floats) if (f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90) busy++;
-  if (busy >= 4) { const old = floats.find((f) => f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90); if (old) { old.el.remove(); floats.splice(floats.indexOf(old), 1); busy--; } }
-  hh += Math.min(busy, 3) * 1.15;
+  if (busy >= 2) { const old = floats.find((f) => f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90); if (old) { old.el.remove(); floats.splice(floats.indexOf(old), 1); busy--; } }
+  hh += Math.min(busy, 2) * 1.2;
   floats.push({ el, x, wy, h: hh, vh: 2.6, t: 0, life: 1.05 + busy * 0.12 });
   while (floats.length > 14) { floats[0].el.remove(); floats.shift(); }
 }
@@ -1622,6 +1622,7 @@ function schedule() {
     const hazP = hordeP + 0.08 + heat * 0.09;
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += 350; spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
+    if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
     if (G.dist > 60 && !firstMob) { firstMob = true; spawnMob(nextY, 0.7); }
     else if (G.dist < 100 && gatesSpawned < 3) spawnGate(nextY);
     else if (roll > 1 - mobP) spawnMob(nextY);
@@ -1644,12 +1645,20 @@ function schedule() {
   }
 }
 
+/* two significant digits past 100: +3400 reads at a glance, +3409 does not */
+function niceNum(v) {
+  if (v < 100) return Math.round(v);
+  const m = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+  return Math.round(v / m) * m;
+}
 function spawnGate(wy) {
   const d = G.level;
   const S = Math.max(10, G.soldiers);
+  /* adds grow with the army only up to twice par, so a lead is earned, not compounded */
+  const SA = Math.min(S, Math.max(10, par(G.dist) * 2));
   /* add values track the army a bit so +N never feels worthless; red gates
      take a share of the army — a wrong pick stings but is rarely lethal early */
-  const addBase = ri(8, 16) + d * 5 + Math.round(S * rnd(0.12, 0.22));
+  const addBase = ri(8, 16) + d * 5 + Math.round(SA * rnd(0.12, 0.22));
   const late = G.dist > 420;
   const bigSub = Math.max(4, Math.round(S * rnd(0.35, 0.6)) + d * 2);
   const styles = [
@@ -1680,6 +1689,14 @@ function spawnGate(wy) {
   const pair = gatesSpawned < 2 ? [{ t: 'add', v: addBase }, { t: 'mul', v: 2 }]
     : lucky ? (chance(0.5) ? [{ t: 'mul', v: 3 }, { t: 'add', v: addBase * 2 }] : [{ t: 'add', v: addBase * 2 }, { t: 'mul', v: 3 }])
     : styles[ri(0, styles.length - 1)];
+  /* way above par, a x3/x4/x5 would make the rest of the run a formality: soften it */
+  const rich = G.soldiers > par(G.dist) * 2.5;
+  for (const pn of pair) {
+    if (pn.t === 'mys' && pn.res.t === 'mul' && rich) pn.res = { t: 'mul', v: 2 };
+    if (pn.t === 'mul' && rich && pn.v > 2) pn.v = 2;
+    if (pn.t === 'add' || pn.t === 'sub') pn.v = niceNum(pn.v);
+    if (pn.t === 'mys' && (pn.res.t === 'add' || pn.res.t === 'sub')) pn.res.v = niceNum(pn.res.v);
+  }
   gatesSpawned += 1;
   const moving = gatesSpawned > 3 && chance(Math.min(0.55, 0.22 + G.level * 0.05))
     ? { amp: rnd(45, 105), speed: rnd(0.0017, 0.0034), phase: rnd(0, 6) } : null;
@@ -1765,14 +1782,15 @@ function spawnWall(wy) {
   walls.push(w);
 }
 
-/* Threat curve. Rival mobs scale with distance AND with the army you bring,
-   so a fat squad still has to fight for it, and every run eventually ends.
-   Shooting a mob down before contact is how you keep your soldiers. */
+/* Threat curve. Rival mobs are sized from PAR: the army a fair player has at
+   this distance. Your own army only adds a small share, so every good gate
+   pick is a buffer you keep, and every bad one leaves you short. Par keeps
+   climbing, so every run still ends. */
+function par(d) { return 20 + 6500 * Math.pow(Math.max(0, d) / 1000, 2.3); }
 function threatBase(d) { return 6 * Math.pow(1.00205, d); }
 function threatRatio(d) {
-  const t = clamp(d / 2300, 0, 1);
-  /* past ~1100m the mobs keep swelling until they outnumber any army: outgun them or die */
-  return 0.24 + 0.62 * t * t * (3 - 2 * t) + Math.max(0, (d - 1100) / 1400) * 0.5;
+  const t = clamp(d / 2000, 0, 1);
+  return 0.3 + 0.5 * t * t * (3 - 2 * t);
 }
 /* firepower per soldier relative to a bare pistol squad */
 function firepower() {
@@ -1785,9 +1803,10 @@ function firepower() {
 function unitHp(d) { return (6 + d / 32) * Math.pow(Math.max(1, firepower()), 0.6); }
 function spawnMob(wy, scale, band) {
   const d = G.dist;
+  const P = par(d), S = G.soldiers;
   let n = band
-    ? Math.max(threatBase(d) * 2, G.soldiers * (0.55 + 0.45 * clamp((d - 300) / 1000, 0, 1)) * rnd(0.9, 1.1) * (1 + Math.max(0, d - 1300) / 2500))
-    : Math.max(threatBase(d), G.soldiers * threatRatio(d)) * rnd(0.8, 1.15) * (scale || 1);
+    ? Math.max(threatBase(d) * 2, (P * (0.55 + 0.5 * clamp((d - 300) / 1300, 0, 1)) + S * 0.2) * rnd(0.9, 1.1))
+    : Math.max(threatBase(d), P * threatRatio(d) + S * 0.12) * rnd(0.8, 1.15) * (scale || 1);
   n = Math.max(4, Math.round(n));
   const uh = unitHp(d);
   const vis = Math.min(n, MOB_VIS);
@@ -1830,7 +1849,7 @@ function killMob(m, how) {
   const loot = Math.max(2, Math.round(Math.sqrt(m.start) * (m.band ? 1.6 : 0.9)));
   for (let i = 0; i < Math.min(loot, 14) && coins.length < MAXCOIN; i++)
     coins.push({ x: clamp(m.x + rnd(-m.hw, m.hw), road.x0 + 20, road.x1 - 20), wy: m.wy + rnd(-m.hd, m.hd), spin: rnd(0, 6), fly: 0.25 + i * 0.04 });
-  floatText(m.x, m.wy, m.band ? 'WAR BAND BROKEN!' : how === 'shot' ? 'WIPED OUT!' : 'CRUSHED!', '#ffd75d', m.band ? 32 : how === 'shot' ? 26 : 30, 3.4);
+  floatText(m.x, m.wy, m.band ? L('WAR BAND BROKEN!', 'PASUKAN HANCUR!') : how === 'shot' ? L('MOB DOWN!', 'TUMBANG!') : L('CRUSHED!', 'DIGILAS!'), '#ffd75d', m.band ? 32 : how === 'shot' ? 26 : 30, 3.4);
   for (let i = 0; i < 28 && parts.length < MAXP - 30; i++) parts.push(mkPart(m.x + rnd(-m.hw, m.hw), m.wy + rnd(-m.hd, m.hd), i % 3 ? '#ff5d6a' : '#ffd75d'));
   for (let i = 0; i < Math.min(10, mobVisible(m)); i++) {
     const u = m.units[i];
@@ -1878,7 +1897,7 @@ function bossBits(boss) {
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
 function spawnBoss(wy) {
   const d = G.level;
-  const hp = Math.round(42 + d * 46 + G.soldiers * 1.5 * (1 + G.dist / 1400));
+  const hp = Math.round(42 + d * 46 + (par(G.dist) * 0.6 + G.soldiers * 0.4) * 1.5 * (1 + G.dist / 1400));
   const bx = (road.x0 + road.x1) / 2 + rnd(-60, 60);
     const boss = mkEnemy('boss', bx, wy, hp);
   boss.roar = 1;
@@ -2152,6 +2171,9 @@ function bannerFlash(text, color) {
   zoneBanner.style.opacity = '1';
   clearTimeout(bannerT);
   bannerT = setTimeout(() => { zoneBanner.style.opacity = '0'; }, 1500);
+  bannerUntil = performance.now() + 1700;
+  /* one message at a time in the middle of the screen */
+  if (toastEl && toastEl.classList.contains('on')) toastEl.classList.add('hush');
 }
 let bannerT = null;
 /* the first time each hazard shows up, say what to do about it, once ever */
@@ -2360,7 +2382,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -2396,7 +2418,13 @@ function offerSkills() {
   if (!pool.length) return;
   const bag = pool.slice();
   const picks = [];
+  /* every offer has at least one way to shoot harder, so a level-up never feels like a tax form */
+  const FIGHT = ['pierce', 'split', 'rate', 'dmg', 'crit', 'chain'];
+  const fight = bag.filter((s) => FIGHT.includes(s.id));
+  if (fight.length) { const f = fight[ri(0, fight.length - 1)]; picks.push(f); bag.splice(bag.indexOf(f), 1); }
   while (picks.length < 3 && bag.length) picks.push(bag.splice(ri(0, bag.length - 1), 1)[0]);
+  /* shuffle so the fight card is not always first */
+  for (let i = picks.length - 1; i > 0; i--) { const j = ri(0, i); [picks[i], picks[j]] = [picks[j], picks[i]]; }
   skillCards.innerHTML = '';
   for (const s of picks) {
     const btn = document.createElement('button');
@@ -2769,16 +2797,23 @@ function missionToast(text, reward, title) {
   toastQ.push({ text, reward, title });
   if (toastQ.length === 1) showToast();
 }
+let bannerUntil = 0;
+function toastBlocked() {
+  if (G.mode !== 'run') return false;
+  if (performance.now() < bannerUntil) return true;
+  return gates.some((g) => !g.passed && g.wy > G.camY && g.wy - G.camY < 560);
+}
 function showToast() {
   if (!toastEl || !toastQ.length) return;
   const q = toastQ[0];
+  if (toastBlocked() && (q.wait = (q.wait || 0) + 1) < 16) { setTimeout(showToast, 400); return; }
   toastEl.innerHTML = `<div class="chip">${icon(q.title ? 'crown' : 'check')}</div><div><b>${q.title || L('MISSION DONE', 'MISI SELESAI')}</b>${q.text} · +${q.reward}${COIN}</div>`;
   toastEl.classList.toggle('rank', !!q.title);
   toastEl.classList.add('on');
   sfx.great(); vib(25);
   clearTimeout(toastT);
   toastT = setTimeout(() => {
-    toastEl.classList.remove('on');
+    toastEl.classList.remove('on', 'hush');
     setTimeout(() => { toastQ.shift(); showToast(); }, 380);
   }, 2300);
 }

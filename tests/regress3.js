@@ -41,19 +41,18 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(r5 === 'run', 'no skill picker pops up after a revive (' + r5 + ')');
 
-  // 3. geometry count stays flat across many gates
+  // 3. geometry count stays flat once every kind of object has been drawn once
   const r3 = await p.evaluate(() => {
-    const M = window.__mob; M.SIM.on = true; M.startGame();
-    const g0 = M.rmem.geometries;
-    for (let i = 0; i < 60 * 120; i++) { if (M.G.mode === 'pick') M.chooseSkill('dmg'); if (M.G.mode !== 'run') { M.G.mode = 'run'; M.G.soldiers = 400; } M.update(1 / 60); M.G.soldiers = Math.max(M.G.soldiers, 200); if (i % 30 === 0) M.draw(performance.now() + i * 16); }
-    const g1 = M.rmem.geometries;
-    M.startGame();
-    for (let i = 0; i < 60 * 120; i++) { if (M.G.mode === 'pick') M.chooseSkill('dmg'); if (M.G.mode !== 'run') { M.G.mode = 'run'; M.G.soldiers = 400; } M.update(1 / 60); M.G.soldiers = Math.max(M.G.soldiers, 200); if (i % 30 === 0) M.draw(performance.now() + i * 16); }
-    const g2 = M.rmem.geometries;
+    const M = window.__mob; M.SIM.on = true; const g = [];
+    for (let pass = 0; pass < 5; pass++) {
+      M.startGame();
+      for (let i = 0; i < 60 * 120; i++) { if (M.G.mode === 'pick') M.chooseSkill('dmg'); if (M.G.mode !== 'run') { M.G.mode = 'run'; M.G.soldiers = 400; } M.update(1 / 60); M.G.soldiers = Math.max(M.G.soldiers, 200); if (i % 30 === 0) M.draw(performance.now() + i * 16); }
+      g.push(M.rmem.geometries);
+    }
     M.SIM.on = false;
-    return [g0, g1, g2, Math.floor(M.G.dist)];
+    return g;
   });
-  assert(r3[2] - r3[1] <= 3, 'after warm-up, a second long run adds no geometry (' + r3.join(' / ') + ')');
+  assert(r3[4] - r3[2] <= 3, 'after warm-up, more long runs add no geometry (' + r3.join(' / ') + ')');
   console.log(errs.length ? errs.join('\n') : 'no page errors');
   await b.close();
 })();
