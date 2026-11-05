@@ -1681,14 +1681,6 @@ function spawnBoss(wy) {
   scene.add(aura);
   boss.aura = aura;
   enemies.push(boss);
-  zoneBanner.textContent = 'BOSS';
-  zoneBanner.style.color = '#e25a32';
-  zoneBanner.classList.remove('go');
-  void zoneBanner.offsetWidth;
-  zoneBanner.classList.add('go');
-  zoneBanner.style.opacity = '1';
-  setTimeout(() => { zoneBanner.style.opacity = '0'; }, 1500);
-  setTimeout(() => { zoneBanner.style.color = ''; }, 1700);
   if (d >= 3 && chance(0.5)) {
     enemies.push(mkEnemy('normal', clamp(bx - 60, road.x0 + 16, road.x1 - 16), wy + 40, Math.round(10 + d * 4)));
     enemies.push(mkEnemy('normal', clamp(bx + 60, road.x0 + 16, road.x1 - 16), wy + 40, Math.round(10 + d * 4)));
@@ -1950,6 +1942,37 @@ function showHint(text, secs) {
   hintT = secs;
 }
 function hitstop(t) { G.slow = Math.max(G.slow, t); }
+/* a little coin flies from the pickup to the HUD counter; pooled DOM, capped */
+const flyPool = [];
+let flyNext = 0;
+function coinToHud(x, wy) {
+  if (!hudCoins || flyPool.length >= 10 && performance.now() < flyNext) return;
+  flyNext = performance.now() + 45;
+  const [sx, sy, zz] = project(wx(x), 1.1, wz(wy));
+  if (zz > 1) return;
+  const r = hudCoins.getBoundingClientRect();
+  let el = flyPool.find((f) => !f.busy);
+  if (!el) {
+    if (flyPool.length >= 10) return;
+    const d = document.createElement('span');
+    d.className = 'coin flycoin';
+    document.body.appendChild(d);
+    el = { d, busy: false };
+    flyPool.push(el);
+  }
+  el.busy = true;
+  const d = el.d;
+  d.style.transition = 'none';
+  d.style.transform = `translate(${sx}px,${sy}px) scale(1.2)`;
+  d.style.opacity = '1';
+  void d.offsetWidth;
+  d.style.transition = 'transform .42s cubic-bezier(.5,0,.75,.4), opacity .42s ease-in';
+  d.style.transform = `translate(${r.left + 14}px,${r.top + r.height / 2}px) scale(.7)`;
+  setTimeout(() => {
+    d.style.opacity = '0'; el.busy = false;
+    hudCoins.classList.remove('pop'); void hudCoins.offsetWidth; hudCoins.classList.add('pop');
+  }, 420);
+}
 function vib(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { } }
 const vigEl = document.getElementById('vignette');
 let vigT = null, lastDanger = false;
@@ -3192,6 +3215,12 @@ function update(dt) {
     if (e.kind === 'gold' && Math.random() < 0.22 && parts.length < MAXP - 4)
       parts.push(mkPart(e.x + rnd(-8, 8), e.wy + rnd(-6, 6), '#ffd75d'));
     if (e.roar) e.roar -= dt * 1.4;
+    /* boss entrance: name card, roar, a jolt, the moment it comes into view */
+    if (e.boss && !e.introduced && e.wy - G.camY < 980) {
+      e.introduced = true; e.roar = 1;
+      bannerFlash(e.shooter ? 'GUNNER BOSS!' : 'BRUTE BOSS!', '#ff5d4a');
+      sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
+    }
     /* shooter bosses lob orbs at the squad while in range */
     if (e.shooter && !e._dead) {
       e.fireT -= dt;
@@ -3411,6 +3440,7 @@ function update(dt) {
       G.coinFrac -= gain;
       G.coins += gain; G.coinsRun += gain; G.coinsPicked += 1; G.coinsPickedVal += gain; touchSave();
       coinLadder();
+      coinToHud(c.x, c.wy);
       if (parts.length < partCap && Math.random() < 0.4) parts.push(mkPart(c.x, c.wy, '#ffd75d'));
       coins.splice(i, 1);
       continue;
@@ -3476,7 +3506,7 @@ const tmpCol = new THREE.Color();
 let soldierOffsets = [];
 let soldierBirth = [];
 
-let lastDraw = performance.now(), camIntro = 0;
+let lastDraw = performance.now(), camIntro = 0, deathCam = 0;
 function draw(now) {
   const t = now * 0.001;
   /* real frame time: animations run the same speed at 60, 90 or 120 Hz */
@@ -3539,7 +3569,11 @@ function draw(now) {
   /* run start: the camera swoops down from a high wide shot into the chase cam */
   if (camIntro > 0) camIntro = Math.max(0, camIntro - FD / 0.9);
   const swoop = camIntro * camIntro * (3 - 2 * camIntro);
-  camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9, 12.5 + camZoom + swoop * 7);
+  /* dying: ease the camera in on the squad as it falls apart */
+  const doomK = G.mode === 'dying' ? clamp(1 - deathT / 0.78, 0, 1) : G.mode === 'over' ? 1 : 0;
+  deathCam += (doomK - deathCam) * Math.min(1, FD * 6);
+  const push = deathCam * deathCam * (3 - 2 * deathCam);
+  camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9 - push * 4.2, 12.5 + camZoom + swoop * 7 - push * 5.5);
   camera.lookAt(axw * 0.35, 1.0 - swoop * 0.5, -12 - swoop * 10);
   camera.rotateZ(bank);
   /* wide screens see too much empty roadside at 62deg: tighten so the road fills the frame */
@@ -4228,7 +4262,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
