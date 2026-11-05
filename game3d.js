@@ -808,9 +808,19 @@ deadSoldierMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(deadSoldierMesh);
 
 /* --- enemies: merged multi-part geo per kind, feet at y=0 --- */
+const FACE = {
+  runner: [1.05, 0.3, 0.55], normal: [1.55, 0.45, 0.9], brute: [1.8, 0.62, 1.2], split: [1.55, 0.45, 0.95],
+  gold: [1.5, 0.45, 0.9], leaper: [1.15, 0.32, 0.7], boss: [2.55, 0.75, 1.7],
+};
 function enemyGeo(kind) {
   const HORN = '#2a1018';
   const parts = [];
+  /* a grumpy mouth with three fangs, sitting just under the eyes */
+  const F = FACE[kind] || FACE.normal;
+  const mY = F[0] - 0.36 * F[2], mZ = F[1] - 0.02;
+  parts.push({ geo: BOX(0.44 * F[2], 0.12 * F[2], 0.08), m: M4(0, mY, mZ, 0, 0, 0), c: '#2a0f1a' });
+  for (const k of [-1, 0, 1])
+    parts.push({ geo: CONE(0.05 * F[2], 0.12 * F[2]), m: M4(k * 0.13 * F[2], mY + 0.01 * F[2], mZ + 0.05, Math.PI, 0, 0), c: '#fff6e0' });
   const body = (r, l, cy, sx, sy, sz) =>
     parts.push({ geo: CAP(r, l), m: M4(0, cy, 0, 0, 0, 0, sx || 1, sy || 1, sz || 1), c: '#ffffff' });
   const horn = (x, y, z, rx, rz, r, h) =>
@@ -885,9 +895,16 @@ const mobUnitMesh = new THREE.InstancedMesh(EDEF.runner.geo,
 mobUnitMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(mobUnitMesh);
 const MAXE = 320;
-const eyeMesh = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.5, 0.14, 0.07),
-  new THREE.MeshBasicMaterial({ color: 0xffffff }), MAXE);
+const eyeGeo = mergeParts([
+  { geo: new THREE.SphereGeometry(0.15, 10, 8), m: M4(-0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
+  { geo: new THREE.SphereGeometry(0.15, 10, 8), m: M4(0.15, 0, 0, 0, 0, 0, 1, 1, 0.55), c: '#ffffff' },
+  { geo: new THREE.SphereGeometry(0.07, 8, 6), m: M4(-0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
+  { geo: new THREE.SphereGeometry(0.07, 8, 6), m: M4(0.13, -0.02, 0.07, 0, 0, 0, 1, 1, 0.5), c: '#1b1430' },
+  { geo: BOX(0.24, 0.06, 0.06), m: M4(-0.15, 0.14, 0.06, 0, 0, -0.42), c: '#1b1430' },
+  { geo: BOX(0.24, 0.06, 0.06), m: M4(0.15, 0.14, 0.06, 0, 0, 0.42), c: '#1b1430' },
+]);
+const eyeMesh = new THREE.InstancedMesh(eyeGeo,
+  new THREE.MeshBasicMaterial({ vertexColors: true }), MAXE);
 eyeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(eyeMesh);
 
@@ -3941,7 +3958,7 @@ function draw(now) {
         shadowMesh.setMatrixAt(shI++, dummy.matrix);
       }
     }
-    const labelY = e.boss ? Math.min(3.3, s * 2.15 + 0.45) : s * d.labelY + 0.4;
+    const labelY = e.boss ? s * 3.05 + 0.3 : s * d.labelY + 0.4;
     setLabel(e.label, wx(e.x), labelY, zP, String(Math.ceil(e.hp)));
     if (e.attacking) e.label.style.color = '#ffb0a0';
     else e.label.style.color = '';
@@ -4331,7 +4348,7 @@ function draw(now) {
 /* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
-    G, SIM, META, UPGRADES, beginDeath, update, draw, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
+    G, SIM, META, UPGRADES, beginDeath, update, draw, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },
     get gates() { return gates; }, get enemies() { return enemies; }, get walls() { return walls; },
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
