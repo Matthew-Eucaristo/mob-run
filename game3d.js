@@ -1770,7 +1770,8 @@ const PIECES = [
       const free = ri(0, 2);
       for (let i = 0; i < 6; i++) {
         const opts = [0, 1, 2].filter((k) => k !== free);
-        const m = spawnMeteor(wy + i * 115); m.x = lanes[opts[i % 2]] + rnd(-12, 12);
+        /* six rocks in a row: smaller and gentler each, so the shower tests you without wiping you */
+        const m = spawnMeteor(wy + i * 115); m.x = lanes[opts[i % 2]] + rnd(-12, 12); m.r = 50; m.shower = true;
       }
     } },
   { title: L('SAW GAUNTLET', 'LORONG GERGAJI'), sub: L('Three blades, one squad.', 'Tiga gergaji, satu pasukan.'), len: 920,
@@ -4211,7 +4212,7 @@ function update(dt) {
           const share = insideShare(inDisc);
           if (share === 0 && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
           if (share > 0) {
-            loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * (h.stomp ? 0.6 : 0.7))), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE', inDisc);
+            loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * (h.stomp ? 0.5 : h.shower ? 0.35 : 0.5))), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE', inDisc);
             dmgFlash(); vib(50);
           }
           for (const e of enemies)
