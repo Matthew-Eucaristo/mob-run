@@ -83,11 +83,23 @@ const pauseOv = document.getElementById('pauseOverlay');
 const pauseBtn = document.getElementById('pauseBtn');
 if (pauseBtn) pauseBtn.innerHTML = icon('pause');
 if (pauseBtn) pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); setPause(true); });
+let quitArmedAt = 0;
 if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
   const id = e.target.closest && e.target.closest('button') && e.target.closest('button').id;
-  if (id === 'pauseSet') { renderSettings(); if (setOv) setOv.style.display = 'flex'; return; }
+  if (id === 'pauseSet') { renderSettings(); if (setOv) { setOv.style.display = 'flex'; setOv.scrollTop = 0; } return; }
   if (id === 'pauseQuit') {
+    /* ending a run takes two taps: the first one only asks */
+    const qb = document.getElementById('pauseQuit');
+    if (!(performance.now() - quitArmedAt < 2200)) {
+      quitArmedAt = performance.now();
+      if (!qb.dataset.label) qb.dataset.label = qb.textContent;
+      qb.textContent = L('TAP AGAIN TO END', 'KETUK LAGI UNTUK SELESAI');
+      setTimeout(() => { if (qb.dataset.label) qb.textContent = qb.dataset.label; quitArmedAt = 0; }, 2200);
+      sfx.bad(); vib(15);
+      return;
+    }
+    quitArmedAt = 0; if (qb.dataset.label) qb.textContent = qb.dataset.label;
     /* quitting still banks the run: coins, distance bonus, missions */
     pauseOv.style.display = 'none';
     G.quit = true;
@@ -1566,6 +1578,7 @@ function spawnMeteor(wy) {
   scene.add(grp);
   h.grp = grp; h.ring = ring; h.rock = rock; h.warn = warn;
   hazards.push(h);
+  return h;
 }
 
 function spawnHazard(wy, forced) {
@@ -1653,7 +1666,7 @@ function spawnHazard(wy, forced) {
     scene.add(grp);
     h.grp = grp;
     hazards.push(h);
-  } else if (G.dist > 180) {
+  } else if (G.dist > 180 || forced !== undefined) {
     /* hole in the asphalt — anyone standing on it drops */
     const wpx = (road.x1 - road.x0) * rnd(0.28, 0.55);
     const len = rnd(78, 140);
@@ -1753,7 +1766,7 @@ const PIECES = [
   { title: L('THE SQUEEZE', 'JEPITAN'), sub: L('Swipe up. Breathe in.', 'Geser ke atas. Tahan napas.'), len: 760,
     make: (wy) => { spawnHazard(wy, 0.62); spawnCoinLine(wy + 200); spawnHazard(wy + 380, 0.62); } },
 ];
-let pieceZone = -1, pieceAt = 0;
+let pieceZone = -1, pieceAt = 0, lastPieceY = -1e9, lastBossY = -1e9;
 const pieceMarks = [];
 function schedule() {
   const heat = clamp((G.dist - 220) / 1900, 0, 1);
@@ -1767,10 +1780,11 @@ function schedule() {
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += Math.max(170, 350 - Math.max(0, G.dist - 900) * 0.2); spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
     /* the zone's set-piece, ~70m into the zone (never in the first 100m of a run) */
+    if (pieceZone >= 0 && nextY / 40 > pieceAt && nextY - lastBossY < 2500) pieceAt += 20;
     if (pieceZone >= 0 && nextY / 40 > pieceAt) {
       const pc = PIECES[pieceZone % PIECES.length];
       pc.make(nextY);
-      pieceMarks.push({ wy: nextY, pc });
+      pieceMarks.push({ wy: nextY, pc }); lastPieceY = nextY;
       nextY += pc.len + 300;
       pieceZone = -1;
       continue;
@@ -1802,7 +1816,10 @@ function schedule() {
     if (G.dist > 400 && step > 640 && chance(0.55)) { if (chance(0.6)) spawnPack(nextY + step * 0.5); else spawnBarrels(nextY + step * 0.5); }
     nextY += step;
     bossCounter += 1;
-    if (bossCounter >= (G.dist < 450 ? 10 : 6)) { bossCounter = 0; spawnBoss(nextY + 140); nextY += 900; }
+    /* a boss fight needs the road to itself: room for the whole showdown, and never on top of a set-piece */
+    if (bossCounter >= (G.dist < 450 ? 10 : 6) && Math.abs(nextY - lastPieceY) > 2500 && pieceZone < 0) {
+      bossCounter = 0; spawnBoss(nextY + 140); lastBossY = nextY; nextY += 600 + 8 * G.speed;
+    }
   }
 }
 
@@ -2074,8 +2091,8 @@ function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.re
 /* three recurring rivals, each with a name and a mouth on them */
 const BOSSES = {
   brute: { name: L('MURGO THE WALL', 'MURGO SI TEMBOK'), taunts: L(
-    ["Murgo doesn't move. You do.", 'He ate the last squad.', 'Big, slow, and very, very rude.'],
-    ['Murgo tak bergeser. Kamu yang minggir.', 'Dia memakan pasukan terakhir.', 'Besar, lambat, dan sangat tidak sopan.']) },
+    ["He's coming. Slowly. Loudly.", 'He ate the last squad.', 'Big, slow, and very, very rude.'],
+    ['Dia datang. Pelan. Berisik.', 'Dia memakan pasukan terakhir.', 'Besar, lambat, dan sangat tidak sopan.']) },
   gunner: { name: L('AUNTIE BOOM', 'BIBI BOOM'), taunts: L(
     ["She brought snacks. They're on fire.", 'Duck. No, the other way.', 'Every orb is a hug.'],
     ['Dia bawa camilan. Camilannya terbakar.', 'Menunduk! Bukan, ke arah lain.', 'Setiap bola api adalah pelukan.']) },
@@ -2238,6 +2255,7 @@ function overflow(extra) {
   G.upDmg += dmg;
   /* the surplus isn't lost: a third of it waits in reserve and marches in after the next clash */
   const banked = Math.min(RESERVE_CAP - G.reserve, Math.round(extra * 0.35));
+  if (!META.seen.cap) { META.seen.cap = true; showHint(L('ARMY FULL · extras wait in reserve and refill you after a fight', 'PASUKAN PENUH · sisanya jadi cadangan, mengisi lagi setelah bentrok'), 5); }
   if (banked > 0) G.reserve += banked;
   const txt = dmg ? L('MAX ARMY! GUN DMG +', 'PASUKAN PENUH! DAMAGE +') + dmg
     : banked > 0 ? L('RESERVE +', 'CADANGAN +') + fmtNum(banked) : '';
@@ -2333,7 +2351,8 @@ function applyGate(g) {
     if (g.meshes && g.meshes[side]) { const mat = g.meshes[side].material, old = mat.map; mat.map = panelTex({ ...pp.res, gold: false }); mat.needsUpdate = true; if (old) old.dispose(); }
     (good ? sfx.fanfare : sfx.bad)();
   }
-  const lab = gunUp && delta === 0 ? L('WEAPON UP!', 'SENJATA NAIK!') : ((delta >= 0 ? '+' : '') + delta);
+  /* at the cap a green gate feeds the reserve, and says so instead of a number that changes nothing */
+  const lab = gunUp && delta === 0 ? L('WEAPON UP!', 'SENJATA NAIK!') : (army >= ARMY_CAP && delta > 0) ? L('→ RESERVE', '→ CADANGAN') : ((delta >= 0 ? '+' : '') + delta);
   const tag = split ? (gateLabel(lp) + ' | ' + gateLabel(rp) + '  ') : '';
   floatText(G.armyX, G.camY + 10, tag + lab,
     good ? '#ffd75d' : '#ff5d6a', split || gunUp ? 26 : 24, 3.4);
@@ -2620,7 +2639,7 @@ function startGame() {
   armyRoll = G.soldiers;
   G.rankUp = null; G.reserve = 0; G.reserveFlow = 0; G.reserveMsgT = -9; G.coinsRun = 0; G.coinsPicked = 0; G.coinsPickedVal = 0; G.bonusTotal = 0; G.gunUps = 0; G.rescued = 0; G.grace = 0; G.closeCalls = 0; G.lifeBanked = null; G.quit = false; G.overflowMsgT = -9; G.steered = false; G.missionCoins = 0; G.coinFrac = 0; G.bonusPaid = 0; G.time = 0; G.cause = ''; G.mobsBeaten = 0; G.bossKills = 0; G.wallsBroken = 0; G.gateStreakBest = 0;
   clearWorld();
-  nextY = LH * 0.55; skillDelay = 0; pendingZone = null; pieceZone = -1; pieceMarks.length = 0; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
+  nextY = LH * 0.55; skillDelay = 0; pendingZone = null; pieceZone = -1; pieceMarks.length = 0; lastPieceY = -1e9; lastBossY = -1e9; crowdS = 1; firstMob = false; nextBand = 320; nextWall = 170; bossCounter = 0; gatesSpawned = 0; sinceGate = 0; fireAcc = 0; drainAcc = 0; fallAcc = 0;
   hintT = 0; zoneIdx = -1;
   if (hintEl) hintEl.textContent = document.body.classList.contains('touch') ? 'swipe sideways to steer · up for a column · down to spread wide' : '← → steer · ↑ column · ↓ spread wide'; distMark = 0; revived = false; lastLevel = 1; bossIntro = false; deathT = 0;
   startOv.style.display = 'none'; overOv.style.display = 'none'; overOv.classList.remove('on');
@@ -2803,6 +2822,7 @@ function gameOver() {
   }
   saveSave();
   overOv.style.display = 'flex';
+  overOv.scrollTop = 0;   /* a tall results screen always opens at its top */
   overOv.classList.remove('on');
   void overOv.offsetWidth;
   overOv.classList.add('on');
@@ -2960,7 +2980,7 @@ function bestBuy() {
     const c = u.cost(l);
     /* suggest what changes the next run most: a better starting gun, then firepower,
        then the cheapest of the rest */
-    const w = u.id === 'gun' ? 0.35 : u.id === 'fire' ? 0.6 : 1;
+    const w = u.id === 'gun' ? 0.35 : u.id === 'fire' ? 0.6 : u.id === 'army' ? 1.6 : 1;
     if (c <= G.coins && (!pick || c * w < pick.c * pick.w)) pick = { u, l, c, w };
   }
   return pick;
@@ -3008,7 +3028,7 @@ function renderSettings() {
   if (list) list.innerHTML = rows.map(([id, ic, name, on]) =>
     `<button type="button" class="setRow" data-k="${id}"><i>${icon(ic)}</i><b>${name}</b><span class="tog${on ? ' on' : ''}"><u></u></span></button>`).join('') +
     (G.mode === 'menu' || G.mode === 'over'
-      ? `<button type="button" class="setRow" data-k="lang"><i>${icon('share')}</i><b>${L('LANGUAGE', 'BAHASA')}</b><span class="langTag">${LANG === 'id' ? 'INDONESIA' : 'ENGLISH'}</span></button>` : '');
+      ? `<button type="button" class="setRow" data-k="lang"><i>${icon('talk')}</i><b>${L('LANGUAGE', 'BAHASA')}</b><span class="langTag">${LANG === 'id' ? 'INDONESIA' : 'ENGLISH'}</span></button>` : '');
 }
 if (setOv) {
   setOv.addEventListener('pointerdown', (e) => {
@@ -3031,7 +3051,7 @@ if (setOv) {
     if (e.target.closest && e.target.closest('#setClose')) setOv.style.display = 'none';
   });
 }
-if (muteBtn) muteBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); renderSettings(); if (setOv) setOv.style.display = 'flex'; });
+if (muteBtn) muteBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); audio(); renderSettings(); if (setOv) { setOv.style.display = 'flex'; setOv.scrollTop = 0; } });
 if (dailyBtn) dailyBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation(); e.preventDefault(); audio();
   if (!dailyReady()) return;
@@ -3273,7 +3293,7 @@ function openShop(e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   audio();
   renderShop();
-  if (shopOv) shopOv.style.display = 'flex';
+  if (shopOv) { shopOv.style.display = 'flex'; shopOv.scrollTop = 0; }
   shopOpenAt = performance.now();
 }
 function closeShop(e) {
@@ -3730,7 +3750,7 @@ function update(dt) {
   const wt = WT[G.tier];
   const shooters = Math.min(G.soldiers, Q.low ? 22 : Q.phone ? 32 : 60);
   const stand = (G.soldiers < 18 && G.skills.laststand) ? (1 + 0.22 * G.skills.laststand) : 1;
-  const dmgPerBullet = (wt.dmg + G.upDmg) * Math.max(1, Math.ceil(G.soldiers / Math.max(1, shooters))) * stand * (1 + (META.up.fire || 0) * 0.04);
+  const dmgPerBullet = 1.15 * (wt.dmg + G.upDmg) * Math.max(1, G.soldiers / Math.max(1, shooters)) * stand * (1 + (META.up.fire || 0) * 0.04);
   let rate = Math.max(0.04, wt.rate - G.upRate);
   rate *= 1 - Math.min(0.4, (G.skills.rate || 0) * 0.1);
   if (stand > 1) rate *= 1 - 0.1 * (G.skills.laststand || 0);
@@ -3878,9 +3898,14 @@ function update(dt) {
       if (dA < -(sr + 40) || dA > 1400) continue;
       const dx = b.x - e.x, dy = b.wy - e.wy;
       if (dx * dx + dy * dy < (e.r + 6) * (e.r + 6)) {
+        const hpBefore = e.hp;
         hurt(e, b.dmg);
         if (!b.pierced) b.pierced = [];
         b.pierced.push(e);
+        /* overkill carries on: a heavy bullet that drops a small monster keeps its leftover damage,
+           so fewer, heavier bullets (low quality) hit as hard as many light ones */
+        const left = e.boss ? 0 : b.dmg - Math.max(0, hpBefore);
+        if (e.hp <= 0 && left > 0.5) { b.dmg = left; break; }
         if ((b.pierce || 0) > 0) b.pierce -= 1;
         else hit = true;
         break;
@@ -3973,6 +3998,15 @@ function update(dt) {
       e.fightT += dt;
       e.budget = Math.min(e.maxhp * 0.22, (e.budget ?? 0) + e.maxhp * 0.22 * dt);
       /* after a short stomp through the squad it lumbers past and falls behind */
+      if (!e.shooter && !e.splitter && e.fightT > 1.2 && e.fightT < 6.4) {
+        e.stompT = (e.stompT ?? 0.6) - dt;
+        if (e.stompT <= 0) {
+          e.stompT = 2.4;
+          const st = spawnMeteor(G.camY + G.speed * 1.3);
+          st.x = clamp(G.armyX, road.x0 + 40, road.x1 - 40); st.r = 72; st.stomp = true;
+          e.roar = 0.6; vib(20);
+        }
+      }
       const hold = Math.max(0, 500 - e.fightT * 75);
       if (e.fightT < 8.2 && e.wy - G.camY < hold) e.wy = G.camY + hold;
     }
@@ -3987,7 +4021,10 @@ function update(dt) {
         tone(210, 0.13, 'sawtooth', 0.05, 120);
       }
     }
-    if (e.wy < G.camY - 320) { e.label.remove(); dropBossBits(e); enemies.splice(i, 1); continue; }
+    if (e.wy < G.camY - 320) {
+      if (e.boss && e.hp > 0 && e.introduced) floatText(G.armyX, G.camY + 60, bossTitle(e) + L(' GOT AWAY', ' KABUR'), '#ff8d6a', 20, 4.4);
+      e.label.remove(); dropBossBits(e); enemies.splice(i, 1); continue;
+    }
     const near = e.wy - G.camY < sr + e.r && e.wy - G.camY > -(sr + e.r + 90);
     e.attacking = near && Math.abs(e.x - G.armyX) < sr + e.r;
     if (e.attacking && doDrain) {
@@ -4078,11 +4115,12 @@ function update(dt) {
       parts.push({ x: sawX(h) + rnd(-10, 10), wy: h.wy + rnd(-8, 8), h: 0.15,
         vx: rnd(-40, 40), vwy: rnd(-20, 20), vh: rnd(1, 4), t: 0, life: rnd(0.2, 0.45), color: '#ffd75d' });
     if (h.kind === 'meteor') {
-      if (!h.armed && h.wy - G.camY < 560) { h.armed = true; h.tImpact = 1.15; }
+      /* land as the squad arrives: the warning ring is up long before, the rock comes down on time */
+      if (!h.armed && h.wy - G.camY < G.speed * 1.25) { h.armed = true; h.tImpact = h.t0 = Math.max(0.45, (h.wy - G.camY) / G.speed); }
       if (h.armed) {
         h.tImpact -= dt;
         if (Math.random() < 0.5 && parts.length < MAXP - 4)
-          parts.push({ x: h.x + rnd(-8, 8), wy: h.wy, h: 28 * Math.max(0, h.tImpact / 1.15) + rnd(1, 4),
+          parts.push({ x: h.x + rnd(-8, 8), wy: h.wy, h: 28 * Math.max(0, h.tImpact / (h.t0 || 1.15)) + rnd(1, 4),
             vx: 0, vwy: 0, vh: 2.5, t: 0, life: 0.28, color: '#ffb03d' });
         if (h.tImpact <= 0) {
           h.dead = true; h.deadT = 0;
@@ -4094,7 +4132,7 @@ function update(dt) {
           if (dd >= h.r + sr && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
           if (dd < h.r + sr) {
             const frac = clamp(1 - dd / (h.r + sr), 0.15, 1);
-            loseSoldiers(Math.max(3, Math.ceil(G.soldiers * 0.4 * frac)), 'METEOR STRIKE');
+            loseSoldiers(Math.max(3, Math.ceil(G.soldiers * (h.stomp ? 0.22 : 0.3) * frac)), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE');
             for (let k = 0; k < 4; k++) flingSoldier();
             dmgFlash(); vib(50);
           }
@@ -4126,7 +4164,8 @@ function update(dt) {
         ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(G.armyX - h.gapX) + sr * 0.75 > h.gapW / 2
         : Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) < h.r + sr * 0.75;
     if (touching) {
-      hazDmg += h.drain;
+      /* a flat bite plus a share of the army, so a saw still matters to 9,000 soldiers */
+      hazDmg += h.drain + G.soldiers * 0.025;
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
       G.shake = Math.max(G.shake, 3);
       dmgFlash(); vib(25);
@@ -4831,7 +4870,7 @@ function draw(now) {
         h.rock.visible = h.warn.visible = false;
         h.ring.material.opacity = Math.max(0, 0.6 - h.deadT * 1.4);
       } else if (h.armed) {
-        const f = clamp(1 - h.tImpact / 1.15, 0, 1);
+        const f = clamp(1 - h.tImpact / (h.t0 || 1.15), 0, 1);
         h.rock.visible = h.warn.visible = true;
         h.rock.position.set(wx(h.x), 30 * (1 - f) + 0.4, 0);
         h.rock.rotation.x = t * 7; h.rock.rotation.y = t * 9;
@@ -5018,7 +5057,8 @@ function draw(now) {
   /* HUD: the army number rolls toward the real count, green up / red down */
   if (hudReserve) {
     const rs = G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' ? Math.round(G.reserve || 0) : 0;
-    const txt = rs > 0 ? '+' + fmtNum(rs) + ' ' + L('reserve', 'cadangan') : '';
+    const full = (G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused') && G.soldiers >= ARMY_CAP;
+    const txt = (full ? L('MAX', 'PENUH') + (rs > 0 ? ' · ' : '') : '') + (rs > 0 ? '+' + fmtNum(rs) + ' ' + L('reserve', 'cadangan') : '');
     if (hudReserve.textContent !== txt) hudReserve.textContent = txt;
     hudReserve.style.display = txt ? '' : 'none';
   }
@@ -5078,7 +5118,8 @@ function draw(now) {
   if (pauseBtn) pauseBtn.style.display = G.mode === 'run' ? 'block' : 'none';
   const formHud = document.getElementById('hudForm');
   if (formHud) { const on = G.mode === 'run' || G.mode === 'pick'; formHud.style.opacity = on ? '1' : '0'; formHud.style.pointerEvents = on ? 'auto' : 'none'; }
-  hintEl.style.opacity = hintT > 0 && G.mode === 'run' ? '0.9' : '0';
+  /* a banner owns the middle of the screen while it is up: the tip steps aside */
+  hintEl.style.opacity = hintT > 0 && G.mode === 'run' && performance.now() > bannerUntil ? '0.9' : '0';
   if (tutEl) tutEl.classList.toggle('on', G.mode === 'run' && !G.steered && META.runs <= 3 && G.time > 0.6 && G.time < 14);
   labelsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
   floatsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';

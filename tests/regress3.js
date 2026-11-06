@@ -16,7 +16,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await p.waitForTimeout(1000);
   await p.click('#againBtn'); await p.waitForTimeout(1200);
   await p.click('#pauseBtn'); await p.waitForTimeout(200);
-  await p.click('#pauseQuit'); await p.waitForTimeout(400);
+  await p.click('#pauseQuit'); await p.waitForTimeout(150); await p.click('#pauseQuit'); await p.waitForTimeout(400);
   const h2 = await p.evaluate(() => window.__mob.META.hist.length);
   assert(h2 === h1 + 1, 'END RUN adds its own history entry (' + h1 + ' -> ' + h2 + ')');
   assert(await p.evaluate(() => getComputedStyle(document.getElementById('reviveBtn')).display) === 'none', 'no revive after END RUN');

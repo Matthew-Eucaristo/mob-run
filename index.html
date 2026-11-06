@@ -64,7 +64,7 @@
   #hudWeapon { display:inline-flex; align-items:center; gap:5px; margin-top:6px; padding:2px 9px 2px 6px; border-radius:999px;
     font-family:var(--disp); font-size:13px; letter-spacing:.6px; background:var(--ink); border:2px solid currentColor; }
   #hudWeapon .ic { font-size:14px; }
-  #hudReserve { margin-top:4px; font-size:11px; font-weight:900; color:#9fe0ff; text-shadow:var(--ol); letter-spacing:.3px; }
+  #hudReserve { margin-top:4px; font-size:12px; font-weight:900; color:#bfeaff; text-shadow:var(--ol); letter-spacing:.3px; }
   #hudSkills { display:flex; flex-wrap:nowrap; gap:4px; margin-top:6px; }
   #hudSkills span b { color:#fff4dc; font-weight:900; margin-left:1px; }
   #hudSkills span.more { color:#fff4dc; font-weight:900; }
@@ -393,7 +393,7 @@
     #hint { top:calc(110px + env(safe-area-inset-top)); bottom:auto; max-width:78vw; font-size:12px; }
     .skillCard { width:min(100%, 360px); padding:10px 12px 10px; display:grid; grid-template-columns:52px 1fr; column-gap:12px; align-items:center; }
     .skillCard i { grid-row:1 / span 3; }
-    .skillCard b { margin:0; font-size:19px; }
+    .skillCard b { margin:0; font-size:19px; padding-right:54px; }
     .skillCard .pips { margin-top:4px; }
     #skillCards { gap:10px; }
   }
@@ -504,7 +504,7 @@
   <div class="head">SETTINGS</div>
   <div class="panel" id="setList"></div>
   <div class="panel" id="records"></div>
-  <button type="button" class="btn cream" id="setClose" style="margin-top:18px">DONE</button>
+  <button type="button" class="btn cream" id="setClose" style="margin-top:18px; position:sticky; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:2">DONE</button>
 </div>
 
 <div class="overlay" id="pauseOverlay" style="display:none">

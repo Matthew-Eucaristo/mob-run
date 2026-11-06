@@ -18,6 +18,8 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   assert(await p.isVisible('#pauseOverlay'), 'back on the pause menu');
   await p.screenshot({ path: 'pause.png' });
   const c0 = await p.evaluate(() => window.__mob.G.coins);
+  await p.click('#pauseQuit'); await p.waitForTimeout(150);
+  assert(await p.evaluate(() => window.__mob.G.mode) === 'paused', 'one tap on END RUN only asks for a second');
   await p.click('#pauseQuit');
   await p.waitForTimeout(600);
   const st = await p.evaluate(() => ({ m: window.__mob.G.mode, cause: document.getElementById('overCause').textContent, revive: getComputedStyle(document.getElementById('reviveBtn')).display, coins: window.__mob.G.coins }));
