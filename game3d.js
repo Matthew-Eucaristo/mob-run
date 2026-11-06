@@ -1553,7 +1553,7 @@ function sawX(h) {
 
 /* choke barriers: road narrows — crowd wider than the gap gets crushed */
 const chokeGeo = new THREE.BoxGeometry(1, 1.7, 1);
-const chokeMat = new THREE.MeshLambertMaterial({ color: 0x303c5c });
+const chokeMat = new THREE.MeshLambertMaterial({ color: 0xb8433a, emissive: 0x3a0e0a, emissiveIntensity: 0.6 });   /* reads on dark and pale roads alike */
 const chokeEdgeGeo = new THREE.BoxGeometry(0.26, 2.2, 1);
 const chokeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xff5d6a });
 
@@ -4964,7 +4964,7 @@ function draw(now) {
         h.rock.visible = !h.stomp; h.warn.visible = true;
         h.fill.material.opacity = 0.18 + f * 0.32;
         h.fill.scale.setScalar(h.r * K);
-        h.rock.position.set(wx(h.x), 30 * (1 - f) + 0.4, 0);
+        h.rock.position.set(wx(h.x), 16 * (1 - f) + 0.4, 0);
         h.rock.rotation.x = t * 7; h.rock.rotation.y = t * 9;
         h.ring.material.opacity = 0.3 + f * 0.5 + Math.sin(t * 12) * 0.08;
         h.ring.scale.setScalar(h.r * K * (0.9 + Math.sin(t * 12) * 0.08));
