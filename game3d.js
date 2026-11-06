@@ -905,8 +905,6 @@ const soldierGeo = mergeParts([
   { geo: BOX(0.07, 0.1, 0.035), m: M4(0, 0.64, 0.18), c: '#ffffff' },
   { geo: SPH(0.145, 8), m: M4(0, 0.76, 0, 0, 0, 0, 1, 0.78, 1.02), c: '#ffffff' },
   { geo: BOX(0.19, 0.055, 0.05), m: M4(0, 0.72, -0.125), c: '#2a2d3a' },
-  { geo: BOX(0.02, 0.16, 0.02), m: M4(0, 0.98, -0.01), c: '#dfe7ff' },
-  { geo: SPH(0.035, 6), m: M4(0, 1.08, -0.01), c: '#ffd75d' },
   { geo: BOX(0.055, 0.07, 0.46), m: M4(0.17, 0.44, -0.3), c: '#121722' },
   { geo: BOX(0.04, 0.045, 0.12), m: M4(0.17, 0.52, -0.36), c: '#2c384f' },
   { geo: BOX(0.03, 0.03, 0.08), m: M4(0.17, 0.44, -0.56), c: '#ffe9a0' },
@@ -1311,7 +1309,7 @@ document.getElementById('labels').appendChild(bestLabel);
 const MAXB = 500;
 const BULLET_CAP = Q.low ? 140 : Q.phone ? 260 : MAXB;
 const bulletMesh = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.12, 0.12, 0.78),
+  new THREE.BoxGeometry(0.1, 0.1, 0.62),
   /* tracers glow through haze: on the pale Salt Flats fog they used to vanish */
   new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), MAXB);
 bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -2074,10 +2072,19 @@ const cannonGeo = mergeParts([
 const cannonMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.5, emissive: 0x331a00, emissiveIntensity: 0.5 });
 const coreMat = new THREE.MeshBasicMaterial({ color: 0xd8a8ff });
 const coreGeo = SPH(0.17, 10);
+const auntieGeo = mergeParts([
+  { geo: SPH(0.34, 10), m: M4(0, 3.12, -0.18, 0, 0, 0, 1, 0.85, 1), c: '#3b2638' },
+  { geo: SPH(0.2, 8), m: M4(0, 3.38, -0.22), c: '#3b2638' },
+  { geo: CONE(0.14, 0.32), m: M4(-0.2, 3.5, -0.2, 0, 0, Math.PI / 2), c: '#ff6fb4' },
+  { geo: CONE(0.14, 0.32), m: M4(0.2, 3.5, -0.2, 0, 0, -Math.PI / 2), c: '#ff6fb4' },
+  { geo: SPH(0.08, 6), m: M4(0, 3.5, -0.2), c: '#ff9fd0' },
+]);
+const auntieMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
 function bossBits(boss) {
   const g = new THREE.Group();
   if (boss.shooter) {
     for (const sx of [-1, 1]) { const c = new THREE.Mesh(cannonGeo, cannonMat); c.position.set(sx * 1.0, 2.45, 0.1); g.add(c); }
+    g.add(new THREE.Mesh(auntieGeo, auntieMat));
   } else if (boss.splitter) {
     for (const [x, y] of [[0, 1.35], [-0.38, 1.85], [0.38, 1.85]]) {
       const c = new THREE.Mesh(coreGeo, coreMat); c.position.set(x, y - 0.25, 0.9); g.add(c);
@@ -2096,9 +2103,9 @@ const BOSSES = {
   gunner: { name: L('AUNTIE BOOM', 'BIBI BOOM'), taunts: L(
     ["She brought snacks. They're on fire.", 'Duck. No, the other way.', 'Every orb is a hug.'],
     ['Dia bawa camilan. Camilannya terbakar.', 'Menunduk! Bukan, ke arah lain.', 'Setiap bola api adalah pelukan.']) },
-  splitter: { name: L('THE GRUBB TWINS', 'SI KEMBAR GRUBB'), taunts: L(
-    ['Hit one, meet the other.', 'Twice the ugly.', 'They share everything. Even you.'],
-    ['Pukul satu, kenalan sama yang lain.', 'Jeleknya dua kali lipat.', 'Mereka berbagi segalanya. Termasuk kamu.']) },
+  splitter: { name: L('THE GRUBB BROTHERS', 'GRUBB BERSAUDARA'), taunts: L(
+    ['Hit one, meet the others.', 'Three times the ugly.', 'They share everything. Even you.'],
+    ['Pukul satu, kenalan sama yang lain.', 'Jeleknya tiga kali lipat.', 'Mereka berbagi segalanya. Termasuk kamu.']) },
 };
 const bossKind = (e) => (e.shooter ? 'gunner' : e.splitter ? 'splitter' : 'brute');
 function bossTitle(e) { return BOSSES[bossKind(e)].name; }
@@ -2321,6 +2328,10 @@ function applyGate(g) {
   }
   let nl = transformCount(thru * lFrac, lp);
   let nr = transformCount(thru * rFrac, rp);
+  /* the soldiers who ran through a losing panel, or into the post, are the ones who fall */
+  if (postLoss > 0) cullBodies(postLoss, (x) => Math.abs(x - mid) < SEAM, '');
+  if (nl < thru * lFrac) cullBodies(thru * lFrac - nl, (x) => x < mid, '');
+  if (nr < thru * rFrac) cullBodies(thru * rFrac - nr, (x) => x >= mid, '');
   let gunUp = false;
   if (lp.t === 'gun' && lFrac > 0) gunUp = true;
   if (rp.t === 'gun' && rFrac > 0) gunUp = true;
@@ -2388,7 +2399,39 @@ function clashTick(m) {
   if (clashSfx <= 0) { clashSfx = 0.07; tone(180 + Math.random() * 90, 0.05, 'square', 0.035, 90); }
 }
 function sr0() { return squadRadius(); }
-function loseSoldiers(n, cause) {
+/* Per-soldier losses. A loss that happens somewhere (lava, a saw, the bad side of a gate)
+   takes the drawn soldiers who are standing there: they fall where they stood, and the rest
+   of the crowd closes up. Past the drawing limit each body stands for several soldiers.
+   inZone(x, wy) is a test in road space; returns how many bodies fell. */
+function cullBodies(lost, inZone, how) {
+  if (!(lost > 0) || bodyN <= 1 || !(G.mode === 'run' || G.mode === 'dying')) return 0;
+  const shown = Math.max(1, Math.min(G.soldiers, visCap, bodyN));
+  const per = Math.max(1, G.soldiers / shown);
+  let k = Math.floor(lost / per);
+  if (Math.random() < lost / per - k) k += 1;
+  if (k <= 0) return 0;
+  const cand = [];
+  for (let i = 1; i < bodyN; i++) if (inZone(G.armyX + bodyX[i], G.camY - bodyY[i])) cand.push(i);
+  if (!cand.length) return 0;
+  for (let j = cand.length - 1; j > 0; j--) { const r = ri(0, j); const tmp = cand[j]; cand[j] = cand[r]; cand[r] = tmp; }
+  const kill = cand.slice(0, Math.min(k, cand.length)).sort((a, b) => b - a);
+  for (const i of kill) {
+    dropCorpse(G.armyX + bodyX[i], G.camY - bodyY[i], how);
+    const last = bodyN - 1;
+    if (i !== last) { bodyX[i] = bodyX[last]; bodyY[i] = bodyY[last]; bodyVX[i] = bodyVX[last]; bodyVY[i] = bodyVY[last]; bodyPh[i] = bodyPh[last]; }
+    bodyN -= 1;
+  }
+  return kill.length;
+}
+/* a fallen soldier, in the squad's own color: knocked up and away from the crowd, then gone */
+function dropCorpse(x, wy, how) {
+  const away = x >= G.armyX ? 1 : -1;
+  const pit = how === 'pit';
+  deadSoldiers.push({ x, wy, y: pit ? 0.3 : 0.45, vy: pit ? rnd(0.2, 1) : rnd(3, 5.2), vx: pit ? rnd(-10, 10) : away * rnd(30, 90),
+    vwy: pit ? 0 : -rnd(15, 55), spin: rnd(-9, 9), t: 0, off: pit, burn: how === 'burn', skin: true });
+  if (deadSoldiers.length > MAXDEAD) deadSoldiers.shift();
+}
+function loseSoldiers(n, cause, inZone) {
   if (G.grace > 0) return;
   if (cause) G.cause = cause;
   n = Math.max(0, Math.round(n));
@@ -2402,6 +2445,7 @@ function loseSoldiers(n, cause) {
     ringT = 0; ringMat.color.set('#f3ecdf');
     return;
   }
+  if (inZone) cullBodies(n, inZone, cause === 'BURNED IN LAVA' ? 'burn' : cause === 'FELL IN A PIT' ? 'pit' : '');
   addSoldiers(G.soldiers - n);
 }
 
@@ -2613,8 +2657,10 @@ function flingEnemy(e) {
 }
 const deadSoldiers = [];
 function flingSoldier() {
-  deadSoldiers.push({ x: G.armyX + rnd(-18, 18), wy: G.camY + rnd(0, 22),
-    y: 0.45, vy: rnd(2.6, 4.6), vx: rnd(-45, 45), vwy: -rnd(35, 75), spin: rnd(-8, 8), t: 0 });
+  /* a generic casualty comes off the front edge of the crowd and is thrown outward, never left standing inside it */
+  const side = Math.random() < 0.5 ? -1 : 1;
+  deadSoldiers.push({ x: G.armyX + side * rnd(6, 22), wy: G.camY + rnd(10, 26),
+    y: 0.45, vy: rnd(2.6, 4.6), vx: side * rnd(30, 75), vwy: -rnd(35, 75), spin: rnd(-8, 8), t: 0, skin: true });
   if (deadSoldiers.length > MAXDEAD) deadSoldiers.shift();
 }
 function flingOff(px) {
@@ -3469,7 +3515,7 @@ let crowdS = 1;
 function crowdTarget() {
   const S = G.soldiers;
   if (S <= visCap) return 1;
-  return 1 + 0.42 * clamp(Math.log(S / visCap) / Math.log(20000 / visCap), 0, 1);
+  return 1 + 0.25 * clamp(Math.log(S / visCap) / Math.log(20000 / visCap), 0, 1);
 }
 function formation(n) {
   /* Width tracks the asphalt. A centered wide line fills the road;
@@ -3528,13 +3574,15 @@ function stepBodies(dt) {
   for (let i = 0; i < n; i++) {
     const slot = squadNow[i] || squadNow[0];
     const pull = i === 0 ? 16 : 7;
-    const biasX = i === 0 ? 0 : Math.sin(bodyPh[i]) * 8;
-    const biasY = i === 0 ? 0 : Math.cos(bodyPh[i] * 1.7) * 6;
+    /* a big crowd marches tighter: less personal wander as it grows */
+    const calm = 1 / (1 + (crowdS - 1) * 4);
+    const biasX = i === 0 ? 0 : Math.sin(bodyPh[i]) * 8 * calm;
+    const biasY = i === 0 ? 0 : Math.cos(bodyPh[i] * 1.7) * 6 * calm;
     bodyVX[i] = (bodyVX[i] + (slot.x + biasX - bodyX[i]) * pull * dt) * damp;
     bodyVY[i] = (bodyVY[i] + (slot.y + biasY - bodyY[i]) * pull * dt) * damp;
     if (i !== 0) {
-      bodyVX[i] += Math.sin(crowdT * 2.1 + bodyPh[i]) * 90 * dt;
-      bodyVY[i] += Math.cos(crowdT * 1.7 + bodyPh[i] * 1.6) * 70 * dt;
+      bodyVX[i] += Math.sin(crowdT * 2.1 + bodyPh[i]) * 90 * calm * dt;
+      bodyVY[i] += Math.cos(crowdT * 1.7 + bodyPh[i] * 1.6) * 70 * calm * dt;
     }
     bodyX[i] += bodyVX[i] * dt;
     bodyY[i] += bodyVY[i] * dt;
@@ -3677,7 +3725,7 @@ function update(dt) {
     let loss = Math.max(1, Math.round(off * per * 0.22));
     loss = Math.max(1, Math.round(loss * (1 - Math.min(0.5, (G.skills.steady || 0) * 0.25))));
     loss = Math.min(loss, Math.ceil(G.soldiers * 0.14));
-    loseSoldiers(loss, 'FELL OFF THE ROAD');
+    loseSoldiers(loss, 'FELL OFF THE ROAD', (x) => x < road.x0 + 1 || x > road.x1 - 1);
     let flung = 0;
     for (let i = 0; i < crowd; i++) {
       const px = G.armyX + bodyX[i];
@@ -3758,7 +3806,10 @@ function update(dt) {
   const spread = Math.min(7, wt.spread + (G.skills.split || 0) + (G.upSpread || 0));
   fireAcc += dt;
   const interval = rate / Math.max(1, shooters * 0.11);
-  const muzzleWy = G.camY + 30;
+  /* shots leave from just ahead of the crowd's real front row, not from inside a big crowd */
+  let front = 0;
+  for (let i = 0; i < bodyN; i++) front = Math.max(front, -bodyY[i]);
+  const muzzleWy = G.camY + Math.max(30, front + 14);
   while (fireAcc >= interval && bullets.length < BULLET_CAP - spread) {
     fireAcc -= interval;
     const si = bodyN > 0 ? ri(0, bodyN - 1) : 0;
@@ -3802,8 +3853,9 @@ function update(dt) {
       if (d < best) { best = d; tgt = { x: tx, wy: w.wy }; }
     }
     if (tgt) {
-      const dx = tgt.x - mx, dy = tgt.wy - muzzleWy, len = Math.hypot(dx, dy) || 1;
-      tvx = (dx / len) * 760; twy = (dy / len) * 760;
+      /* aim, but within a forward cone: shots sweeping sideways across the road read as clutter */
+      const ang = clamp(Math.atan2(tgt.x - mx, Math.max(1, tgt.wy - muzzleWy)), -0.56, 0.56);
+      tvx = Math.sin(ang) * 760; twy = Math.cos(ang) * 760;
     }
     let shotDmg = dmgPerBullet, shotCol = wt.col, shotPulse = 0;
     if ((G.skills.crit || 0) > 0 && Math.random() < 0.07 * G.skills.crit) {
@@ -3811,9 +3863,10 @@ function update(dt) {
     }
     for (let s = 0; s < spread; s++) {
       const focus = 1 - Math.min(0.55, (G.skills.focus || 0) * 0.2);
-      const jit = ((s - (spread - 1) / 2) * 0.10 + rnd(-0.03, 0.03)) * focus;
+      const jit = ((s - (spread - 1) / 2) * 0.07 + rnd(-0.025, 0.025)) * focus;
       const cs = Math.cos(jit), sn = Math.sin(jit);
-      bullets.push({ x: mx, wy: muzzleWy, vx: tvx * cs - twy * sn, vwy: tvx * sn + twy * cs,
+      /* staggered a little in depth so a volley reads as a stream, not a bundle of straws */
+      bullets.push({ x: mx, wy: muzzleWy + rnd(0, 26), vx: tvx * cs - twy * sn, vwy: tvx * sn + twy * cs,
         dmg: shotDmg, col: shotCol, len: wt.tl, wid: wt.tw || 1,
         pierce: G.skills.pierce || 0, pulse: shotPulse });
     }
@@ -3950,10 +4003,10 @@ function update(dt) {
     if (p.t > 7 || p.wy < G.camY - 140 || p.x < road.x0 - 80 || p.x > road.x1 + 80) { ebullets.splice(i, 1); continue; }
     const dx = p.x - G.armyX, dy = p.wy - G.camY, rr = sr * 0.8 + p.r;
     if (dx * dx + dy * dy < rr * rr) {
-      loseSoldiers(Math.max(2, Math.ceil(G.soldiers * 0.07)), 'BOSS FIREBALL');
+      loseSoldiers(Math.max(2, Math.ceil(G.soldiers * 0.07)), 'BOSS FIREBALL', (x, y) => Math.hypot(x - p.x, y - p.wy) < p.r + 22);
       for (let k = 0; k < 10 && parts.length < MAXP - 12; k++)
         parts.push(mkPart(p.x + rnd(-10, 10), p.wy + rnd(-8, 8), '#ff5d6a'));
-      dmgFlash(); sfx.hurt(); vib(30); flingSoldier(); flingSoldier();
+      dmgFlash(); sfx.hurt(); vib(30);
       ebullets.splice(i, 1);
     }
   }
@@ -4098,6 +4151,7 @@ function update(dt) {
   /* environmental hazards chip away at the squad while it overlaps them.
      Hazards get their own, harsher cap — they are supposed to threaten. */
   let hazDmg = 0, hazCause = '';
+  const hazZones = [];
   for (let i = hazards.length - 1; i >= 0; i--) {
     const h = hazards[i];
     if (h.dead) {
@@ -4132,8 +4186,8 @@ function update(dt) {
           if (dd >= h.r + sr && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
           if (dd < h.r + sr) {
             const frac = clamp(1 - dd / (h.r + sr), 0.15, 1);
-            loseSoldiers(Math.max(3, Math.ceil(G.soldiers * (h.stomp ? 0.22 : 0.3) * frac)), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE');
-            for (let k = 0; k < 4; k++) flingSoldier();
+            loseSoldiers(Math.max(3, Math.ceil(G.soldiers * (h.stomp ? 0.22 : 0.3) * frac)), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE',
+              (x, y) => Math.hypot(x - h.x, y - h.wy) < h.r + 6);
             dmgFlash(); vib(50);
           }
           for (const e of enemies)
@@ -4144,8 +4198,7 @@ function update(dt) {
     }
     if (h.kind === 'gap') {
       if (doDrain && Math.abs(h.wy - G.camY) < h.len / 2 + 8 && Math.abs(h.x - G.armyX) < h.w / 2 + sr * 0.3) {
-        loseSoldiers(Math.max(2, Math.ceil(G.soldiers * 0.07)), 'FELL IN A PIT');
-        flingOff(G.armyX);
+        loseSoldiers(Math.max(2, Math.ceil(G.soldiers * 0.07)), 'FELL IN A PIT', (x, y) => Math.abs(x - h.x) < h.w / 2 + 4 && Math.abs(y - h.wy) < h.len / 2 + 12);
         dmgFlash();
         if (Math.random() < 0.45) sfx.hurt();
       }
@@ -4166,18 +4219,20 @@ function update(dt) {
     if (touching) {
       /* a flat bite plus a share of the army, so a saw still matters to 9,000 soldiers */
       hazDmg += h.drain + G.soldiers * 0.025;
+      if (h.kind === 'lava') hazZones.push((x, y) => Math.abs(x - h.x) < h.w / 2 + 4 && Math.abs(y - h.wy) < h.len / 2 + 12);
+      else if (h.kind === 'choke') hazZones.push((x, y) => Math.abs(y - h.wy) < h.len / 2 + 12 && Math.abs(x - h.gapX) > h.gapW / 2 - 4);
+      else { const hx = sawX(h); hazZones.push((x, y) => Math.hypot(x - hx, y - h.wy) < h.r + 8); }
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
       G.shake = Math.max(G.shake, 3);
       dmgFlash(); vib(25);
       if (Math.random() < 0.5) sfx.hurt();
-      if (Math.random() < 0.6) flingSoldier();
       for (let k = 0; k < 5 && parts.length < MAXP - 6; k++)
         parts.push(mkPart(G.armyX + rnd(-sr * 0.6, sr * 0.6), G.camY + rnd(-6, 18), h.kind === 'lava' ? '#ff7a3d' : '#ff5d6a'));
     }
   }
   const guard = 1 - Math.min(0.55, (G.skills.bulwark || 0) * 0.18);
   if (doDrain && hazDmg > 0)
-    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))) * guard, hazCause);
+    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
   if (doDrain && (tickDmg > 0 || bossDmg > 0))
     loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS');
   if (doDrain) drainAcc = 0;
@@ -4201,8 +4256,8 @@ function update(dt) {
     }
     if (w.wy - G.camY < sr + 30 && G.armyX + sr * 0.6 > w.x0 && G.armyX - sr * 0.6 < w.x1) {
       if (doDrain) {
-        loseSoldiers(Math.max(1, Math.ceil(G.soldiers * 0.12 * guard)), 'SMASHED INTO A WALL');
-        G.shake = 5; flingSoldier();
+        loseSoldiers(Math.max(1, Math.ceil(G.soldiers * 0.12 * guard)), 'SMASHED INTO A WALL', (x, y) => x > w.x0 - 4 && x < w.x1 + 4 && y > G.camY - 4);
+        G.shake = 5;
       }
       w.hp -= G.soldiers * 6 * dt;
       if (w.hp <= 0) killWall(w);
@@ -4589,7 +4644,7 @@ function draw(now) {
     const from = paintedSkin !== G.skin ? 0 : Math.max(0, oldN);
     for (let i = from; i < shown; i++) {
       tmpCol.set(i === 0 ? sk.lead : sk.body);
-      if (i !== 0) tmpCol.offsetHSL(rnd(-0.02, 0.02), 0, rnd(-0.05, 0.06));
+      if (i !== 0) tmpCol.offsetHSL(rnd(-0.012, 0.012), 0, rnd(-0.035, 0.04));
       soldierBody.setColorAt(i, tmpCol);
     }
     paintedSkin = G.skin;
@@ -4597,9 +4652,10 @@ function draw(now) {
     if (soldierBody.instanceColor) soldierBody.instanceColor.needsUpdate = true;
   }
   const bobT = G.mode === 'run' ? t : t * 0.4;
-  const liveBodies = bodyN >= shown && shown > 0 && (G.mode === 'run' || G.mode === 'dying');
+  const liveRun = shown > 0 && (G.mode === 'run' || G.mode === 'dying');
   for (let i = 0; i < shown; i++) {
     const o = soldierOffsets[i] || soldierOffsets[0] || { x: 0, y: 0 };
+    const liveBodies = liveRun && i < bodyN;
     const px = liveBodies ? bodyX[i] : o.x;
     const py = liveBodies ? bodyY[i] : o.y;
     const bob = Math.abs(Math.sin(bobT * 9 + i * 1.7)) * 0.16;
@@ -4622,7 +4678,8 @@ function draw(now) {
       leaderFlag.visible = born > 0.4 && G.mode !== 'menu';
     }
     if (i < 16) {
-      dummy.position.set(bx + 0.16 * (lead ? 1.15 : 1), 0.48 + bob, bz - 0.62);
+      const ms = (lead ? 1.65 : 1.3 * bulk * crowdS) / 1.3;
+      dummy.position.set(bx + 0.17 * ms, 0.5 * ms + bob, bz - 0.62 * ms);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(0.05, 0.05, 0.12 + muzzleGlow * 0.7);
       dummy.updateMatrix();
@@ -4796,13 +4853,16 @@ function draw(now) {
     p.y += p.vy * FD; p.vy -= (p.off ? 18 : 9.5) * FD;
     if (!p.off && p.y < 0.1) { p.y = 0.1; p.vy *= -0.3; }
     dummy.position.set(wx(p.x), p.y, wz(p.wy));
-    dummy.rotation.set(p.spin * p.t, p.spin * p.t * 0.6, 0);
+    /* a fallen soldier tips over at once instead of standing in the crowd like a dark statue */
+    dummy.rotation.set(p.skin ? -Math.min(1.5, p.t * 9) + p.spin * p.t * 0.25 : p.spin * p.t, p.spin * p.t * 0.6, 0);
     const life = p.doom ? 1.35 : 0.8;
     dummy.scale.setScalar(Math.max(0.05, 1.05 * (1 - p.t / life)));
     dummy.updateMatrix();
     if (di2 >= MAXDEAD) continue;
     deadSoldierMesh.setMatrixAt(di2, dummy.matrix);
-    deadSoldierMesh.setColorAt(di2, tmpCol.set(p.doom ? '#c46a3a' : '#3c342c'));
+    if (p.skin) tmpCol.set(p.burn ? (p.t < 0.25 ? '#ff7a2a' : '#7a3420') : skinNow().body).offsetHSL(0, -0.15, p.burn ? 0 : -0.12 - 0.25 * Math.min(1, p.t / 0.5));
+    else tmpCol.set(p.doom ? '#c46a3a' : skinNow().body).offsetHSL(0, -0.2, p.doom ? 0 : -0.3);
+    deadSoldierMesh.setColorAt(di2, tmpCol);
     di2++;
   }
   deadSoldierMesh.count = di2;
@@ -4939,7 +4999,7 @@ function draw(now) {
     /* a coin in flight turns its face to you instead of flashing edge-on */
     const flying = c.fly !== undefined;
     dummy.rotation.set(0, flying ? Math.sin(t * 9 + c.spin) * 0.35 : t * 3.4 + c.spin, 0);
-    const sc = (flying ? 1.12 : 1) * 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
+    const sc = (flying ? 0.8 : 1) * 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
     dummy.scale.set(sc, sc, sc);
     dummy.updateMatrix();
     if (coinI < MAXCOIN) coinMesh.setMatrixAt(coinI++, dummy.matrix);
@@ -4952,10 +5012,10 @@ function draw(now) {
   for (const b of bullets) {
     const zP = wz(b.wy);
     if (zP > 14) continue;
-    dummy.position.set(wx(b.x), 0.8, zP);
+    dummy.position.set(wx(b.x), 0.62 + crowdS * 0.18, zP);
     dummy.rotation.set(0, Math.atan2(b.vx, -b.vwy), 0);
     const pulse = 1 + (b.pulse || 0) * 0.85;
-    dummy.scale.set((b.wid || 1) * pulse, (b.wid || 1) * pulse, (b.len || 1) * (1 + (b.pulse || 0) * 0.35));
+    dummy.scale.set((b.wid || 1) * pulse, (b.wid || 1) * pulse, Math.min(1.6, b.len || 1) * (1 + (b.pulse || 0) * 0.35));
     dummy.updateMatrix();
     if (bi < MAXB) {
       bulletMesh.setMatrixAt(bi, dummy.matrix);
