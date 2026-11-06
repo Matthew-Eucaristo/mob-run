@@ -1560,10 +1560,11 @@ const chokeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xff5d6a });
 /* meteors: warning ring, then a rock falls and blows up whoever stands there */
 const hazRingGeo = new THREE.RingGeometry(0.86, 1, 32);
 const meteorGeo = new THREE.DodecahedronGeometry(0.55, 0);
+const discGeo = new THREE.CircleGeometry(1, 36);
 const meteorMat = new THREE.MeshStandardMaterial({ color: 0xff7a3d, emissive: 0xff4a1a, emissiveIntensity: 0.9, roughness: 0.6 });
 
 function spawnMeteor(wy) {
-  const h = { kind: 'meteor', x: rnd(road.x0 + 60, road.x1 - 60), wy, r: rnd(65, 95),
+  const h = { kind: 'meteor', x: rnd(road.x0 + 60, road.x1 - 60), wy, r: rnd(55, 80),
     armed: false, dead: false, tImpact: 0, deadT: 0, pop: 1 };
   const grp = new THREE.Group();
   const ring = new THREE.Mesh(hazRingGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
@@ -1571,7 +1572,11 @@ function spawnMeteor(wy) {
   const rock = new THREE.Mesh(meteorGeo, meteorMat);
   rock.position.set(wx(h.x), 30, 0); rock.visible = false;
   const warn = makeSprite('warn'); warn.position.set(wx(h.x), 3.4, 0); warn.visible = false;
-  grp.add(ring, rock, warn);
+  /* the danger area is a filled disc, so you can read exactly where not to be */
+  const fill = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
+  fill.rotation.x = -Math.PI / 2; fill.position.set(wx(h.x), 0.04, 0);
+  grp.add(fill, ring, rock, warn);
+  h.fill = fill;
   grp.position.z = wz(wy);
   scene.add(grp);
   h.grp = grp; h.ring = ring; h.rock = rock; h.warn = warn;
@@ -1672,12 +1677,13 @@ function spawnHazard(wy, forced) {
     const h = { kind: 'gap', x, w: wpx, wy: wy + len * 0.5, len, drain: 7 + Math.floor(d / 2), pop: 0 };
     const grp = new THREE.Group();
     const hole = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0x070910, transparent: true, opacity: 0.92, depthWrite: false }));
-    hole.rotation.x = -Math.PI / 2; hole.position.y = 0.05;
+    /* the black hole sits on top of its striped lip, so the lip reads as a frame around a hole */
+    hole.rotation.x = -Math.PI / 2; hole.position.y = 0.065; hole.renderOrder = 2;
     hole.scale.set(wpx * K, len * K, 1);
     const lipTex = stripeTex.clone(); lipTex.needsUpdate = true; lipTex.repeat.set(4, 4); h.ownTex = lipTex;
     const lip = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ map: lipTex, transparent: true, opacity: 0.95, depthWrite: false }));
-    lip.rotation.x = -Math.PI / 2; lip.position.y = 0.055;
-    lip.scale.set(wpx * K * 1.12, len * K * 1.08, 1);
+    lip.rotation.x = -Math.PI / 2; lip.position.y = 0.055; lip.renderOrder = 1;
+    lip.scale.set(wpx * K * 1.2, len * K * 1.18, 1);
     const warn = makeSprite('warn'); warn.position.set(0, 2.4, -len * K * 0.5 - 1);
     grp.add(lip, hole, warn);
     grp.position.set(wx(x), 0, wz(h.wy));
@@ -1757,8 +1763,16 @@ const PIECES = [
     make: (wy) => { for (let i = 0; i < 3; i++) spawnCage(wy + i * 200); } },
   { title: L('SINKHOLES', 'LUBANG AMBLAS'), sub: L('The mire is eating the road.', 'Rawa sedang memakan jalan.'), len: 820,
     make: (wy) => { for (let i = 0; i < 3; i++) spawnHazard(wy + i * 270, 0.86); } },
-  { title: L('METEOR SHOWER', 'HUJAN METEOR'), sub: L('Keep moving. Do not stop.', 'Terus bergerak. Jangan berhenti.'), len: 700,
-    make: (wy) => { for (let i = 0; i < 6; i++) spawnMeteor(wy + i * 115); } },
+  { title: L('METEOR SHOWER', 'HUJAN METEOR'), sub: L('Read the circles. Find the gap.', 'Baca lingkarannya. Cari celahnya.'), len: 700,
+    make: (wy) => {
+      /* three lanes; each rock picks one of the two that aren't the free lane, so a gap always exists */
+      const lanes = [0.2, 0.5, 0.8].map((f) => road.x0 + (road.x1 - road.x0) * f);
+      const free = ri(0, 2);
+      for (let i = 0; i < 6; i++) {
+        const opts = [0, 1, 2].filter((k) => k !== free);
+        const m = spawnMeteor(wy + i * 115); m.x = lanes[opts[i % 2]] + rnd(-12, 12);
+      }
+    } },
   { title: L('SAW GAUNTLET', 'LORONG GERGAJI'), sub: L('Three blades, one squad.', 'Tiga gergaji, satu pasukan.'), len: 920,
     make: (wy) => { for (let i = 0; i < 3; i++) spawnHazard(wy + i * 300, 0.4); } },
   { title: L('THE SQUEEZE', 'JEPITAN'), sub: L('Swipe up. Breathe in.', 'Geser ke atas. Tahan napas.'), len: 760,
@@ -2319,7 +2333,7 @@ function applyGate(g) {
   else if (rFrac < 0.2) { rFrac = 0; lFrac = 1; }
   const lp = g.panels[0], rp = g.panels[1];
   /* only a squad that straddles the gate pays for the post */
-  const postLoss = lFrac > 0 && rFrac > 0 && G.dist > 60 ? Math.min(army - 1, Math.round(army * seam / counted)) : 0;
+  const postLoss = lFrac > 0 && rFrac > 0 && G.dist > 60 ? Math.min(army - 1, Math.round(army * Math.min(0.12, seam / counted))) : 0;
   const thru = army - postLoss;
   if (postLoss > 0) {
     floatText(mid, G.camY + 20, '-' + fmtNum(postLoss) + L(' POST!', ' TIANG!'), '#ff6b6b', 20, 3.2);
@@ -2424,6 +2438,13 @@ function cullBodies(lost, inZone, how) {
   return kill.length;
 }
 /* a fallen soldier, in the squad's own color: knocked up and away from the crowd, then gone */
+/* share of the drawn squad standing inside an area (road space): hazards hurt only them */
+function insideShare(inZone) {
+  if (bodyN <= 0) return 0;
+  let n = 0;
+  for (let i = 0; i < bodyN; i++) if (inZone(G.armyX + bodyX[i], G.camY - bodyY[i])) n++;
+  return n / bodyN;
+}
 function dropCorpse(x, wy, how) {
   const away = x >= G.armyX ? 1 : -1;
   const pit = how === 'pit';
@@ -2474,7 +2495,7 @@ function tutorialHint(kind) {
     saw: L('SAW BLADE! Time it and steer around', 'GERGAJI! Atur waktu dan hindari'),
     lava: L('LAVA! Keep the squad on the dark side', 'LAVA! Jaga pasukan di sisi yang gelap'),
     gap: L('PIT! Steer around the hole', 'LUBANG! Belok menghindari lubang'),
-    meteor: L('METEOR! Get out of the red circle', 'METEOR! Keluar dari lingkaran merah'),
+    meteor: L('METEOR! Get everyone out of the red circle', 'METEOR! Keluarkan semua dari lingkaran merah'),
     wall: L('WALL! Shoot it down or go around the gap', 'TEMBOK! Tembak atau lewati celahnya'),
     band: L('WAR BAND! As big as your army. Shoot it down first', 'PASUKAN PERANG! Sebesar pasukanmu. Tembak duluan'),
   };
@@ -3685,7 +3706,8 @@ requestAnimationFrame(frame);
 
 function update(dt) {
   if (parts.length > partCap) parts.splice(0, parts.length - partCap);
-  hintT = Math.max(0, hintT - dt);
+  /* a tip waits out a banner instead of running down behind it */
+  if (performance.now() > bannerUntil) hintT = Math.max(0, hintT - dt);
   if (coinSfx > 0) coinSfx -= dt;
   if (clashSfx > 0) clashSfx -= dt;
   if (ladderT > 0) ladderT -= dt;
@@ -4055,8 +4077,9 @@ function update(dt) {
         e.stompT = (e.stompT ?? 0.6) - dt;
         if (e.stompT <= 0) {
           e.stompT = 2.4;
-          const st = spawnMeteor(G.camY + G.speed * 1.3);
-          st.x = clamp(G.armyX, road.x0 + 40, road.x1 - 40); st.r = 72; st.stomp = true;
+          const st = spawnMeteor(G.camY + G.speed * 1.8);
+          st.x = clamp(G.armyX, road.x0 + 40, road.x1 - 40); st.r = 58; st.stomp = true;
+          st.ring.material.color.set(0xffb03d); st.fill.material.color.set(0xffb03d);
           e.roar = 0.6; vib(20);
         }
       }
@@ -4170,7 +4193,7 @@ function update(dt) {
         vx: rnd(-40, 40), vwy: rnd(-20, 20), vh: rnd(1, 4), t: 0, life: rnd(0.2, 0.45), color: '#ffd75d' });
     if (h.kind === 'meteor') {
       /* land as the squad arrives: the warning ring is up long before, the rock comes down on time */
-      if (!h.armed && h.wy - G.camY < G.speed * 1.25) { h.armed = true; h.tImpact = h.t0 = Math.max(0.45, (h.wy - G.camY) / G.speed); }
+      if (!h.armed && h.wy - G.camY < G.speed * (h.stomp ? 1.6 : 1.7)) { h.armed = true; h.tImpact = h.t0 = Math.max(0.45, (h.wy - G.camY) / G.speed); }
       if (h.armed) {
         h.tImpact -= dt;
         if (Math.random() < 0.5 && parts.length < MAXP - 4)
@@ -4183,11 +4206,12 @@ function update(dt) {
           for (let k = 0; k < 24 && parts.length < MAXP - 26; k++)
             parts.push(mkPart(h.x + rnd(-30, 30), h.wy + rnd(-24, 24), '#ff9d5d'));
           const dd = Math.hypot(h.x - G.armyX, h.wy - G.camY);
-          if (dd >= h.r + sr && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
-          if (dd < h.r + sr) {
-            const frac = clamp(1 - dd / (h.r + sr), 0.15, 1);
-            loseSoldiers(Math.max(3, Math.ceil(G.soldiers * (h.stomp ? 0.22 : 0.3) * frac)), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE',
-              (x, y) => Math.hypot(x - h.x, y - h.wy) < h.r + 6);
+          /* only the soldiers under the disc are hit; a clean dodge costs nothing */
+          const inDisc = (x, y) => Math.hypot(x - h.x, y - h.wy) < h.r;
+          const share = insideShare(inDisc);
+          if (share === 0 && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
+          if (share > 0) {
+            loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * (h.stomp ? 0.6 : 0.7))), h.stomp ? 'CRUSHED BY A BOSS' : 'METEOR STRIKE', inDisc);
             dmgFlash(); vib(50);
           }
           for (const e of enemies)
@@ -4197,8 +4221,10 @@ function update(dt) {
       continue;
     }
     if (h.kind === 'gap') {
-      if (doDrain && Math.abs(h.wy - G.camY) < h.len / 2 + 8 && Math.abs(h.x - G.armyX) < h.w / 2 + sr * 0.3) {
-        loseSoldiers(Math.max(2, Math.ceil(G.soldiers * 0.07)), 'FELL IN A PIT', (x, y) => Math.abs(x - h.x) < h.w / 2 + 4 && Math.abs(y - h.wy) < h.len / 2 + 12);
+      const inPit = (x, y) => Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.wy) < h.len / 2;
+      const share = doDrain ? insideShare(inPit) : 0;
+      if (share > 0) {
+        loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * 0.6)), 'FELL IN A PIT', inPit);
         dmgFlash();
         if (Math.random() < 0.45) sfx.hurt();
       }
@@ -4206,22 +4232,22 @@ function update(dt) {
     }
     if (h.kind === 'saw') {
       const dSaw = Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) - (h.r + sr * 0.75);
-      if (dSaw < 0) h.hit = true;
+      const sx0 = sawX(h);
+      if (insideShare((x, y) => Math.abs(x - sx0) < 38 && Math.abs(y - h.wy) < 26) > 0) h.hit = true;
       if (Math.abs(h.wy - G.camY) < 40) h.near = Math.min(h.near === undefined ? 1e9 : h.near, dSaw);
       if (!h.paid && h.wy < G.camY - 40) { h.paid = true; if (!h.hit && h.near < 34) closeCall(sawX(h), h.wy); }
     }
     if (!doDrain) continue;
-    const touching = h.kind === 'lava'
-      ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(h.x - G.armyX) < h.w / 2 + sr * 0.55
-      : h.kind === 'choke'
-        ? Math.abs(h.wy - G.camY) < h.len / 2 + sr * 0.5 && Math.abs(G.armyX - h.gapX) + sr * 0.75 > h.gapW / 2
-        : Math.hypot(sawX(h) - G.armyX, h.wy - G.camY) < h.r + sr * 0.75;
-    if (touching) {
-      /* a flat bite plus a share of the army, so a saw still matters to 9,000 soldiers */
-      hazDmg += h.drain + G.soldiers * 0.025;
-      if (h.kind === 'lava') hazZones.push((x, y) => Math.abs(x - h.x) < h.w / 2 + 4 && Math.abs(y - h.wy) < h.len / 2 + 12);
-      else if (h.kind === 'choke') hazZones.push((x, y) => Math.abs(y - h.wy) < h.len / 2 + 12 && Math.abs(x - h.gapX) > h.gapW / 2 - 4);
-      else { const hx = sawX(h); hazZones.push((x, y) => Math.hypot(x - hx, y - h.wy) < h.r + 8); }
+    /* each hazard hurts the soldiers inside its drawn shape, and only them */
+    const hx = h.kind === 'saw' ? sawX(h) : 0;
+    const zone = h.kind === 'lava' ? (x, y) => Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.wy) < h.len / 2
+      : h.kind === 'choke' ? (x, y) => Math.abs(y - h.wy) < h.len / 2 && Math.abs(x - h.gapX) > h.gapW / 2
+        : (x, y) => Math.abs(x - hx) < 38 && Math.abs(y - h.wy) < 26;
+    const share = insideShare(zone);
+    if (share > 0) {
+      const rate = h.kind === 'saw' ? 0.5 : 0.3;
+      hazDmg += Math.max(1, G.soldiers * share * rate);
+      hazZones.push(zone);
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
       G.shake = Math.max(G.shake, 3);
       dmgFlash(); vib(25);
@@ -4232,7 +4258,7 @@ function update(dt) {
   }
   const guard = 1 - Math.min(0.55, (G.skills.bulwark || 0) * 0.18);
   if (doDrain && hazDmg > 0)
-    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
+    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.3))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
   if (doDrain && (tickDmg > 0 || bossDmg > 0))
     loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS');
   if (doDrain) drainAcc = 0;
@@ -4926,20 +4952,27 @@ function draw(now) {
       h.blade.rotation.z = -(t * 12 + h.phase);
       if (h.grp.children[0]) h.grp.children[0].scale.x = Math.max(0.25, (roadHalf * 2 + 0.5) / (ROADW + 1.4));
     } else if (h.kind === 'meteor') {
+      /* follow h.x: a stomp is aimed after it is spawned */
+      h.ring.position.x = h.fill.position.x = h.rock.position.x = h.warn.position.x = wx(h.x);
       if (h.dead) {
         h.rock.visible = h.warn.visible = false;
         h.ring.material.opacity = Math.max(0, 0.6 - h.deadT * 1.4);
       } else if (h.armed) {
         const f = clamp(1 - h.tImpact / (h.t0 || 1.15), 0, 1);
-        h.rock.visible = h.warn.visible = true;
+        h.rock.visible = !h.stomp; h.warn.visible = true;
+        h.fill.material.opacity = 0.18 + f * 0.32;
+        h.fill.scale.setScalar(h.r * K);
         h.rock.position.set(wx(h.x), 30 * (1 - f) + 0.4, 0);
         h.rock.rotation.x = t * 7; h.rock.rotation.y = t * 9;
         h.ring.material.opacity = 0.3 + f * 0.5 + Math.sin(t * 12) * 0.08;
         h.ring.scale.setScalar(h.r * K * (0.9 + Math.sin(t * 12) * 0.08));
       } else {
-        h.ring.material.opacity = 0.25 + Math.sin(t * 6) * 0.1;
+        h.ring.material.opacity = 0.45 + Math.sin(t * 6) * 0.12;
         h.ring.scale.setScalar(h.r * K);
+        h.fill.material.opacity = 0.14 + Math.sin(t * 6) * 0.05;
+        h.fill.scale.setScalar(h.r * K);
       }
+      h.fill.visible = !h.dead;
     } else if (h.inner) {
       h.inner.material.opacity = 0.4 + Math.sin(t * 5 + h.wy) * 0.18;
     }
