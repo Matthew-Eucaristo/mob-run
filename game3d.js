@@ -2379,7 +2379,9 @@ function applyGate(g) {
   }
   /* at the cap a green gate feeds the reserve, and says so instead of a number that changes nothing */
   const lab = gunUp && delta === 0 ? L('WEAPON UP!', 'SENJATA NAIK!') : (army >= ARMY_CAP && delta > 0) ? L('→ RESERVE', '→ CADANGAN') : ((delta >= 0 ? '+' : '') + delta);
-  const tag = split ? (gateLabel(lp) + ' | ' + gateLabel(rp) + '  ') : '';
+  /* in the display font a small ÷ reads like +, so floating text writes it as / */
+  const fl = (q) => gateLabel(q).replace('÷', '/');
+  const tag = split ? (fl(lp) + ' | ' + fl(rp) + '  =  ') : '';
   floatText(G.armyX, G.camY + 10, tag + lab,
     good ? '#ffd75d' : '#ff5d6a', split || gunUp ? 26 : 24, 3.4);
   /* up to a fifth higher for a big multiplier, in semitones so it stays musical */
@@ -2432,13 +2434,12 @@ function cullBodies(lost, inZone, how) {
   const kill = cand.slice(0, Math.min(k, cand.length)).sort((a, b) => b - a);
   for (const i of kill) {
     dropCorpse(G.armyX + bodyX[i], G.camY - bodyY[i], how);
-    const last = bodyN - 1;
-    if (i !== last) { bodyX[i] = bodyX[last]; bodyY[i] = bodyY[last]; bodyVX[i] = bodyVX[last]; bodyVY[i] = bodyVY[last]; bodyPh[i] = bodyPh[last]; }
+    for (const arr of BODY_ARRS) arr.copyWithin(i, i + 1, bodyN);
     bodyN -= 1;
   }
+  needRemap = true;
   return kill.length;
 }
-/* a fallen soldier, in the squad's own color: knocked up and away from the crowd, then gone */
 /* share of the drawn squad standing inside an area (road space): hazards hurt only them */
 function insideShare(inZone) {
   if (bodyN <= 0) return 0;
@@ -2446,8 +2447,14 @@ function insideShare(inZone) {
   for (let i = 0; i < bodyN; i++) if (inZone(G.armyX + bodyX[i], G.camY - bodyY[i])) n++;
   return n / bodyN;
 }
+/* a fallen soldier, in the squad's own color: knocked up and away from the crowd, then gone */
 function dropCorpse(x, wy, how) {
   const away = x >= G.armyX ? 1 : -1;
+  if (how === 'off') {
+    deadSoldiers.push({ x, wy, y: 0.55, vy: rnd(0.4, 1.4), vx: away * rnd(60, 120), vwy: -rnd(10, 30), spin: rnd(-9, 9), t: 0, off: true, skin: true });
+    if (deadSoldiers.length > MAXDEAD) deadSoldiers.shift();
+    return;
+  }
   const pit = how === 'pit';
   deadSoldiers.push({ x, wy, y: pit ? 0.3 : 0.45, vy: pit ? rnd(0.2, 1) : rnd(3, 5.2), vx: pit ? rnd(-10, 10) : away * rnd(30, 90),
     vwy: pit ? 0 : -rnd(15, 55), spin: rnd(-9, 9), t: 0, off: pit, burn: how === 'burn', skin: true });
@@ -2467,8 +2474,9 @@ function loseSoldiers(n, cause, inZone) {
     ringT = 0; ringMat.color.set('#f3ecdf');
     return;
   }
-  if (inZone) cullBodies(n, inZone, cause === 'BURNED IN LAVA' ? 'burn' : cause === 'FELL IN A PIT' ? 'pit' : '');
+  const fell = inZone ? cullBodies(n, inZone, cause === 'BURNED IN LAVA' ? 'burn' : cause === 'FELL IN A PIT' ? 'pit' : cause === 'FELL OFF THE ROAD' ? 'off' : '') : 0;
   addSoldiers(G.soldiers - n);
+  return fell;
 }
 
 function bannerFlash(text, color, sub) {
@@ -3574,21 +3582,63 @@ const CROWD = 220;
 const bodyX = new Float32Array(CROWD), bodyY = new Float32Array(CROWD);
 const bodyVX = new Float32Array(CROWD), bodyVY = new Float32Array(CROWD);
 const bodyPh = new Float32Array(CROWD);
+const bodyBorn = new Float32Array(CROWD);   /* crowdT when this soldier joined: drives its pop-in */
+let refillAcc = 0, needRemap = false;
+const BODY_ARRS = [bodyX, bodyY, bodyVX, bodyVY, bodyPh, bodyBorn];
+/* after the formation changes, every soldier takes the free slot nearest to where it stands
+   (matched row by row), instead of the slot that happens to share its index */
+function remapBodies() {
+  const m = Math.min(bodyN, squadNow.length);
+  if (m <= 2) return;
+  const slots = [];
+  for (let j = 1; j < m; j++) slots.push(j);
+  slots.sort((a, b) => squadNow[a].y - squadNow[b].y || squadNow[a].x - squadNow[b].x);
+  const rows = [];
+  let cur = [slots[0]];
+  for (let k = 1; k < slots.length; k++) {
+    if (Math.abs(squadNow[slots[k]].y - squadNow[cur[0]].y) < 1) cur.push(slots[k]);
+    else { rows.push(cur); cur = [slots[k]]; }
+  }
+  rows.push(cur);
+  const bods = [];
+  for (let i = 1; i < m; i++) bods.push(i);
+  bods.sort((a, b) => bodyY[a] - bodyY[b]);
+  const assign = new Int32Array(m);
+  let q = 0;
+  for (const row of rows) {
+    const chunk = bods.slice(q, q + row.length).sort((a, b) => bodyX[a] - bodyX[b]);
+    q += row.length;
+    const rs = row.slice().sort((a, b) => squadNow[a].x - squadNow[b].x);
+    for (let k = 0; k < rs.length; k++) assign[rs[k]] = chunk[k];
+  }
+  for (const arr of BODY_ARRS) { const tmp = arr.slice(0, m); for (let j = 1; j < m; j++) arr[j] = tmp[assign[j]]; }
+}
 let bodyN = 0, crowdT = 0;
 function stepBodies(dt) {
   const n = Math.max(1, Math.min(G.soldiers, visCap, CROWD, squadNow.length));
+  crowdT += dt;
+  if (bodyN > n) { bodyN = n; needRemap = true; }
+  if (needRemap) { needRemap = false; remapBodies(); }
   if (bodyN < n) {
-    for (let i = bodyN; i < n; i++) {
+    /* new soldiers run in from behind the crowd a few at a time, each with its own pop,
+       instead of all appearing in place at once (a fresh squad still forms at once) */
+    const instant = bodyN <= 1;
+    refillAcc += dt * (n - bodyN > 40 ? 70 : 34);
+    let add = instant ? n - bodyN : Math.min(n - bodyN, Math.floor(refillAcc));
+    if (add > 0) refillAcc -= add;
+    let back = 0;
+    for (let i = 0; i < bodyN; i++) back = Math.max(back, bodyY[i]);
+    for (let i = bodyN; i < bodyN + add; i++) {
       const slot = squadNow[i] || squadNow[0];
       bodyX[i] = slot.x + rnd(-4, 4);
-      bodyY[i] = slot.y + rnd(-3, 3);
+      bodyY[i] = instant ? slot.y + rnd(-3, 3) : Math.max(slot.y, back) + rnd(10, 22);
       bodyVX[i] = rnd(-30, 30);
-      bodyVY[i] = rnd(-18, 18);
+      bodyVY[i] = instant ? rnd(-18, 18) : -rnd(40, 80);
       bodyPh[i] = rnd(0, 6.28);
+      bodyBorn[i] = crowdT;
     }
-  }
-  bodyN = n;
-  crowdT += dt;
+    bodyN += Math.max(0, add);
+  } else refillAcc = 0;
   /* ease toward the new size in steps, so the formation is not rebuilt every frame */
   const ct = crowdTarget();
   if (Math.abs(ct - crowdS) > 0.02) crowdS += Math.sign(ct - crowdS) * Math.min(Math.abs(ct - crowdS), 0.02);
@@ -3645,10 +3695,12 @@ function stepBodies(dt) {
     const ox = bodyX[i] - slot.x, oy = bodyY[i] - slot.y;
     const d2 = ox * ox + oy * oy;
     if (d2 > lim * lim) {
+      /* too far from its place: walk back quickly, never teleport */
       const d = Math.sqrt(d2);
-      bodyX[i] = slot.x + ox / d * lim;
-      bodyY[i] = slot.y + oy / d * lim;
-      bodyVX[i] *= 0.4; bodyVY[i] *= 0.4;
+      const pull = Math.min(d - lim, 320 * dt);
+      bodyX[i] -= ox / d * pull;
+      bodyY[i] -= oy / d * pull;
+      bodyVX[i] *= 0.8; bodyVY[i] *= 0.8;
     }
     h = Math.max(h, Math.abs(bodyX[i]));
   }
@@ -3660,6 +3712,7 @@ function refreshFormation() {
   if (key === formKey && squadNow.length === shown) return;
   formKey = key;
   squadNow = formation(shown);
+  needRemap = true;
   let h = 12;
   for (const o of squadNow) h = Math.max(h, Math.abs(o.x));
   halfPxCache = h;
@@ -3748,9 +3801,9 @@ function update(dt) {
     let loss = Math.max(1, Math.round(off * per * 0.22));
     loss = Math.max(1, Math.round(loss * (1 - Math.min(0.5, (G.skills.steady || 0) * 0.25))));
     loss = Math.min(loss, Math.ceil(G.soldiers * 0.14));
-    loseSoldiers(loss, 'FELL OFF THE ROAD', (x) => x < road.x0 + 1 || x > road.x1 - 1);
-    let flung = 0;
-    for (let i = 0; i < crowd; i++) {
+    const fellN = loseSoldiers(loss, 'FELL OFF THE ROAD', (x) => x < road.x0 + 1 || x > road.x1 - 1);
+    let flung = fellN > 0 ? 3 : 0;
+    for (let i = 0; i < crowd && flung < 3; i++) {
       const px = G.armyX + bodyX[i];
       if (px >= road.x0 + 1 && px <= road.x1 - 1) continue;
       flingOff(px);
@@ -4165,6 +4218,7 @@ function update(dt) {
         G.kills += hitN;
         const lose = Math.max(1, Math.round(hitN * (1 - armor)));
         G.cause = 'OUTNUMBERED BY A MOB';
+        cullBodies(lose, (x, y) => y > G.camY - 6, '');
         addSoldiers(G.soldiers - lose);
         clashTick(m);
       }
@@ -4242,7 +4296,7 @@ function update(dt) {
     /* each hazard hurts the soldiers inside its drawn shape, and only them */
     const hx = h.kind === 'saw' ? sawX(h) : 0;
     const zone = h.kind === 'lava' ? (x, y) => Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.wy) < h.len / 2
-      : h.kind === 'choke' ? (x, y) => Math.abs(y - h.wy) < h.len / 2 && Math.abs(x - h.gapX) > h.gapW / 2
+      : h.kind === 'choke' ? (x, y) => Math.abs(y - h.wy) < h.len / 2 && Math.abs(x - h.gapX) > h.gapW / 2 - 7
         : (x, y) => Math.abs(x - hx) < 38 && Math.abs(y - h.wy) < 26;
     const share = insideShare(zone);
     if (share > 0) {
@@ -4262,7 +4316,7 @@ function update(dt) {
   if (doDrain && hazDmg > 0)
     loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
   if (doDrain && (tickDmg > 0 || bossDmg > 0))
-    loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS');
+    loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS', (x, y) => y > G.camY - 6);
   if (doDrain) drainAcc = 0;
 
   /* gates */
@@ -4471,7 +4525,7 @@ function draw(now) {
   camera.rotateZ(bank);
   /* wide screens see too much empty roadside at 62deg: tighten so the road fills the frame */
   const baseFov = W / H > 1.25 ? 50 : 62;
-  const fovT = baseFov + (shakeOff ? 0 : fovKick) + Math.max(0, G.speed - SPEED_BASE) * 0.02;
+  const fovT = baseFov + (shakeOff ? 0 : fovKick) + Math.max(0, G.speed - SPEED_BASE) * 0.02 + (W / H < 0.75 && G.mode === 'run' ? Math.max(0, G.form) * 6 : 0);
   if (Math.abs(camera.fov - fovT) > 0.01) { camera.fov += (fovT - camera.fov) * 0.12; camera.updateProjectionMatrix(); }
   starMat.opacity += (ZONE_STARS[zi] - starMat.opacity) * 0.05;
   warm.intensity = 26 + muzzleGlow * 46; muzzleGlow *= 0.8;
@@ -4655,7 +4709,7 @@ function draw(now) {
       squadLabel.classList.toggle('low', n < 10);
       squadShownN = n;
     }
-    setLabel(squadLabel, axw, 2.5 + (crowdS - 1) * 1.6, 0.9);
+    setLabel(squadLabel, axw, (Q.phone || Q.low ? 3.3 : 2.5) + (crowdS - 1) * 1.6, 0.9);
   } else squadLabel.style.display = 'none';
   /* squad */
   const shown = Math.min(G.soldiers, visCap);
@@ -4681,14 +4735,16 @@ function draw(now) {
   }
   const bobT = G.mode === 'run' ? t : t * 0.4;
   const liveRun = shown > 0 && (G.mode === 'run' || G.mode === 'dying');
-  for (let i = 0; i < shown; i++) {
+  const drawN = liveRun ? Math.max(1, Math.min(shown, bodyN)) : shown;
+  const skinBody = skinNow().body;
+  for (let i = 0; i < drawN; i++) {
     const o = soldierOffsets[i] || soldierOffsets[0] || { x: 0, y: 0 };
     const liveBodies = liveRun && i < bodyN;
     const px = liveBodies ? bodyX[i] : o.x;
     const py = liveBodies ? bodyY[i] : o.y;
     const bob = Math.abs(Math.sin(bobT * 9 + i * 1.7)) * 0.16;
     const bx = axw + px * K, bz = 0.6 + py * K;
-    const born = Math.min(1, (t - (soldierBirth[i] || 0)) * 5 + 0.25);
+    const born = liveBodies ? Math.min(1, (crowdT - bodyBorn[i]) * 5 + 0.25) : Math.min(1, (t - (soldierBirth[i] || 0)) * 5 + 0.25);
     const bulk = i === 0 ? 1 : 0.74 + (bodyPh[i] % 1) * 0.48;
     const lead = i === 0;
     dummy.position.set(bx, bob + (1 - born) * 0.35, bz);
@@ -4699,6 +4755,12 @@ function draw(now) {
     dummy.scale.setScalar((lead ? 1.65 * Math.max(1, crowdS * 0.92) : 1.3 * bulk * crowdS) * born);
     dummy.updateMatrix();
     soldierBody.setMatrixAt(i, dummy.matrix);
+    if (liveBodies && i > 0) {
+      /* each soldier's shade comes from its own phase, so it keeps its color when slots are reassigned */
+      const ph = bodyPh[i];
+      tmpCol.set(skinBody).offsetHSL(((ph * 3.7) % 1 - 0.5) * 0.024, 0, ((ph * 7.3) % 1 - 0.5) * 0.075);
+      soldierBody.setColorAt(i, tmpCol);
+    }
     if (i < MAXS) hatMesh.setMatrixAt(i, dummy.matrix);
     if (lead) {
       leaderFlag.position.set(bx, 1.15 + bob, bz + 0.05);
@@ -4724,11 +4786,15 @@ function draw(now) {
       shadowMesh.setMatrixAt(shI++, dummy.matrix);
     }
   }
-  soldierBody.count = shown;
-  /* grace blink: hidden a quarter of the time, so the revived squad still reads as there */
-  soldierBody.visible = !(G.grace > 0 && G.mode === 'run' && Math.floor(t * 10) % 4 === 3);
+  soldierBody.count = drawN;
+  if (liveRun && soldierBody.instanceColor) soldierBody.instanceColor.needsUpdate = true;
+  /* grace: the squad shimmers see-through instead of blinking out */
+  const ghost = G.grace > 0 && G.mode === 'run';
+  if (soldierBody.material.transparent !== ghost) { soldierBody.material.transparent = ghost; soldierBody.material.needsUpdate = true; }
+  soldierBody.material.opacity = ghost ? 0.55 + 0.3 * Math.abs(Math.sin(t * 9)) : 1;
+  soldierBody.visible = true;
   setHat(G.skin);
-  hatMesh.count = shown;
+  hatMesh.count = drawN;
   if (hatFor && HATS[hatFor]) hatMesh.visible = soldierBody.visible;
   hatMesh.instanceMatrix.needsUpdate = true;
   muzzleMesh.count = muzzleGlow > 0.4 ? Math.min(shown, 16) : 0;
@@ -4888,7 +4954,7 @@ function draw(now) {
     dummy.updateMatrix();
     if (di2 >= MAXDEAD) continue;
     deadSoldierMesh.setMatrixAt(di2, dummy.matrix);
-    if (p.skin) tmpCol.set(p.burn ? (p.t < 0.25 ? '#ff7a2a' : '#7a3420') : skinNow().body).offsetHSL(0, -0.15, p.burn ? 0 : -0.12 - 0.25 * Math.min(1, p.t / 0.5));
+    if (p.skin) tmpCol.set(p.burn ? (p.t < 0.25 ? '#ff7a2a' : '#7a3420') : skinNow().body).offsetHSL(0, -0.15, p.burn ? 0 : -0.04 - 0.14 * Math.min(1, p.t / 0.5));
     else tmpCol.set(p.doom ? '#c46a3a' : skinNow().body).offsetHSL(0, -0.2, p.doom ? 0 : -0.3);
     deadSoldierMesh.setColorAt(di2, tmpCol);
     di2++;
@@ -5050,7 +5116,9 @@ function draw(now) {
     dummy.position.set(wx(b.x), 0.62 + crowdS * 0.18, zP);
     dummy.rotation.set(0, Math.atan2(b.vx, -b.vwy), 0);
     const pulse = 1 + (b.pulse || 0) * 0.85;
-    dummy.scale.set((b.wid || 1) * pulse, (b.wid || 1) * pulse, Math.min(1.6, b.len || 1) * (1 + (b.pulse || 0) * 0.35));
+    /* heavier bullets (a big army behind each shot) read a little thicker */
+    const heft = 1 + 0.18 * Math.log10(Math.max(1, b.dmg || 1));
+    dummy.scale.set((b.wid || 1) * pulse * heft, (b.wid || 1) * pulse * heft, Math.min(2.4, b.len || 1) * (1 + (b.pulse || 0) * 0.35));
     dummy.updateMatrix();
     if (bi < MAXB) {
       bulletMesh.setMatrixAt(bi, dummy.matrix);
@@ -5230,7 +5298,7 @@ if (/[?&]debug\b/.test(location.search)) {
     get hazards() { return hazards; }, get barrels() { return barrels; }, get coins() { return coins; },
     get road() { return road; }, get W() { return W; }, get H() { return H; }, get mobs() { return mobs; },
     setAim(x, f) { aimX = clampAim(x); if (f !== undefined) aimForm = f; },
-    sfx, coinLadder, get audioOut() { return { AC, MASTER }; }, sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); },
+    sfx, coinLadder, get audioOut() { return { AC, MASTER }; }, sawX, squadRadius, bodies() { return Array.from(bodyX.slice(0, bodyN)); }, bodiesXY() { const o = []; for (let i = 0; i < bodyN; i++) o.push([bodyX[i], bodyY[i]]); return o; },
   };
 }
 scene.traverse(o => { if (o.isInstancedMesh || o.isPoints) o.frustumCulled = false; });
