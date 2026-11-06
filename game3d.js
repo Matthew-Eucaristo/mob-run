@@ -3876,7 +3876,7 @@ function update(dt) {
     }
     if (tgt) {
       /* aim, but within a forward cone: shots sweeping sideways across the road read as clutter */
-      const ang = clamp(Math.atan2(tgt.x - mx, Math.max(1, tgt.wy - muzzleWy)), -0.56, 0.56);
+      const ang = clamp(Math.atan2(tgt.x - mx, Math.max(1, tgt.wy - muzzleWy)), -1.0, 1.0);
       tvx = Math.sin(ang) * 760; twy = Math.cos(ang) * 760;
     }
     let shotDmg = dmgPerBullet, shotCol = wt.col, shotPulse = 0;
@@ -3885,7 +3885,7 @@ function update(dt) {
     }
     for (let s = 0; s < spread; s++) {
       const focus = 1 - Math.min(0.55, (G.skills.focus || 0) * 0.2);
-      const jit = ((s - (spread - 1) / 2) * 0.07 + rnd(-0.025, 0.025)) * focus;
+      const jit = ((s - (spread - 1) / 2) * 0.09 + rnd(-0.025, 0.025)) * focus;
       const cs = Math.cos(jit), sn = Math.sin(jit);
       /* staggered a little in depth so a volley reads as a stream, not a bundle of straws */
       bullets.push({ x: mx, wy: muzzleWy + rnd(0, 26), vx: tvx * cs - twy * sn, vwy: tvx * sn + twy * cs,
@@ -4224,7 +4224,7 @@ function update(dt) {
       const inPit = (x, y) => Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.wy) < h.len / 2;
       const share = doDrain ? insideShare(inPit) : 0;
       if (share > 0) {
-        loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * 0.6)), 'FELL IN A PIT', inPit);
+        loseSoldiers(Math.max(1, Math.ceil(G.soldiers * share * 0.2)), 'FELL IN A PIT', inPit);
         dmgFlash();
         if (Math.random() < 0.45) sfx.hurt();
       }
@@ -4245,7 +4245,8 @@ function update(dt) {
         : (x, y) => Math.abs(x - hx) < 38 && Math.abs(y - h.wy) < 26;
     const share = insideShare(zone);
     if (share > 0) {
-      const rate = h.kind === 'saw' ? 0.5 : 0.3;
+      /* per tick, of the soldiers inside: about what the old whole-squad drain cost when fully in */
+      const rate = h.kind === 'saw' ? 0.15 : 0.04;
       hazDmg += Math.max(1, G.soldiers * share * rate);
       hazZones.push(zone);
       hazCause = h.kind === 'lava' ? 'BURNED IN LAVA' : h.kind === 'choke' ? 'CRUSHED IN A CHOKEPOINT' : 'SHREDDED BY A SAW';
@@ -4258,7 +4259,7 @@ function update(dt) {
   }
   const guard = 1 - Math.min(0.55, (G.skills.bulwark || 0) * 0.18);
   if (doDrain && hazDmg > 0)
-    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.3))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
+    loseSoldiers(Math.min(hazDmg, Math.max(2, Math.ceil(G.soldiers * 0.16))) * guard, hazCause, (x, y) => hazZones.some((z) => z(x, y)));
   if (doDrain && (tickDmg > 0 || bossDmg > 0))
     loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS');
   if (doDrain) drainAcc = 0;
