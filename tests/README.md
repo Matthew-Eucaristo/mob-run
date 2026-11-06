@@ -31,6 +31,7 @@ Each script prints `ok:` / `FAIL:` lines and `no page errors` at the end; `run-a
 | `pausemenu.js`, `tut.js`, `mouse.js` | Pause menu (settings, END RUN), swipe tutorial, desktop mouse steering |
 | `close.js`, `mys.js`, `records.js`, `bestin.js` | Close calls, mystery gates and splitter boss, lifetime records, BEST IN countdown |
 | `sharenav.js`, `offline.js`, `layouts.js` | Share never navigates away, PWA works offline, key buttons fit on small/landscape/desktop screens |
+| `latefeat.js` | Every zone set-piece shows up on a long run; reserves bank the surplus past the army cap and refill the army after a loss |
 | `monkey.js [secs] [phone/desktop]` | Random taps, swipes, keys, blur and fast-forwards; fails on page errors, NaN state or stuck modes |
 | `sim.js [runs] [good/sloppy]` | Balance: a bot plays full runs, prints distance, duration and cause of death |
 | `prog.js [runs] human` | Long-term economy: a bot plays many runs and buys upgrades with what it earns |

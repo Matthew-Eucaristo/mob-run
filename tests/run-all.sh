@@ -2,7 +2,7 @@
 # Runs the pass/fail browser tests against http://localhost:8787 (serve the repo root first).
 cd "$(dirname "$0")"
 fail=0
-for t in e2e regress regress3 settings rmotion i18n pausemenu tut mouse close mys records bestin sharenav offline layouts; do
+for t in e2e regress regress3 settings rmotion i18n pausemenu tut mouse close mys records bestin sharenav offline layouts latefeat; do
   out=$(node "$t.js" 2>&1)
   if echo "$out" | grep -qE "FAIL|PAGEERR|Error:|net::ERR"; then
     echo "✗ $t"; echo "$out" | grep -E "FAIL|PAGEERR|Error|net::ERR" | head -5; fail=1
