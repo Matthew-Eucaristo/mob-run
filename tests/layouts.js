@@ -16,7 +16,6 @@ const { chromium } = require('playwright');
     await p.waitForFunction(() => document.getElementById('overOverlay').style.display === 'flex');
     await p.waitForTimeout(1100);
     await p.screenshot({ path: `L_${tag}_over.png` });
-    // check the key buttons are on screen without scrolling
     const vis = await p.evaluate(() => ['againBtn', 'reviveBtn'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return id + ':' + (r.bottom <= innerHeight && r.top >= 0 ? 'in' : 'OUT(' + Math.round(r.top) + ')'); }).join(' '));
     console.log(tag, vis);
     await ctx.close();

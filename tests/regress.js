@@ -1,4 +1,3 @@
-// Regression tests for the review findings.
 const { chromium } = require('playwright');
 const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode = 1; } else console.log('ok:', m); };
 (async () => {
@@ -9,7 +8,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await p.goto('http://localhost:8787/index.html?debug');
   await p.waitForTimeout(800);
 
-  // 1. a boss alone in contact drains the army (fightT 7: the showdown has closed in)
   const r1 = await p.evaluate(() => {
     const M = window.__mob; M.SIM.on = true; M.startGame();
     for (let i = 0; i < 60; i++) M.update(1 / 60); M.spawnBoss(M.G.camY + 300);
@@ -24,7 +22,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(r1[1] < r1[0], 'a lone boss in contact hurts the squad ' + r1.join(' '));
 
-  // 3. mob kills counted once
   const r3 = await p.evaluate(() => {
     const M = window.__mob; M.startGame(); M.G.soldiers = 50;
     const m = M.spawnMob(M.G.camY + 600); const n = m.count; const k0 = M.G.kills;
@@ -33,7 +30,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(r3[0] === r3[1], 'mob kills counted once (' + r3.join(' vs ') + ')');
 
-  // 4. upgrades don't pre-complete missions
   const r4 = await p.evaluate(() => {
     const M = window.__mob; M.META.up.gun = 3; M.META.up.army = 10;
     M.META.missions = [{ type: 'gun', done: false }, { type: 'army', done: false }, { type: 'dist', done: false }];
@@ -45,7 +41,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(r4.length === 0, 'starting upgrades do not complete missions on frame 1 (' + r4 + ')');
 
-  // 2. revive doesn't pay the next tier of missions with the old run's stats
   const r2 = await p.evaluate(() => {
     const M = window.__mob;
     M.META.missions = [{ type: 'dist', done: false }, { type: 'coins', done: false }, { type: 'mobs', done: false }];
@@ -63,7 +58,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(r2[0] > 0 && r2[1] === r2[0], 'revive does not re-pay missions (' + r2.join(' / ') + ')');
 
-  // 6. revive grace: nothing can hurt the squad for a moment after a revive
   const r6 = await p.evaluate(() => {
     const M = window.__mob; M.SIM.on = true;
     M.startGame(); for (let i = 0; i < 30; i++) M.update(1 / 60);
@@ -80,7 +74,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   assert(r6[1] >= r6[0] && r6[2] < r6[1] + 1000, 'revive grace protects for ~1.8s then ends (' + r6.join(' -> ') + ')');
   await p.evaluate(() => { const M = window.__mob; M.G.mode = 'dying'; M.gameOver(); });
 
-  // 5. Enter with the armory open does not start a run
   await p.evaluate(() => { const M = window.__mob; M.SIM.on = false; });
   await p.waitForFunction(() => document.getElementById('overOverlay').style.display === 'flex');
   await p.waitForTimeout(1000);

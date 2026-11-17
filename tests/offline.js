@@ -1,4 +1,3 @@
-// Loads once online (service worker installs + precaches), then reloads with the network cut.
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });

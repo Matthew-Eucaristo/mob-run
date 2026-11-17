@@ -1,9 +1,5 @@
-/* MOB RUN 3D — the game from those ads, in Three.js.
-   Chase-camera crowd runner: steer, stretch the squad, pick gates, shoot mobs. */
 import * as THREE from './vendor/three.module.min.js';
 import { icon, drawIcon } from './icons.js';
-/* older Android WebViews / iOS < 16 lack canvas roundRect, which the gates, badges and
-   signs are drawn with: fall back to a plain rounded path */
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     const rr = Math.max(0, Math.min(typeof r === 'number' ? r : 0, w / 2, h / 2));
@@ -17,7 +13,6 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
   };
 }
 const COIN = '<span class="coin"></span>';
-/* language: Bahasa Indonesia for Indonesian devices, English otherwise; switchable in SETTINGS */
 const LANG = (() => {
   try { const v = localStorage.getItem('mobrun_lang'); if (v === 'en' || v === 'id') return v; } catch (e) { }
   return /^(id|in)\b/i.test(navigator.language || '') ? 'id' : 'en';
@@ -25,7 +20,6 @@ const LANG = (() => {
 const L = (en, id) => (LANG === 'id' ? id : en);
 document.documentElement.lang = LANG;
 const INK = '#1b1430';
-/* canvas text waits for the display font so gate numbers never flash in a fallback face */
 if (document.fonts) document.fonts.load('64px "Lilita One"').catch(() => {});
 
 const cv = document.getElementById('game');
@@ -34,7 +28,6 @@ const overOv = document.getElementById('overOverlay');
 const overStats = document.getElementById('overStats');
 const reviveBtn = document.getElementById('reviveBtn');
 const bestLine = document.getElementById('bestLine');
-/* sound: always on; 'M' mutes */
 const labelsEl = document.getElementById('labels');
 const floatsEl = document.getElementById('floats');
 const hudArmy = document.getElementById('hudArmy');
@@ -89,7 +82,6 @@ if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
   const id = e.target.closest && e.target.closest('button') && e.target.closest('button').id;
   if (id === 'pauseSet') { renderSettings(); if (setOv) { setOv.style.display = 'flex'; setOv.scrollTop = 0; } return; }
   if (id === 'pauseQuit') {
-    /* ending a run takes two taps: the first one only asks */
     const qb = document.getElementById('pauseQuit');
     if (!(performance.now() - quitArmedAt < 2200)) {
       quitArmedAt = performance.now();
@@ -100,7 +92,6 @@ if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
       return;
     }
     quitArmedAt = 0; if (qb.dataset.label) qb.textContent = qb.dataset.label;
-    /* quitting still banks the run: coins, distance bonus, missions */
     pauseOv.style.display = 'none';
     G.quit = true;
     G.cause = 'YOU CALLED IT';
@@ -110,8 +101,6 @@ if (pauseOv) pauseOv.addEventListener('pointerdown', (e) => {
   setPause(false);
 });
 
-/* Phones drop MSAA and cap the pixel ratio. Truly weak devices also
-   cut instance counts. Missing deviceMemory (iPhone) counts as fine. */
 function detectQuality() {
   let q = '';
   try { q = new URLSearchParams(location.search).get('q') || ''; } catch (e) { }
@@ -132,20 +121,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredInstall = e;
 });
 
-/* ---------------- sizes / coords ---------------- */
 let W = 0, H = 0, DPR = 1;
-/* Gameplay runs in a fixed logical space the size of a phone, whatever the
-   window is. Before, px -> world scale followed the window width, so a wide
-   desktop packed gates and mobs 3x tighter in the 3D world than a phone did. */
 const LW = 400, LH = 820;
 const road = { x0: 0, x1: 0 };
-const ROADW = 13;                 // world units across the road at the start
-let K = ROADW / (LW * 0.84);                    // px -> world units (locked to the FULL road, never the narrowed one)
-let roadHalf = ROADW / 2;         // current asphalt half-width in world units
+const ROADW = 13;
+let K = ROADW / (LW * 0.84);
+let roadHalf = ROADW / 2;
 const wx = (x) => (x - LW / 2) * K;
-const wz = (wy) => (G.camY - wy) * K;   // ahead = negative z
+const wz = (wy) => (G.camY - wy) * K;
 
-/* ---------------- three setup ---------------- */
 const renderer = new THREE.WebGLRenderer({
   canvas: cv, antialias: Q.aa, alpha: false,
   powerPreference: Q.low ? 'low-power' : 'default',
@@ -186,10 +170,6 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-/* ---------------- audio ----------------
-   Everything goes through one bus: a compressor glues the mix and keeps a
-   busy fight from clipping, and a short synthetic room adds a tail to the
-   big moments. Noise comes from one shared buffer. */
 let AC = null, muted = false, musicOff = false, vibOff = false, shakeOff = false, BUS = null, VERB = null, NOISE = null, MASTER = null;
 function audio() {
   if (!AC) {
@@ -198,14 +178,12 @@ function audio() {
       const comp = AC.createDynamicsCompressor();
       comp.threshold.value = -22; comp.knee.value = 10; comp.ratio.value = 4;
       comp.attack.value = 0.004; comp.release.value = 0.2;
-      /* makeup gain into a brickwall-ish limiter: loud like a phone game, never clipping */
       const master = AC.createGain(); master.gain.value = 2.6;
       const lim = AC.createDynamicsCompressor();
       lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12;
       comp.connect(master); master.connect(lim); lim.connect(AC.destination);
       MASTER = lim;
       BUS = comp;
-      /* room: exponentially decaying stereo noise impulse */
       const len = Math.floor(AC.sampleRate * 1.1);
       const ir = AC.createBuffer(2, len, AC.sampleRate);
       for (let c = 0; c < 2; c++) {
@@ -224,7 +202,6 @@ function audio() {
   if (AC && AC.state === 'suspended') AC.resume().catch(() => { });
   if (AC) musicStart();
 }
-/* oscillator voice: pitch glide, attack, exponential decay, optional reverb send */
 function voice(f, d, type, v, slide, opt) {
   if (!AC || !BUS || (opt && opt.mus ? musicOff : muted)) return;
   const t = AC.currentTime + ((opt && opt.at) || 0);
@@ -242,7 +219,6 @@ function voice(f, d, type, v, slide, opt) {
   o.start(t); o.stop(t + a + d + 0.03);
 }
 function tone(f, d, type, v, slide) { voice(f, d, type, v, slide); }
-/* filtered noise with a cutoff sweep: hits, whooshes, crunches */
 function hiss(d, v, kind, f0, f1, q, opt) {
   if (!AC || !BUS || (opt && opt.mus ? musicOff : muted)) return;
   const t = AC.currentTime + ((opt && opt.at) || 0);
@@ -260,13 +236,11 @@ function hiss(d, v, kind, f0, f1, q, opt) {
 }
 function noise(d, v) { hiss(d, v, 'lowpass', 900); }
 const sfx = {
-  /* a muffled crack, darker for heavier guns */
   shoot: () => {
     const heavy = G.tier / 5;
     hiss(0.045, 0.05, 'bandpass', 2600 - heavy * 1300, 900, 1.2);
     voice(170 - heavy * 50, 0.05, 'sine', 0.05, 60);
   },
-  /* k raises the pitch: a bigger gain rings higher */
   good: (k = 1) => {
     hiss(0.22, 0.06, 'bandpass', 500, 3800, 0.9);
     voice(659 * k, 0.12, 'triangle', 0.09); voice(988 * k, 0.16, 'triangle', 0.08, 0, { at: 0.06 });
@@ -276,7 +250,6 @@ const sfx = {
     [523, 659, 784, 1047].forEach((f, j) => voice(f * k, 0.16, 'triangle', 0.09, 0, { at: j * 0.05, verb: j === 3 }));
   },
   bad: () => { voice(220, 0.28, 'sawtooth', 0.08, 70); hiss(0.2, 0.08, 'lowpass', 700, 120); },
-  /* a little "pop": falling sine plus a click */
   kill: () => { voice(520 + Math.random() * 160, 0.07, 'sine', 0.06, 140); hiss(0.025, 0.04, 'highpass', 3000); },
   hurt: () => { voice(130, 0.12, 'sine', 0.1, 55); hiss(0.08, 0.06, 'lowpass', 600); },
   boss: () => { voice(80, 0.6, 'sawtooth', 0.1, 38, { verb: true }); hiss(0.5, 0.12, 'lowpass', 1400, 90, 0.7, { verb: true }); },
@@ -285,7 +258,6 @@ const sfx = {
   barrel: () => { hiss(0.16, 0.12, 'bandpass', 1800, 400, 1.4); voice(260, 0.12, 'triangle', 0.08, 90); },
   coin: () => { voice(1568, 0.08, 'sine', 0.05); voice(1568 * 2.76, 0.05, 'sine', 0.015); },
   click: () => { voice(1250, 0.03, 'sine', 0.05, 900); hiss(0.018, 0.03, 'highpass', 4000); },
-  /* big moments: a rising major arpeggio over a thump, into the room */
   fanfare: () => {
     voice(70, 0.32, 'sine', 0.16, 40);
     hiss(0.3, 0.06, 'bandpass', 600, 5000, 0.8);
@@ -295,7 +267,6 @@ const sfx = {
     });
   },
 };
-/* coins climb a pentatonic ladder while you keep scooping them */
 const LADDER = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
 let ladder = 0, ladderT = 0;
 function coinLadder() {
@@ -304,13 +275,11 @@ function coinLadder() {
   if (coinSfx > 0) return;
   coinSfx = 0.03;
   const f = 1046 * Math.pow(2, LADDER[ladder] / 12);
-  /* bell: a fundamental plus the inharmonic partial a struck coin has */
   voice(f, 0.09, 'sine', 0.05);
   voice(f * 2.76, 0.05, 'sine', 0.014);
   voice(f * 2, 0.03, 'square', 0.008);
 }
 
-/* ---------------- zones ---------------- */
 const ZONES = [
   { bg: '#2c3a72', ground: '#1d2a52', road: '#3e4c84', post: '#6a7fc4', dash: '#a9bcff', sky: 0xc4d0ff },
   { bg: '#1b3a1a', ground: '#14301a', road: '#38552a', post: '#8fd13a', dash: '#c8f55a', sky: 0xc6ff9a },
@@ -323,7 +292,6 @@ const colCache = {};
 const col3 = (hex) => colCache[hex] || (colCache[hex] = new THREE.Color(hex));
 const curZone = { bg: new THREE.Color(ZONES[0].bg), ground: new THREE.Color(ZONES[0].ground), road: new THREE.Color(ZONES[0].road), post: new THREE.Color(ZONES[0].post), dash: new THREE.Color(ZONES[0].dash) };
 
-/* ---------------- weapon tiers ---------------- */
 const WT = [
   { name: 'PISTOL', dmg: 1, rate: 0.24, spread: 1, col: '#ffe97d', tl: 1.0 },
   { name: 'SMG', dmg: 1, rate: 0.15, spread: 1, col: '#7de8ff', tl: 1.25 },
@@ -333,7 +301,6 @@ const WT = [
   { name: 'ANNIHILATOR', dmg: 5, rate: 0.11, spread: 3, col: '#ff6ef2', tl: 2.4, tw: 1.35 },
 ];
 
-/* ---------------- state ---------------- */
 const G = {
   mode: 'menu',
   camY: 0, speed: 162,
@@ -384,9 +351,6 @@ const SKINS = [
   { id: 'neon', name: 'NEON', price: 8000, body: '#ff3df2', lead: '#3dfff0', hat: L('Visor + cans', 'Visor + headset') },
   { id: 'gold', name: 'GOLDEN', price: 15000, body: '#ffb81a', lead: '#fff6d0', hat: L('Crown', 'Mahkota') },
 ];
-/* ---------------- meta progression (persists between runs) ----------------
-   Upgrades make the next run go further, missions give a reason to try a
-   different route, and the daily gift brings people back. */
 const UPGRADES = [
   { id: 'army', name: L('RECRUITER', 'PEREKRUT'), icon: 'flag', col: '#5bd44a', max: 15, desc: L('More soldiers from every green gate', 'Lebih banyak prajurit dari tiap gerbang hijau'), val: (l) => l ? '+' + l * 3 + '%' : L('normal', 'biasa'), cost: (l) => Math.round(110 * Math.pow(1.35, l)) },
   { id: 'gun', name: L('STARTING GUN', 'SENJATA AWAL'), icon: 'gun', col: '#ff4d5e', max: 3, desc: L('Weapon at the start', 'Senjata di awal run'), val: (l) => ['PISTOL', 'SMG', 'RIFLE', 'SHOTGUN'][l], cost: (l) => [450, 1700, 4500][l] },
@@ -415,7 +379,6 @@ const META = {
   daily: { last: '', streak: 0 },
   runs: 0,
 };
-/* rank: every 3 missions done promotes you; each rank pays out and adds +5% coins */
 const RANKS = L(['RECRUIT', 'PRIVATE', 'CORPORAL', 'SERGEANT', 'LIEUTENANT', 'CAPTAIN', 'MAJOR', 'COLONEL', 'GENERAL', 'WARLORD'],
   ['REKRUT', 'PRAJURIT', 'KOPRAL', 'SERSAN', 'LETNAN', 'KAPTEN', 'MAYOR', 'KOLONEL', 'JENDERAL', 'PANGLIMA']);
 function rankOf(done) { return Math.min(RANKS.length - 1, Math.floor(done / 3)); }
@@ -443,7 +406,6 @@ function fillMissions() {
     const t = types[ri(0, types.length - 1)];
     if (META.missions.some((m) => m.type === t)) continue;
     if ((META.mlv[t] || 0) >= MISSION_DEFS[t].steps.length) continue;
-    /* no "reach 100" right after a 20,000 run: start near half the player's record */
     const rec = t === 'army' ? META.life.peak : t === 'dist' ? G.best : 0;
     if (rec) {
       const st = MISSION_DEFS[t].steps;
@@ -454,7 +416,6 @@ function fillMissions() {
     META.missions.push({ type: t, done: false, isNew: true });
   }
 }
-/* called every frame in a run: a finished mission pays out immediately */
 function checkMissions() {
   for (const m of META.missions) {
     if (m.done) continue;
@@ -475,7 +436,6 @@ function checkMissions() {
     }
   }
 }
-/* end of run: finished missions level up and get replaced */
 function rollMissions() {
   for (const m of META.missions) if (m.done) { META.mlv[m.type] = (META.mlv[m.type] || 0) + 1; m.claimed = true; }
   for (const m of META.missions) m.isNew = false;
@@ -510,16 +470,10 @@ const ri = (a, b) => Math.floor(rnd(a, b + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const chance = (p) => Math.random() < p;
 
-/* ---------------- input ----------------
-   Pointer tracks fast, but lateral speed is capped so a flick / macro
-   cannot teleport the squad across the road. Vertical drag stretches
-   the formation; a mostly-horizontal drag does not. */
 let dragging = false, lastPX = 0, lastPY = 0, prevArmyX = 0, bank = 0, dragAxis = 0;
 let aimX = 0, aimForm = 0;
 const keys = { left: false, right: false, up: false, down: false };
 function latMax() { return Math.max(560, LW * 1.7); }
-/* Steering alone never drops anyone: the squad's own width stays on the
-   asphalt. Only a formation spread wider than the road hangs over. */
 function clampAim(x) {
   const m = Math.min(halfPxCache + 8, (road.x1 - road.x0) * 0.5);
   return clamp(x, road.x0 + m, road.x1 - m);
@@ -535,8 +489,6 @@ function press(x, y) {
 function move(x, y) {
   if (!dragging || G.mode !== 'run') return;
   const dx = x - lastPX, dy = y - lastPY;
-  /* One thumb: the first real move locks the gesture. Sideways steers,
-     up packs a column, down spreads the squad wide. */
   if (!dragAxis) {
     if (dx * dx + dy * dy < 144) return;
     dragAxis = Math.abs(dx) >= Math.abs(dy) ? 1 : 2;
@@ -593,7 +545,6 @@ function snapForm(v, e) {
 }
 if (btnCol) btnCol.addEventListener('pointerdown', (e) => snapForm(-1, e));
 if (btnWide) btnWide.addEventListener('pointerdown', (e) => snapForm(1, e));
-/* the formation chip is a button too: square -> column -> wide -> square */
 const formChip = document.getElementById('hudForm');
 if (formChip) formChip.addEventListener('pointerdown', (e) => snapForm(G.form < -0.34 ? 1 : G.form > 0.34 ? 0 : -1, e));
 const shopBtn = document.getElementById('shopBtn');
@@ -615,7 +566,6 @@ if (installBtn) installBtn.addEventListener('pointerdown', async (e) => {
   deferredInstall = null;
   installCard.style.display = 'none';
 });
-/* every button press: a soft click and a tiny buzz, so the UI feels physical */
 document.addEventListener('pointerdown', (e) => {
   if (!(e.target.closest && e.target.closest('button, .skillCard, .upCard, .skinCard, .setRow'))) return;
   audio(); sfx.click(); vib(8);
@@ -647,19 +597,12 @@ document.addEventListener('keyup', e => {
   else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
 });
 
-/* ================================================================
-   THREE scene objects
-   ================================================================ */
-
-/* --- environment --- */
 const groundMat = new THREE.MeshLambertMaterial({ color: ZONES[0].ground });
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 300), groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.set(0, 0, -60);
 scene.add(ground);
 
-/* asphalt: a light-grey grain/crack/patch texture, tinted by the zone colour and
-   scrolled with the run so the ground visibly rushes past */
 const roadTex = (() => {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512;
   const g = c.getContext('2d');
@@ -670,12 +613,12 @@ const roadTex = (() => {
     g.fillRect(Math.random() * 256, Math.random() * 512, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
   g.globalAlpha = 0.5;
-  for (let i = 0; i < 6; i++) {                       // darker repair patches
+  for (let i = 0; i < 6; i++) {
     g.fillStyle = '#b4b4b4';
     g.beginPath(); g.roundRect(Math.random() * 200, Math.random() * 480, 30 + Math.random() * 50, 18 + Math.random() * 40, 6); g.fill();
   }
   g.globalAlpha = 0.55; g.strokeStyle = '#9a9a9a'; g.lineWidth = 1.5;
-  for (let i = 0; i < 7; i++) {                       // hairline cracks
+  for (let i = 0; i < 7; i++) {
     let x = Math.random() * 256, y = Math.random() * 512;
     g.beginPath(); g.moveTo(x, y);
     for (let k = 0; k < 5; k++) { x += (Math.random() - 0.5) * 30; y += Math.random() * 22; g.lineTo(x, y); }
@@ -700,7 +643,6 @@ shoulder.rotation.x = -Math.PI / 2;
 shoulder.position.set(0, 0.012, -60);
 scene.add(shoulder);
 
-/* scrolling side posts + center dashes (instanced) */
 const NPOST = 44, POST_GAP = 5;
 const postMat = new THREE.MeshLambertMaterial({ color: ZONES[0].post });
 const postMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 1.1, 0.22), postMat, NPOST * 2);
@@ -710,7 +652,6 @@ const dashMat = new THREE.MeshBasicMaterial({ color: ZONES[0].dash });
 const dashMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.02, 1.6), dashMat, NDASH);
 scene.add(dashMesh);
 
-/* speed lines: streaks at the roadside once the run gets fast */
 const NSL = 16;
 const speedLineMesh = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.05, 0.05, 3),
@@ -720,7 +661,6 @@ scene.add(speedLineMesh);
 const slSeed = [];
 for (let i = 0; i < NSL; i++) slSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 + 2.5, 20), off: rnd(0, 120), h: rnd(0.5, 4) });
 
-/* chevron arrows on the road */
 const chevTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -735,7 +675,6 @@ const chevMesh = new THREE.InstancedMesh(
   NCHEV);
 scene.add(chevMesh);
 
-/* roadside props: rocks + spires, wrap-scroll like posts */
 const NROCK = 70, NSPIRE = 46, PROP_GAP = 5.5, PROP_RANGE = 150;
 const rockMesh = new THREE.InstancedMesh(
   new THREE.DodecahedronGeometry(1, 0),
@@ -762,7 +701,6 @@ function tintProps() {
   crysMesh.instanceColor && (crysMesh.instanceColor.needsUpdate = true);
 }
 
-/* distant mountains silhouettes */
 {
   const mGeo = new THREE.ConeGeometry(1, 1, 5);
   const mMat = new THREE.MeshLambertMaterial({ color: 0x11182c });
@@ -776,7 +714,6 @@ function tintProps() {
   }
 }
 
-/* round particles with a bright core: square GL points read as placeholder art */
 const dotTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -786,7 +723,6 @@ const dotTex = (() => {
   g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 31, 0, Math.PI * 2); g.fill();
   return new THREE.CanvasTexture(c);
 })();
-/* stars + motes */
 const NSTARS = 260;
 const starGeo = new THREE.BufferGeometry();
 {
@@ -801,15 +737,13 @@ const stars = new THREE.Points(starGeo, starMat);
 scene.add(stars);
 const ZONE_STARS = [0.9, 0.3, 0.15, 0.85, 0.45];
 
-/* weather: every zone has its own air. Particles live in a box around the
-   camera, scroll with the road and drift with the zone's wind. */
 const NMOTES = Q.low ? 60 : Q.phone ? 130 : 240;
 const WEATHER = [
-  { col: '#f2f6ff', size: 0.38, op: 0.85, vx: 0, vy: -1.3, wob: 0.6, add: false },    // nightfall: snow
-  { col: '#b4ff8a', size: 0.42, op: 0.7, vx: 0, vy: 0.55, wob: 0.9, add: true },       // toxic: spores
-  { col: '#ffd06a', size: 0.36, op: 1, vx: 0.3, vy: 2.6, wob: 0.5, add: true },     // ember: embers
-  { col: '#fff1d6', size: 0.44, op: 0.55, vx: 3.8, vy: -0.15, wob: 0.3, add: false },   // salt: blowing dust
-  { col: '#bff2ff', size: 0.46, op: 0.65, vx: 0, vy: 0.9, wob: 0.7, add: true },        // deep run: bubbles
+  { col: '#f2f6ff', size: 0.38, op: 0.85, vx: 0, vy: -1.3, wob: 0.6, add: false },
+  { col: '#b4ff8a', size: 0.42, op: 0.7, vx: 0, vy: 0.55, wob: 0.9, add: true },
+  { col: '#ffd06a', size: 0.36, op: 1, vx: 0.3, vy: 2.6, wob: 0.5, add: true },
+  { col: '#fff1d6', size: 0.44, op: 0.55, vx: 3.8, vy: -0.15, wob: 0.3, add: false },
+  { col: '#bff2ff', size: 0.46, op: 0.65, vx: 0, vy: 0.9, wob: 0.7, add: true },
 ];
 const wx0 = { col: new THREE.Color(WEATHER[0].col), size: WEATHER[0].size, op: WEATHER[0].op, vx: WEATHER[0].vx, vy: WEATHER[0].vy, wob: WEATHER[0].wob };
 const moteGeo = new THREE.BufferGeometry();
@@ -847,7 +781,6 @@ function stepWeather(dt, zi, scrollV, t) {
   moteGeo.attributes.position.needsUpdate = true;
 }
 
-/* --- merged-geometry builder: multi-part meshes, one draw call each --- */
 function M4(px, py, pz, rx, ry, rz, sx, sy, sz) {
   const m = new THREE.Matrix4();
   m.compose(new THREE.Vector3(px, py, pz),
@@ -877,16 +810,13 @@ function mergeParts(parts) {
   out.setAttribute('color', new THREE.Float32BufferAttribute(colA, 3));
   return out;
 }
-/* geometry detail per quality tier: at phone size the extra segments are invisible but cost
-   thousands of triangles once a crowd of 90 soldiers and a mob are on screen */
 const LOD = Q.low ? 0.55 : Q.phone ? 0.72 : 1;
-let LODK = 1;   /* extra squeeze for crowd units seen mostly from afar */
+let LODK = 1;
 const CAP = (r, l, s) => new THREE.CapsuleGeometry(r, l, Math.max(2, Math.round((s || 3) * LOD * LODK)), Math.max(5, Math.round((s ? 10 : 8) * LOD * LODK)));
 const SPH = (r, s) => new THREE.SphereGeometry(r, Math.max(5, Math.round((s || 10) * LOD * LODK)), Math.max(4, Math.round((s || 10) * LOD * LODK)));
 const CONE = (r, h) => new THREE.ConeGeometry(r, h, 6);
 const BOX = (a, b, c) => new THREE.BoxGeometry(a, b, c);
 
-/* --- squad soldier: armored runner, one draw call --- */
 const soldierGeo = mergeParts([
   { geo: BOX(0.11, 0.07, 0.14), m: M4(-0.07, 0.035, 0.02), c: '#141822' },
   { geo: BOX(0.11, 0.07, 0.14), m: M4(0.07, 0.035, 0.02), c: '#141822' },
@@ -914,7 +844,6 @@ const soldierBody = new THREE.InstancedMesh(soldierGeo,
   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.08 }), MAXS);
 soldierBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(soldierBody);
-/* --- headgear: each squad color wears something of its own, drawn with the same matrices --- */
 const CYL = (r1, r2, h, n) => new THREE.CylinderGeometry(r1, r2, h, n || 10);
 const HATS = {
   vanguard: () => mergeParts([
@@ -972,7 +901,6 @@ function setHat(id) {
   hatMesh.geometry = hatGeoCache[id] || (hatGeoCache[id] = HATS[id]());
   hatMesh.visible = true;
 }
-/* shop portraits: each squad color rendered once, hat and all, into a small image */
 const portraitCache = {};
 let portraitRig = null;
 function skinPortrait(sk) {
@@ -1020,14 +948,12 @@ const leaderFlag = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0xffd75d, side: THREE.DoubleSide, depthWrite: false }));
 scene.add(leaderFlag);
 
-/* dead soldier corpses (flung on drain / fallen off the road) */
 const MAXDEAD = 48;
 const deadSoldierMesh = new THREE.InstancedMesh(soldierGeo,
   new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.08 }), MAXDEAD);
 deadSoldierMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(deadSoldierMesh);
 
-/* --- enemies: merged multi-part geo per kind, feet at y=0 --- */
 const FACE = {
   runner: [1.05, 0.3, 0.55], normal: [1.55, 0.45, 0.9], brute: [1.8, 0.62, 1.2], split: [1.55, 0.45, 0.95],
   gold: [1.5, 0.45, 0.9], leaper: [1.15, 0.32, 0.7], boss: [2.55, 0.75, 1.7],
@@ -1035,7 +961,6 @@ const FACE = {
 function enemyGeo(kind) {
   const HORN = '#2a1018';
   const parts = [];
-  /* a grumpy mouth with three fangs, sitting just under the eyes */
   const F = FACE[kind] || FACE.normal;
   const mY = F[0] - 0.36 * F[2], mZ = F[1] - 0.02;
   parts.push({ geo: BOX(0.44 * F[2], 0.12 * F[2], 0.08), m: M4(0, mY, mZ, 0, 0, 0), c: '#2a0f1a' });
@@ -1055,7 +980,7 @@ function enemyGeo(kind) {
     body(0.75, 0.9, 1.2, 1, 0.95, 0.9);
     horn(-0.58, 2.1, 0, 0, 0.5, 0.2, 0.7); horn(0.58, 2.1, 0, 0, -0.5, 0.2, 0.7);
     horn(-0.82, 1.65, 0, 0, 1.1, 0.13, 0.45); horn(0.82, 1.65, 0, 0, -1.1, 0.13, 0.45);
-    parts.push({ geo: SPH(0.3), m: M4(0, 0.9, 0.45), c: '#d8dce8' });            // pale belly
+    parts.push({ geo: SPH(0.3), m: M4(0, 0.9, 0.45), c: '#d8dce8' });
   } else if (kind === 'split') {
     body(0.5, 0.9, 1.0);
     parts.push({ geo: SPH(0.38), m: M4(0, 0.85, 0.3, 0, 0, 0, 1, 1.1, 0.6), c: '#f0c2a0' });
@@ -1063,7 +988,7 @@ function enemyGeo(kind) {
     arm(-0.5, 1.0, -0.05, -0.9); arm(0.5, 1.0, -0.05, 0.9);
   } else if (kind === 'gold') {
     body(0.5, 0.9, 1.0);
-    parts.push({ geo: CONE(0.3, 0.5, 6), m: M4(0, 2.2, 0), c: '#fff2a8' });      // crown
+    parts.push({ geo: CONE(0.3, 0.5, 6), m: M4(0, 2.2, 0), c: '#fff2a8' });
     for (let i = 0; i < 4; i++) parts.push({ geo: CONE(0.07, 0.3, 5), m: M4(Math.cos(i * 1.57) * 0.28, 2.0, Math.sin(i * 1.57) * 0.28), c: '#fff2a8' });
     arm(-0.48, 1.0, -0.05, -0.85); arm(0.48, 1.0, -0.05, 0.85);
   } else if (kind === 'leaper') {
@@ -1074,24 +999,22 @@ function enemyGeo(kind) {
     horn(0.2, 1.22, 0.12, 0.7, -0.35, 0.07, 0.38);
     arm(-0.32, 0.85, -0.16, -1.1); arm(0.32, 0.85, -0.16, 1.1);
   } else if (kind === 'boss') {
-    /* a hulking ogre: stubby legs, barrel chest, a head sunk between huge shoulders,
-       knuckles near the ground. The face (eyes, mouth) sits on the head's front */
     const W = '#ffffff', PALE = '#f0b8a8', TUSK = '#fff6e0';
     for (const sx of [-1, 1]) {
-      parts.push({ geo: CAP(0.3, 0.42), m: M4(sx * 0.5, 0.48, 0), c: W });                              // leg
-      parts.push({ geo: BOX(0.5, 0.18, 0.62), m: M4(sx * 0.5, 0.09, 0.12), c: HORN });                // foot
-      parts.push({ geo: SPH(0.5), m: M4(sx * 1.12, 2.0, -0.1, 0, 0, 0, 1, 0.9, 1), c: W });           // shoulder
-      parts.push({ geo: CONE(0.13, 0.42), m: M4(sx * 1.22, 2.46, -0.12, 0, 0, -sx * 0.45), c: HORN });  // shoulder spike
+      parts.push({ geo: CAP(0.3, 0.42), m: M4(sx * 0.5, 0.48, 0), c: W });
+      parts.push({ geo: BOX(0.5, 0.18, 0.62), m: M4(sx * 0.5, 0.09, 0.12), c: HORN });
+      parts.push({ geo: SPH(0.5), m: M4(sx * 1.12, 2.0, -0.1, 0, 0, 0, 1, 0.9, 1), c: W });
+      parts.push({ geo: CONE(0.13, 0.42), m: M4(sx * 1.22, 2.46, -0.12, 0, 0, -sx * 0.45), c: HORN });
       parts.push({ geo: CONE(0.1, 0.32), m: M4(sx * 0.92, 2.42, -0.3, -0.3, 0, -sx * 0.25), c: HORN });
-      parts.push({ geo: CAP(0.26, 0.75), m: M4(sx * 1.38, 1.32, 0, 0, 0, sx * 0.18), c: W });          // arm
-      parts.push({ geo: SPH(0.4), m: M4(sx * 1.52, 0.72, 0.12), c: W });                               // fist
-      parts.push({ geo: CONE(0.21, 0.9), m: M4(sx * 0.52, 2.98, -0.05, 0, 0, -sx * 0.55), c: HORN });   // horn
-      parts.push({ geo: CONE(0.07, 0.28), m: M4(sx * 0.3, 2.02, 0.68), c: TUSK });                      // tusk
+      parts.push({ geo: CAP(0.26, 0.75), m: M4(sx * 1.38, 1.32, 0, 0, 0, sx * 0.18), c: W });
+      parts.push({ geo: SPH(0.4), m: M4(sx * 1.52, 0.72, 0.12), c: W });
+      parts.push({ geo: CONE(0.21, 0.9), m: M4(sx * 0.52, 2.98, -0.05, 0, 0, -sx * 0.55), c: HORN });
+      parts.push({ geo: CONE(0.07, 0.28), m: M4(sx * 0.3, 2.02, 0.68), c: TUSK });
     }
-    parts.push({ geo: SPH(1.0), m: M4(0, 1.32, -0.12, 0, 0, 0, 1.3, 1.0, 0.95), c: W });                 // torso
-    parts.push({ geo: SPH(0.55), m: M4(0, 1.05, 0.62, 0, 0, 0, 1.1, 0.9, 0.45), c: PALE });            // belly
-    parts.push({ geo: SPH(0.72), m: M4(0, 2.3, 0.06), c: W });                                         // head
-    parts.push({ geo: BOX(0.9, 0.12, 0.3), m: M4(0, 2.86, 0.42, -0.25, 0, 0), c: HORN });              // brow
+    parts.push({ geo: SPH(1.0), m: M4(0, 1.32, -0.12, 0, 0, 0, 1.3, 1.0, 0.95), c: W });
+    parts.push({ geo: SPH(0.55), m: M4(0, 1.05, 0.62, 0, 0, 0, 1.1, 0.9, 0.45), c: PALE });
+    parts.push({ geo: SPH(0.72), m: M4(0, 2.3, 0.06), c: W });
+    parts.push({ geo: BOX(0.9, 0.12, 0.3), m: M4(0, 2.86, 0.42, -0.25, 0, 0), c: HORN });
   } else {
     body(0.5, 1.0, 1.05);
     horn(-0.4, 2.0, 0, 0, 0.4, 0.15, 0.5); horn(0.4, 2.0, 0, 0, -0.4, 0.15, 0.5);
@@ -1120,7 +1043,6 @@ kindMesh.boss.material.fog = false;
 kindMesh.boss.material.emissive = new THREE.Color('#ff7a45');
 kindMesh.boss.material.emissiveIntensity = 0.32;
 kindMesh.boss.renderOrder = 2;
-/* rival mobs: one shared instanced crowd for every enemy army on screen */
 const MOBU_MAX = 300;
 const MOB_VIS = Q.low ? 34 : Q.phone ? 56 : 90;
 LODK = 0.6;
@@ -1145,7 +1067,6 @@ const eyeMesh = new THREE.InstancedMesh(eyeGeo,
 eyeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(eyeMesh);
 
-/* --- soft blob shadows (fake AO) --- */
 const blobTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
@@ -1165,7 +1086,6 @@ shadowMesh.renderOrder = 2;
 shadowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(shadowMesh);
 
-/* --- sky dome gradient + horizon glow + moon --- */
 const domeGeo = new THREE.SphereGeometry(160, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2);
 {
   const pos = domeGeo.attributes.position, cols = [];
@@ -1198,7 +1118,6 @@ const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x
 moon.position.set(-48, 52, -140); moon.scale.set(17, 17, 1);
 scene.add(moon);
 
-/* --- battle scorch marks (instanced, fade out) --- */
 const MAXSC = 44;
 const scorchMesh = new THREE.InstancedMesh(
   new THREE.PlaneGeometry(1, 1),
@@ -1207,7 +1126,6 @@ scorchMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(scorchMesh);
 const scorches = [];
 
-/* --- glowing crystals along the roadside (zone-tinted) --- */
 const NCRY = 30;
 const crysMesh = new THREE.InstancedMesh(
   new THREE.OctahedronGeometry(1, 0),
@@ -1216,7 +1134,6 @@ crysMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(crysMesh);
 for (let i = 0; i < NCRY; i++) propSeed.push({ x: (chance(0.5) ? -1 : 1) * rnd(ROADW / 2 + 2.6, 48), s: rnd(0.4, 1.3), ry: rnd(0, 6), kind: 2 });
 
-/* trees, grass, lamps, ruins — instanced, zone-tinted, no shadow maps */
 const NTREE = 40, NGRASS = 110, NLAMP = 26, NRUIN = 22;
 const trunkMesh = new THREE.InstancedMesh(
   new THREE.CylinderGeometry(0.12, 0.2, 1.15, 5),
@@ -1254,7 +1171,6 @@ for (let i = 0; i < NRUIN; i++) ruinSeed.push({
   off: rnd(0, 170), ry: rnd(0, 3), h: rnd(0.5, 1.6),
 });
 
-/* --- dark ground patches: break up the flat roadside --- */
 const NPT = 56;
 const patchMesh = new THREE.InstancedMesh(
   new THREE.PlaneGeometry(1, 1),
@@ -1268,7 +1184,6 @@ function addScorch(x, wy, s) {
   if (scorches.length > MAXSC) scorches.shift();
 }
 
-/* --- road edge light strips (follow the asphalt as it narrows) --- */
 const stripMat = new THREE.MeshBasicMaterial({ color: ZONES[0].post });
 const roadStrips = [];
 for (const sx of [-1, 1]) {
@@ -1278,7 +1193,6 @@ for (const sx of [-1, 1]) {
   roadStrips.push(st);
 }
 
-/* --- personal-best finish line: you can see the record coming --- */
 const bestGrp = new THREE.Group();
 {
   const gold = new THREE.MeshBasicMaterial({ color: 0xffd75d, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
@@ -1305,12 +1219,10 @@ const bestLabel = document.createElement('div');
 bestLabel.className = 'lb best';
 document.getElementById('labels').appendChild(bestLabel);
 
-/* --- bullets: instanced tracers --- */
 const MAXB = 500;
 const BULLET_CAP = Q.low ? 140 : Q.phone ? 260 : MAXB;
 const bulletMesh = new THREE.InstancedMesh(
   new THREE.BoxGeometry(0.1, 0.1, 0.62),
-  /* tracers glow through haze: on the pale Salt Flats fog they used to vanish */
   new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), MAXB);
 bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(bulletMesh);
@@ -1321,7 +1233,6 @@ const ebulletMesh = new THREE.InstancedMesh(
 ebulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(ebulletMesh);
 const MAXCOIN = 72;
-/* coins: a chunky gold disc with a darker rim, spinning on its edge like every coin in every runner */
 const coinMesh = new THREE.InstancedMesh(
   mergeParts([
     { geo: new THREE.CylinderGeometry(0.24, 0.24, 0.08, 16), m: M4(0, 0, 0, Math.PI / 2, 0, 0), c: '#e09a12' },
@@ -1331,7 +1242,6 @@ const coinMesh = new THREE.InstancedMesh(
 coinMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 scene.add(coinMesh);
 
-/* --- particles: Points --- */
 const MAXP = 900;
 const partGeo = new THREE.BufferGeometry();
 const partPos = new Float32Array(MAXP * 3);
@@ -1344,25 +1254,21 @@ const partMesh = new THREE.Points(partGeo, new THREE.PointsMaterial({
 }));
 scene.add(partMesh);
 
-/* --- pickups & rewards: glowing orbs (small pool) --- */
 const pickupProto = new THREE.SphereGeometry(0.32, 10, 10);
 const pickupMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 const PICKUP_COL = { rate: 0xe2b657, dmg: 0xffd75d, spread: 0xd7e2c3, heal: 0xd7e2c3, gold: 0xffd75d, weapon: 0xff9d5d, upgrade: 0xe2b657, ward: 0xf3ecdf };
 
-/* --- barrels: group per barrel --- */
 const BAR_COL = { weapon: '#ff9d5d', heal: '#7dff9b', bomb: '#ff5d6a', gold: '#ffd75d', upgrade: '#7de8ff' };
 const BAR_ICON = { weapon: 'gun', heal: 'plus', bomb: 'bomb', gold: 'star', upgrade: 'bolt' };
 const barrelGeoC = new THREE.CylinderGeometry(0.5, 0.55, 1.15, 12);
 const barrelRing = new THREE.CylinderGeometry(0.56, 0.56, 0.14, 12);
 
-/* --- emoji sprite texture cache --- */
 const emojiTex = {};
 function makeIconTex(name, fill) {
   const key = name + fill;
   if (emojiTex[key]) return emojiTex[key];
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
-  /* round badge, ink rim, icon in the middle */
   g.fillStyle = INK; g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#fff4dc'; g.beginPath(); g.arc(64, 64, 50, 0, Math.PI * 2); g.fill();
   drawIcon(g, name, 64, 66, 64, fill);
@@ -1393,7 +1299,6 @@ function makeSprite(name, fill) {
   return sp;
 }
 
-/* --- gate panels --- */
 const PANEL_STYLE = {
   add: { bg: 'rgba(60,180,70,0.78)', edge: '#a6f59a' },
   mul: { bg: 'rgba(40,170,80,0.82)', edge: '#c4ffb0' },
@@ -1479,7 +1384,6 @@ function layoutGate(g) {
 function removeGate(g) {
   if (!g.grp) return;
   scene.remove(g.grp);
-  /* panel canvases and materials are per gate; geometries are shared, leave them */
   for (const m of [...(g.meshes || []), ...(g.frames || []), g.postMesh, g.baseMesh]) {
     if (!m) continue;
     if (m.material.map) m.material.map.dispose();
@@ -1488,7 +1392,6 @@ function removeGate(g) {
   g.grp = null;
 }
 
-/* --- walls: barricade slab + rim + side pillars + warning core --- */
 const wallGeo = mergeParts([
   { geo: BOX(1, 3.0, 0.8), m: M4(0, 1.5, 0), c: '#3a4a6e' },
   { geo: BOX(1.03, 0.4, 0.95), m: M4(0, 3.2, 0), c: '#2a3654' },
@@ -1504,10 +1407,7 @@ function makeWallMesh(w) {
   scene.add(m); w.mesh = m;
 }
 
-/* --- hazards: lava pools + sweeping sawblades (dodge, can't be shot) --- */
 const lavaGeo = new THREE.PlaneGeometry(1, 1);
-/* sawblade: a toothed steel disc standing upright, facing the player, so it
-   reads as a saw from the chase cam instead of a flat ellipse on the road */
 const sawGeo = (() => {
   const shape = new THREE.Shape();
   const teeth = 14, R = 1, r = 0.8;
@@ -1530,7 +1430,6 @@ const sawGeo = (() => {
   ]);
 })();
 const sawRimGeo = new THREE.TorusGeometry(0.62, 0.05, 6, 24);
-/* rail with black and yellow hazard stripes */
 const stripeTex = (() => {
   const c = document.createElement('canvas'); c.width = 128; c.height = 32;
   const g = c.getContext('2d');
@@ -1551,13 +1450,11 @@ function sawX(h) {
   return h.mid + Math.sin(G.time * 1000 * h.speed + h.phase) * h.amp;
 }
 
-/* choke barriers: road narrows — crowd wider than the gap gets crushed */
 const chokeGeo = new THREE.BoxGeometry(1, 1.7, 1);
-const chokeMat = new THREE.MeshLambertMaterial({ color: 0xb8433a, emissive: 0x3a0e0a, emissiveIntensity: 0.6 });   /* reads on dark and pale roads alike */
+const chokeMat = new THREE.MeshLambertMaterial({ color: 0xb8433a, emissive: 0x3a0e0a, emissiveIntensity: 0.6 });
 const chokeEdgeGeo = new THREE.BoxGeometry(0.26, 2.2, 1);
 const chokeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xff5d6a });
 
-/* meteors: warning ring, then a rock falls and blows up whoever stands there */
 const hazRingGeo = new THREE.RingGeometry(0.86, 1, 32);
 const meteorGeo = new THREE.DodecahedronGeometry(0.55, 0);
 const discGeo = new THREE.CircleGeometry(1, 36);
@@ -1572,7 +1469,6 @@ function spawnMeteor(wy) {
   const rock = new THREE.Mesh(meteorGeo, meteorMat);
   rock.position.set(wx(h.x), 30, 0); rock.visible = false;
   const warn = makeSprite('warn'); warn.position.set(wx(h.x), 3.4, 0); warn.visible = false;
-  /* the danger area is a filled disc, so you can read exactly where not to be */
   const fill = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0xff5d6a, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
   fill.rotation.x = -Math.PI / 2; fill.position.set(wx(h.x), 0.04, 0);
   grp.add(fill, ring, rock, warn);
@@ -1587,14 +1483,11 @@ function spawnMeteor(wy) {
 function spawnHazard(wy, forced) {
   const d = G.level;
   let roll = Math.random();
-  /* each zone leans on its own hazard: pits in Toxic Mire, lava in Ember Ridge,
-     saws on the Salt Flats, chokepoints in Deep Run */
   const sig = [null, 0.86, 0.12, 0.4, 0.62][Math.max(0, zoneIdx) % 5];
   if (G.dist < 150 && roll > 0.62) roll = Math.random() * 0.62;
   if (sig !== null && chance(0.45)) roll = sig;
   if (forced !== undefined) roll = forced;
   if (roll < 0.28) {
-    /* lava pool(s) anchored to a road edge — steer to the free side */
     const n = d >= 3 && chance(0.45) ? 2 : 1;
     let ly = wy;
     for (let i = 0; i < n; i++) {
@@ -1619,7 +1512,6 @@ function spawnHazard(wy, forced) {
       ly += len + rnd(80, 140);
     }
   } else if (roll < 0.52) {
-    /* sawblade sweeping across the road on a rail */
     const h = {
       kind: 'saw', wy, r: 88, drain: 6 + Math.floor(d / 3),
       mid: (road.x0 + road.x1) / 2 + rnd(-40, 40),
@@ -1644,7 +1536,6 @@ function spawnHazard(wy, forced) {
     h.grp = grp; h.blade = blade;
     hazards.push(h);
   } else if (roll < 0.74) {
-    /* chokepoint: barriers squeeze the road down to a gap */
     const gapW = (road.x1 - road.x0) * rnd(0.38, 0.55);
     const gapX = rnd(road.x0 + gapW / 2 + 24, road.x1 - gapW / 2 - 24);
     const len = rnd(220, 320);
@@ -1670,14 +1561,12 @@ function spawnHazard(wy, forced) {
     h.grp = grp;
     hazards.push(h);
   } else if (G.dist > 180 || forced !== undefined) {
-    /* hole in the asphalt — anyone standing on it drops */
     const wpx = (road.x1 - road.x0) * rnd(0.28, 0.55);
     const len = rnd(78, 140);
     const x = rnd(road.x0 + wpx / 2 + 10, road.x1 - wpx / 2 - 10);
     const h = { kind: 'gap', x, w: wpx, wy: wy + len * 0.5, len, drain: 7 + Math.floor(d / 2), pop: 0 };
     const grp = new THREE.Group();
     const hole = new THREE.Mesh(lavaGeo, new THREE.MeshBasicMaterial({ color: 0x070910, transparent: true, opacity: 0.92, depthWrite: false }));
-    /* the black hole sits on top of its striped lip, so the lip reads as a frame around a hole */
     hole.rotation.x = -Math.PI / 2; hole.position.y = 0.065; hole.renderOrder = 2;
     hole.scale.set(wpx * K, len * K, 1);
     const lipTex = stripeTex.clone(); lipTex.needsUpdate = true; lipTex.repeat.set(4, 4); h.ownTex = lipTex;
@@ -1695,7 +1584,6 @@ function spawnHazard(wy, forced) {
   }
 }
 
-/* --- HTML label pool --- */
 let squadLabel = null, squadNumEl = null, squadShownN = -1;
 function mkLabel(cls) {
   const d = document.createElement('div');
@@ -1714,7 +1602,6 @@ function project(x3, y3, z3) {
 function setLabel(el, x3, y3, z3, txt) {
   if (txt !== undefined) el.textContent = txt;
   const [sx, sy, zz] = project(x3, y3, z3);
-  /* Far labels stay full-size in screen space and pile into an unreadable blob. */
   const cl = el.classList;
   const farCut = cl.contains('boss') || cl.contains('mob') || cl.contains('best') ? -80 : (cl.contains('wall') ? -32 : -15);
   if (zz > 1 || zz < -1 || z3 < farCut || sx < -120 || sx > W + 120 || sy < -60 || sy > H + 60) {
@@ -1731,7 +1618,6 @@ function floatText(x, wy, text, color, size, h) {
   el.className = 'fl'; el.textContent = text;
   el.style.color = color; el.style.fontSize = (size || 18) + 'px';
   floatsEl.appendChild(el);
-  /* stack instead of overlapping when several pop at once near the squad */
   let hh = h === undefined ? 2.5 : h;
   let busy = 0;
   for (const f of floats) if (f.t < 0.45 && Math.abs(f.x - x) < 140 && Math.abs(f.wy - wy) < 90) busy++;
@@ -1741,7 +1627,6 @@ function floatText(x, wy, text, color, size, h) {
   while (floats.length > 14) { floats[0].el.remove(); floats.shift(); }
 }
 
-/* ---------------- spawning ---------------- */
 function spawnCoinLine(wy) {
   if (coins.length > MAXCOIN - 10) return;
   const early = gatesSpawned <= 3;
@@ -1756,8 +1641,6 @@ function spawnCoinLine(wy) {
   }
 }
 
-/* Each zone has one signature moment, once per visit, a little after you enter it:
-   built from the zone's own hazard so it reads as that place's big set-piece. */
 const PIECES = [
   { title: L('PRISON CONVOY', 'KONVOI TAHANAN'), sub: L('Shoot the locks, take the men.', 'Tembak gemboknya, bawa orangnya.'), len: 620,
     make: (wy) => { for (let i = 0; i < 3; i++) spawnCage(wy + i * 200); } },
@@ -1765,12 +1648,10 @@ const PIECES = [
     make: (wy) => { for (let i = 0; i < 3; i++) spawnHazard(wy + i * 270, 0.86); } },
   { title: L('METEOR SHOWER', 'HUJAN METEOR'), sub: L('Read the circles. Find the gap.', 'Baca lingkarannya. Cari celahnya.'), len: 700,
     make: (wy) => {
-      /* three lanes; each rock picks one of the two that aren't the free lane, so a gap always exists */
       const lanes = [0.2, 0.5, 0.8].map((f) => road.x0 + (road.x1 - road.x0) * f);
       const free = ri(0, 2);
       for (let i = 0; i < 6; i++) {
         const opts = [0, 1, 2].filter((k) => k !== free);
-        /* six rocks in a row: smaller and gentler each, so the shower tests you without wiping you */
         const m = spawnMeteor(wy + i * 115); m.x = lanes[opts[i % 2]] + rnd(-12, 12); m.r = 50; m.shower = true;
       }
     } },
@@ -1792,7 +1673,6 @@ function schedule() {
     const hazP = hordeP + 0.08 + heat * 0.09;
     const mobP = G.dist > 60 ? 0.13 + heat * 0.1 : 0;
     if (G.dist > nextBand) { nextBand += Math.max(170, 350 - Math.max(0, G.dist - 900) * 0.2); spawnMob(nextY, 1, true); nextY += rnd(640, 900) - heat * 210; continue; }
-    /* the zone's set-piece, ~70m into the zone (never in the first 100m of a run) */
     if (pieceZone >= 0 && nextY / 40 > pieceAt && nextY - lastBossY < 2500) pieceAt += 20;
     if (pieceZone >= 0 && nextY / 40 > pieceAt) {
       const pc = PIECES[pieceZone % PIECES.length];
@@ -1803,12 +1683,9 @@ function schedule() {
       continue;
     }
     if (G.dist > nextWall) { nextWall += rnd(260, 340); spawnWall(nextY); nextY += rnd(560, 760) - heat * 150; continue; }
-    /* early rules go by where the event lands (the schedule runs ~65m ahead), not where you are */
     const at = nextY / 40;
-    /* the first rival mob is tough enough to reach you: the first real crowd-on-crowd clash */
     if (at > 75 && !firstMob) { firstMob = true; const fm = spawnMob(nextY, 1.5); fm.tough = true; fm.maxHp = fm.hp; sinceGate++; }
     else if (at < 100 && gatesSpawned < 3) { spawnGate(nextY); sinceGate = 0; }
-    /* first minute: a gate every other beat, so there is always a choice coming */
     else if (at < 260 && sinceGate >= 1) { spawnGate(nextY); sinceGate = 0; }
     else if (at < 260) { if (roll > 0.7 && at > 120) spawnMob(nextY); else if (chance(0.5)) spawnBarrels(nextY); else spawnPack(nextY); sinceGate++; }
     else if (roll > 1 - mobP) spawnMob(nextY);
@@ -1822,21 +1699,17 @@ function schedule() {
     if (chance(0.12)) spawnPickup(nextY + rnd(-150, 150));
     if (gatesSpawned <= 3 || chance(0.7)) spawnCoinLine(nextY + rnd(70, 200));
     if (G.dist > 380 && chance((0.08 + heat * 0.1) * (zoneIdx % 5 === 2 ? 2 : 1))) spawnMeteor(nextY + rnd(-120, 240));
-    /* something every few seconds: tighter early, when the player has the least going on */
     const early = clamp(1 - G.dist / 400, 0, 1);
     const step = rnd(600, 860) - heat * 200 - early * 150;
-    /* later on, a long stretch gets a little something halfway: a few runners or barrels to shoot */
     if (G.dist > 400 && step > 640 && chance(0.55)) { if (chance(0.6)) spawnPack(nextY + step * 0.5); else spawnBarrels(nextY + step * 0.5); }
     nextY += step;
     bossCounter += 1;
-    /* a boss fight needs the road to itself: room for the whole showdown, and never on top of a set-piece */
     if (bossCounter >= (G.dist < 450 ? 10 : 6) && Math.abs(nextY - lastPieceY) > 2500 && pieceZone < 0) {
       bossCounter = 0; spawnBoss(nextY + 140); lastBossY = nextY; nextY += 600 + 8 * G.speed;
     }
   }
 }
 
-/* two significant digits past 100: +3400 reads at a glance, +3409 does not */
 function niceNum(v) {
   if (v < 100) return Math.round(v);
   const m = Math.pow(10, Math.floor(Math.log10(v)) - 1);
@@ -1845,10 +1718,7 @@ function niceNum(v) {
 function spawnGate(wy) {
   const d = G.level;
   const S = Math.max(10, G.soldiers);
-  /* adds grow with the army only up to twice par, so a lead is earned, not compounded */
   const SA = Math.min(S, Math.max(10, par(G.dist) * 2));
-  /* add values track the army a bit so +N never feels worthless; red gates
-     take a share of the army — a wrong pick stings but is rarely lethal early */
   const addBase = ri(8, 16) + d * 5 + Math.round(SA * rnd(0.12, 0.22));
   const late = G.dist > 420;
   const bigSub = Math.max(4, Math.round(S * rnd(0.35, 0.6)) + d * 2);
@@ -1865,14 +1735,11 @@ function spawnGate(wy) {
     [{ t: 'gun' }, { t: 'sub', v: bigSub }],
     [{ t: 'gun' }, { t: 'div', v: 2 }],
   ];
-  /* close calls: two good options that need a second of maths, and the odd
-     "least bad" pair where both sides cost you */
   const flip = (x, y) => (chance(0.5) ? [x, y] : [y, x]);
   const near2 = Math.max(6, Math.round(SA * rnd(0.85, 1.2)) + ri(2, 9));
   styles.push(flip({ t: 'add', v: near2 }, { t: 'mul', v: 2 }), flip({ t: 'add', v: near2 }, { t: 'mul', v: 2 }));
   styles.push(flip({ t: 'add', v: Math.max(10, Math.round(SA * rnd(1.7, 2.3))) }, { t: 'mul', v: 3 }));
   if (G.dist > 300) styles.push(flip({ t: 'sub', v: Math.max(4, Math.round(S * rnd(0.4, 0.6))) }, { t: 'div', v: 2 }));
-  /* mystery: a sealed panel next to a known one. Decided now, revealed on the way through */
   if (G.dist > 120 && chance(0.14)) {
     const r = Math.random();
     const res = r < 0.28 ? { t: 'add', v: Math.round(addBase * 1.8) } : r < 0.48 ? { t: 'mul', v: 2 } : r < 0.6 ? { t: 'mul', v: 3 }
@@ -1889,7 +1756,6 @@ function spawnGate(wy) {
     : gatesSpawned === 3 ? trap
     : lucky ? (chance(0.5) ? [{ t: 'mul', v: 3 }, { t: 'add', v: addBase * 2 }] : [{ t: 'add', v: addBase * 2 }, { t: 'mul', v: 3 }])
     : styles[ri(0, styles.length - 1)];
-  /* way above par, a x3/x4/x5 would make the rest of the run a formality: soften it */
   const rich = G.soldiers > par(G.dist) * 2.5;
   for (const pn of pair) {
     if (pn.t === 'mys' && pn.res.t === 'mul' && rich) pn.res = { t: 'mul', v: 2 };
@@ -1966,7 +1832,6 @@ function spawnHorde(wy) {
 
 function spawnWall(wy) {
   const d = G.level;
-  /* sometimes a partial barricade covering part of the road — dodgeable */
   const partial = d >= 2 && chance(0.45);
   let x0 = road.x0, x1 = road.x1;
   if (partial) {
@@ -1982,24 +1847,18 @@ function spawnWall(wy) {
   walls.push(w);
 }
 
-/* Threat curve. Rival mobs are sized from PAR: the army a fair player has at
-   this distance. Your own army only adds a small share, so every good gate
-   pick is a buffer you keep, and every bad one leaves you short. Par keeps
-   climbing, so every run still ends. */
 function par(d) { return 20 + 6500 * Math.pow(Math.max(0, d) / 1000, 2.3); }
 function threatBase(d) { return 6 * Math.pow(1.00205, d); }
 function threatRatio(d) {
   const t = clamp(d / 2000, 0, 1);
   return 0.3 + 0.5 * t * t * (3 - 2 * t);
 }
-/* firepower per soldier relative to a bare pistol squad */
 function firepower() {
   const wt = WT[G.tier];
   const spread = Math.min(7, wt.spread + (G.skills.split || 0) + (G.upSpread || 0));
   const rate = Math.max(0.04, wt.rate - G.upRate) * (1 - Math.min(0.4, (G.skills.rate || 0) * 0.1));
   return ((wt.dmg + G.upDmg) * spread / rate) / (1 / 0.24);
 }
-/* sublinear in firepower: a better gun still shreds more of the mob */
 function unitHp(d) { return (6 + d / 32) * Math.pow(Math.max(1, firepower()), 0.6); }
 function spawnMob(wy, scale, band) {
   const d = G.dist;
@@ -2007,9 +1866,6 @@ function spawnMob(wy, scale, band) {
   let n = band
     ? Math.max(threatBase(d) * 2, (P * (0.55 + 0.5 * clamp((d - 300) / 1300, 0, 1)) + S * 0.2) * rnd(0.9, 1.1))
     : Math.max(threatBase(d), P * threatRatio(d) + S * 0.12) * rnd(0.8, 1.15) * (scale || 1);
-  /* never a flat wall of arithmetic: a band stays just under the army cap, so a
-     full army can always win the clash. The late game is about rebuilding in time
-     for the next one, which comes sooner the further you get */
   n = Math.min(n, band ? ARMY_CAP * 0.95 : ARMY_CAP * rnd(0.35, 0.7));
   n = Math.max(4, Math.round(n));
   const uh = unitHp(d);
@@ -2025,7 +1881,6 @@ function spawnMob(wy, scale, band) {
     const rowN = Math.min(cols, vis - r * cols);
     units.push({ ox: (c - (rowN - 1) / 2) * gap + rnd(-3, 3), oy: (r - (rows - 1) / 2) * gap * 0.9 + rnd(-3, 3), ph: rnd(0, 6.28), k: 0 });
   }
-  /* front rows first, outer edges last: a shrinking crowd thins from the back */
   for (const u of units) u.k = u.oy * 2 + Math.abs(u.ox) * 0.5;
   units.sort((a, b) => a.k - b.k);
   const hw = ((cols - 1) * gap) / 2 + 10;
@@ -2033,7 +1888,6 @@ function spawnMob(wy, scale, band) {
   const m = { x: band ? (road.x0 + road.x1) / 2 : x, band: !!band, wy, count: n, start: n, hp: n * uh, uh, units, hw, hd: ((rows - 1) * gap * 0.9) / 2 + 10,
     clash: false, tick: 0, hitT: 0, pop: 0, dead: false, deadT: 0, label: mkLabel('mob') };
   mobs.push(m);
-  /* one banner at a time: if something else is being announced, the band's own label does the job */
   if (band && performance.now() > bannerUntil) bannerFlash(L('WAR BAND AHEAD', 'PASUKAN PERANG!'), '#ff5d6a');
   return m;
 }
@@ -2068,7 +1922,6 @@ function killMob(m, how) {
 }
 function hurtMob(m, dmg) {
   if (m.dead) return;
-  /* the first mob of a run is a lesson in clashing: it can't be shot away entirely */
   if (m.tough && !m.clash) { const now = G.time; const bud = Math.min(m.maxHp * 0.12, (m.bud ?? m.maxHp * 0.05) + (now - (m.budT ?? now)) * m.maxHp * 0.12); m.budT = now; dmg = Math.min(dmg, bud); m.bud = bud - dmg; }
   m.hp -= dmg;
   const c = Math.max(0, Math.ceil(m.hp / m.uh));
@@ -2077,7 +1930,6 @@ function hurtMob(m, dmg) {
 }
 
 const bossAuraGeo = new THREE.RingGeometry(0.85, 1, 36);
-/* variant silhouettes: gunners carry shoulder cannons, splitters glow with three cores */
 const cannonGeo = mergeParts([
   { geo: new THREE.CylinderGeometry(0.24, 0.28, 1.25, 12), m: M4(0, 0, 0.3, Math.PI / 2, 0, 0), c: '#7a7494' },
   { geo: new THREE.CylinderGeometry(0.3, 0.3, 0.16, 12), m: M4(0, 0, 0.92, Math.PI / 2, 0, 0), c: '#ffcf3d' },
@@ -2105,12 +1957,11 @@ function bossBits(boss) {
       const c = new THREE.Mesh(coreGeo, coreMat); c.position.set(x, y - 0.25, 0.9); g.add(c);
     }
   } else return null;
-  g.visible = false;   /* shown once the draw loop has placed it */
+  g.visible = false;
   scene.add(g);
   return g;
 }
 function dropBossBits(e) { if (e.aura) scene.remove(e.aura); if (e.acc) scene.remove(e.acc); }
-/* three recurring rivals, each with a name and a mouth on them */
 const BOSSES = {
   brute: { name: L('MURGO THE WALL', 'MURGO SI TEMBOK'), taunts: L(
     ["He's coming. Slowly. Loudly.", 'He ate the last squad.', 'Big, slow, and very, very rude.'],
@@ -2125,16 +1976,14 @@ const BOSSES = {
 const bossKind = (e) => (e.shooter ? 'gunner' : e.splitter ? 'splitter' : 'brute');
 function bossTitle(e) { return BOSSES[bossKind(e)].name; }
 function spawnBoss(wy) {
-  bossIntro = true;   /* whichever boss comes first is the intro: never two in a row */
+  bossIntro = true;
   const d = G.level;
-  /* as tough as a rival mob of about a quarter of par: the same per-unit health that tracks your guns */
   const early = clamp(0.45 + G.dist / 600, 0.45, 1);
   const hp = Math.round((42 + d * 46 + unitHp(G.dist) * (par(G.dist) * 0.28 + G.soldiers * 0.06)) * early);
   const bx = (road.x0 + road.x1) / 2 + rnd(-60, 60);
     const boss = mkEnemy('boss', bx, wy, hp);
   boss.roar = 1;
   boss.pop = 0.55;
-  /* variant: a gunner boss lobs burning orbs */
   if (d >= 2 && chance(0.45)) { boss.shooter = true; boss.col = '#d8762a'; boss.fireT = 1.1; }
   else if (d >= 3 && chance(0.45)) { boss.splitter = true; boss.col = '#8a3ad8'; }
   const aura = new THREE.Mesh(bossAuraGeo, new THREE.MeshBasicMaterial({
@@ -2178,8 +2027,6 @@ function spawnBarrels(wy) {
   for (const b of barrels) if (!b.maxhp) b.maxhp = b.hp;
 }
 
-/* --- prisoner cages: shoot the lock off and the prisoners join the squad.
-   Run into one unbroken and only half of them make it out. --- */
 const cageBarGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.0, 6);
 const cagePlateGeo = new THREE.CylinderGeometry(1.2, 1.25, 0.18, 14);
 const cageBarMat = new THREE.MeshStandardMaterial({ color: 0xb8c2d8, metalness: 0.6, roughness: 0.35 });
@@ -2247,17 +2094,13 @@ function spawnPickup(wy) {
   pickups.push({ x: rnd(road.x0 + 30, road.x1 - 30), wy, kind, taken: false, mesh: m, pop: 0 });
 }
 
-/* ---------------- combat helpers ---------------- */
 function squadRadius() {
   const bulk = Math.min(22, Math.sqrt(Math.max(1, G.soldiers)) * 0.85);
   return clamp(halfPxCache * 0.82 + bulk, 20, 200);
 }
 
-/* past the army cap, extra recruits aren't wasted: they turn into coins,
-   and every ~2000 of overflow sharpens the guns, so big gates still pay */
 const ARMY_CAP = 20000;
 const RESERVE_CAP = 6000;
-/* reserves top the army back up once it has dropped well below the cap */
 function stepReserve(dt) {
   if (G.reserve <= 0 || G.soldiers >= ARMY_CAP * 0.85 || G.soldiers <= 0) return;
   const move = Math.min(G.reserve, ARMY_CAP - G.soldiers, Math.ceil(2600 * dt));
@@ -2269,13 +2112,11 @@ function stepReserve(dt) {
   }
 }
 function overflow(extra) {
-  /* logarithmic: a x3 gate at the cap is worth a little more than a +500, not 20x more */
   const coinsN = Math.min(14, Math.max(1, Math.round(Math.log2(1 + extra / 500) * 2)));
   for (let i = 0; i < coinsN && coins.length < MAXCOIN; i++)
     coins.push({ x: G.armyX + rnd(-40, 40), wy: G.camY + 40 + rnd(-10, 20), spin: rnd(0, 6), fly: 0.1 + i * 0.03 });
   const dmg = extra >= 20000 ? 2 : extra >= 3000 ? 1 : 0;
   G.upDmg += dmg;
-  /* the surplus isn't lost: a third of it waits in reserve and marches in after the next clash */
   const banked = Math.min(RESERVE_CAP - G.reserve, Math.round(extra * 0.35));
   if (!META.seen.cap) { META.seen.cap = true; showHint(L('ARMY FULL · extras wait in reserve and refill you after a fight', 'PASUKAN PENUH · sisanya jadi cadangan, mengisi lagi setelah bentrok'), 5); }
   if (banked > 0) G.reserve += banked;
@@ -2318,7 +2159,6 @@ function applyGate(g) {
   const army = G.soldiers;
   const shown = Math.min(army, 180);
   let left = 0, counted = 0, seam = 0;
-  /* the middle post: soldiers who run straight into it don't make it through */
   const SEAM = 13;
   if (bodyN > 1) {
     counted = bodyN;
@@ -2329,11 +2169,9 @@ function applyGate(g) {
     for (const o of offs) { const x = G.armyX + o.x; if (x < mid) left++; if (Math.abs(x - mid) < SEAM) seam++; }
   }
   let lFrac = left / counted, rFrac = 1 - lFrac;
-  /* a few stragglers on the other side follow the crowd: aiming at a panel gets you that panel */
   if (lFrac < 0.2) { lFrac = 0; rFrac = 1; }
   else if (rFrac < 0.2) { rFrac = 0; lFrac = 1; }
   const lp = g.panels[0], rp = g.panels[1];
-  /* only a squad that straddles the gate pays for the post */
   const postLoss = lFrac > 0 && rFrac > 0 && G.dist > 60 ? Math.min(army - 1, Math.round(army * Math.min(0.12, seam / counted))) : 0;
   const thru = army - postLoss;
   if (postLoss > 0) {
@@ -2343,7 +2181,6 @@ function applyGate(g) {
   }
   let nl = transformCount(thru * lFrac, lp);
   let nr = transformCount(thru * rFrac, rp);
-  /* the soldiers who ran through a losing panel, or into the post, are the ones who fall */
   if (postLoss > 0) cullBodies(postLoss, (x) => Math.abs(x - mid) < SEAM, '');
   if (nl < thru * lFrac) cullBodies(thru * lFrac - nl, (x) => x < mid, '');
   if (nr < thru * rFrac) cullBodies(thru * rFrac - nr, (x) => x >= mid, '');
@@ -2351,9 +2188,7 @@ function applyGate(g) {
   if (lp.t === 'gun' && lFrac > 0) gunUp = true;
   if (rp.t === 'gun' && rFrac > 0) gunUp = true;
   let after = Math.max(0, Math.round(nl + nr));
-  /* RECRUITER: every green gate brings a few percent more */
   if (after > army && META.up.army) after = army + Math.round((after - army) * (1 + 0.03 * META.up.army));
-  /* the first stretch is a tutorial: a wrong gate hurts but never ends the run */
   if (G.dist < 250 && after < 5) after = Math.min(army, 5);
   const delta = after - army;
   if (after < army) G.cause = postLoss > army * 0.5 ? 'CLIPPED A GATE POST' : 'A BAD GATE';
@@ -2377,14 +2212,11 @@ function applyGate(g) {
     if (g.meshes && g.meshes[side]) { const mat = g.meshes[side].material, old = mat.map; mat.map = panelTex({ ...pp.res, gold: false }); mat.needsUpdate = true; if (old) old.dispose(); }
     (good ? sfx.fanfare : sfx.bad)();
   }
-  /* at the cap a green gate feeds the reserve, and says so instead of a number that changes nothing */
   const lab = gunUp && delta === 0 ? L('WEAPON UP!', 'SENJATA NAIK!') : (army >= ARMY_CAP && delta > 0) ? L('→ RESERVE', '→ CADANGAN') : ((delta >= 0 ? '+' : '') + delta);
-  /* in the display font a small ÷ reads like +, so floating text writes it as / */
   const fl = (q) => gateLabel(q).replace('÷', '/');
   const tag = split ? (fl(lp) + ' | ' + fl(rp) + '  =  ') : '';
   floatText(G.armyX, G.camY + 10, tag + lab,
     good ? '#ffd75d' : '#ff5d6a', split || gunUp ? 26 : 24, 3.4);
-  /* up to a fifth higher for a big multiplier, in semitones so it stays musical */
   const semis = clamp(Math.round(Math.log2(Math.max(1, after) / Math.max(1, army)) * 4), 0, 7);
   if (good) (delta > army || gunUp ? sfx.great : sfx.good)(Math.pow(2, semis / 12));
   else sfx.bad();
@@ -2416,10 +2248,6 @@ function clashTick(m) {
   if (clashSfx <= 0) { clashSfx = 0.07; tone(180 + Math.random() * 90, 0.05, 'square', 0.035, 90); }
 }
 function sr0() { return squadRadius(); }
-/* Per-soldier losses. A loss that happens somewhere (lava, a saw, the bad side of a gate)
-   takes the drawn soldiers who are standing there: they fall where they stood, and the rest
-   of the crowd closes up. Past the drawing limit each body stands for several soldiers.
-   inZone(x, wy) is a test in road space; returns how many bodies fell. */
 function cullBodies(lost, inZone, how) {
   if (!(lost > 0) || bodyN <= 1 || !(G.mode === 'run' || G.mode === 'dying')) return 0;
   const shown = Math.max(1, Math.min(G.soldiers, visCap, bodyN));
@@ -2440,14 +2268,12 @@ function cullBodies(lost, inZone, how) {
   needRemap = true;
   return kill.length;
 }
-/* share of the drawn squad standing inside an area (road space): hazards hurt only them */
 function insideShare(inZone) {
   if (bodyN <= 0) return 0;
   let n = 0;
   for (let i = 0; i < bodyN; i++) if (inZone(G.armyX + bodyX[i], G.camY - bodyY[i])) n++;
   return n / bodyN;
 }
-/* a fallen soldier, in the squad's own color: knocked up and away from the crowd, then gone */
 function dropCorpse(x, wy, how) {
   const away = x >= G.armyX ? 1 : -1;
   if (how === 'off') {
@@ -2488,14 +2314,11 @@ function bannerFlash(text, color, sub) {
   zoneBanner.classList.add('go');
   zoneBanner.style.opacity = '1';
   clearTimeout(bannerT);
-  /* a banner with a second line stays up long enough to read it */
   bannerT = setTimeout(() => { zoneBanner.style.opacity = '0'; }, sub ? 2400 : 1500);
   bannerUntil = performance.now() + (sub ? 2600 : 1700);
-  /* one message at a time in the middle of the screen */
   if (toastEl && toastEl.classList.contains('on')) toastEl.classList.add('hush');
 }
 let bannerT = null;
-/* the first time each hazard shows up, say what to do about it, once ever */
 function tutorialHint(kind) {
   if (META.seen[kind]) return;
   const touch = document.body.classList.contains('touch');
@@ -2513,8 +2336,6 @@ function tutorialHint(kind) {
   showHint(T[kind], 3.6);
   saveSave();
 }
-/* first runs: an animated hand shows the swipe until the player steers once,
-   then the formation tip takes over */
 const tutEl = document.getElementById('tut');
 function onFirstSteer() {
   G.steered = true;
@@ -2528,7 +2349,6 @@ function showHint(text, secs) {
   hintEl.textContent = text;
   hintT = secs;
 }
-/* skill reward: a hazard that only just missed */
 function closeCall(x, wy) {
   G.closeCalls = (G.closeCalls || 0) + 1;
   const n = 3 + Math.min(5, G.closeCalls);
@@ -2539,7 +2359,6 @@ function closeCall(x, wy) {
   hitstop(0.06);
 }
 function hitstop(t) { G.slow = Math.max(G.slow, t); }
-/* a little coin flies from the pickup to the HUD counter; pooled DOM, capped */
 const flyPool = [];
 let flyNext = 0;
 function coinToHud(x, wy) {
@@ -2584,19 +2403,10 @@ function dmgFlash() {
   }, 70);
 }
 
-/* --- music ---
-   A 16-bar song in A minor, shifted per zone: A (Am F C G) twice, a B section
-   (F G Em Am) for lift, then A again with a pentatonic hook on top. Every
-   fourth bar ends on a little drum fill so the phrases breathe.
-   Notes are scheduled on the audio clock a little ahead of time, so the
-   groove doesn't wobble with frame hitches the way setInterval does.
-   Layers: kick + clap + hats, a moving bassline, a soft chord stab, and
-   an arpeggio that only plays when a mob or boss is close. */
 let musTimer = null, musStep = 0, musNext = 0, musicHeat = 0;
-const STEP = 60 / 116 / 4;                    // 16th notes at 116 bpm
-const CHORDS = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];   // Am F C G as semitones from A
-const CHORDS_B = [[-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7]]; // F G Em Am
-/* the hook: A minor pentatonic, one bar long, answered a step lower on bars 2 and 4 */
+const STEP = 60 / 116 / 4;
+const CHORDS = [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]];
+const CHORDS_B = [[-4, 0, 3], [-2, 2, 5], [-5, -2, 2], [0, 3, 7]];
 const HOOK = [12, null, 15, null, 17, null, 15, 12, null, 10, null, 12, null, null, 7, null];
 const BASSLINE = [0, null, 0, 12, null, 0, 7, null, 0, null, 12, 0, null, 7, 5, 3];
 const ZONE_KEY = [0, 2, -2, 3, 5];
@@ -2607,30 +2417,23 @@ function musicStep(step, at) {
   const key = ZONE_KEY[Math.max(0, zoneIdx) % ZONE_KEY.length];
   const ch = songBar >= 8 && songBar < 12 ? CHORDS_B[bar] : CHORDS[bar];
   const o = { at, mus: true };
-  /* drums */
-  /* boss on screen: double-time kick and a growl under the bass */
   const bossy = !calm && musicHeat >= 1.5;
   if (!calm && (s16 % 4 === 0 || (bossy && s16 % 2 === 0))) { voice(150, 0.11, 'sine', 0.16, 42, o); }
   if (bossy && s16 % 4 === 2) voice(hz(key + ch[0] - 36), STEP * 1.8, 'sawtooth', 0.03, 0, o);
   if (!calm && (s16 === 4 || s16 === 12)) hiss(0.09, 0.05, 'bandpass', 1800, 900, 0.9, o);
-  /* phrase-end fill: three quick claps rising into the next bar */
   if (!calm && bar === 3 && (s16 === 13 || s16 === 14 || s16 === 15)) hiss(0.06, 0.035, 'bandpass', 1400 + (s16 - 13) * 500, 900, 0.9, o);
   if (!calm && s16 % 2 === 1) hiss(0.025, G.soldiers > 120 ? 0.018 : 0.011, 'highpass', 7000, 0, 0.7, o);
-  /* bass: root of the bar's chord, sidestepping on the off-beats */
   const b = BASSLINE[s16];
   if (b !== null) {
     const f = hz(key + ch[0] + b - 24);
     voice(f, STEP * 1.6, 'triangle', calm ? 0.045 : 0.075, 0, o);
     if (!calm) voice(f, STEP * 1.2, 'sawtooth', 0.012, 0, o);
   }
-  /* chord stab on the "and" of beat 2 and 4 */
   if (s16 === 6 || s16 === 14) for (const n of ch) voice(hz(key + n + 12), 0.16, 'triangle', 0.016, 0, { at, attack: 0.012, mus: true });
-  /* the hook, in the last four bars of the song */
   if (!calm && songBar >= 12) {
     const h = HOOK[s16];
     if (h !== null) voice(hz(key + h + (bar % 2 ? 10 : 12)), STEP * 1.7, 'triangle', 0.022, 0, { at, attack: 0.008, mus: true, verb: s16 === 4 });
   }
-  /* tension arpeggio */
   if (!calm && musicHeat > 0.5) {
     const n = ch[s16 % 3] + (s16 % 6 > 2 ? 24 : 12);
     voice(hz(key + n + 12), 0.08, 'square', 0.01 + 0.006 * musicHeat, 0, o);
@@ -2654,8 +2457,6 @@ function musicStart() {
 }
 function musicStop() { clearInterval(musTimer); musTimer = null; }
 
-/* gun tiers unlock along the run (about every 220 m past your starting gun), so the
-   arsenal grows across the whole run instead of maxing out in the first minute */
 function tierCap() { return Math.min(WT.length - 1, (META.up.gun || 0) + 1 + Math.floor(G.dist / 220)); }
 function weaponUp() {
   G.gunUps += 1;
@@ -2671,14 +2472,12 @@ function mkPart(x, wy, color) {
     t: 0, life: rnd(0.3, 0.75), color };
 }
 
-/* --- gate shockwave ring --- */
 const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dff9b, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
 const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), ringMat);
 ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
 scene.add(ring);
 let ringT = 9;
 
-/* --- death flings (enemy corpses + soldier corpses) --- */
 const deadEnemies = [];
 function flingEnemy(e) {
   deadEnemies.push({ x: e.x, wy: e.wy, kind: e.kind, col: e.col, s: e._s || (e.boss ? 1.1 : 0.5), t: 0,
@@ -2687,7 +2486,6 @@ function flingEnemy(e) {
 }
 const deadSoldiers = [];
 function flingSoldier() {
-  /* a generic casualty comes off the front edge of the crowd and is thrown outward, never left standing inside it */
   const side = Math.random() < 0.5 ? -1 : 1;
   deadSoldiers.push({ x: G.armyX + side * rnd(6, 22), wy: G.camY + rnd(10, 26),
     y: 0.45, vy: rnd(2.6, 4.6), vx: side * rnd(30, 75), vwy: -rnd(35, 75), spin: rnd(-8, 8), t: 0, skin: true });
@@ -2703,7 +2501,6 @@ function flingOff(px) {
 }
 let edgeDanger = 0;
 
-/* ---------------- game flow ---------------- */
 function startGame() {
   G.mode = 'run'; G.camY = 0; G.speed = SPEED_BASE; shownArmy = -1;
   G.armyX = LW / 2; aimX = LW / 2; aimForm = 0; G.form = 0; formKey = ''; bodyN = 0; dragAxis = 0;
@@ -2737,7 +2534,6 @@ function startGame() {
 function skillLine() {
   let h = '';
   if (G.shield > 0) h += `<span class="ward">${icon('shield')}${G.shield}</span>`;
-  /* one tidy row: the four strongest picks, then a +N for the rest */
   const got = SKILLS.filter((sk) => sk.id !== 'shield' && G.skills[sk.id]).sort((a, b) => G.skills[b.id] - G.skills[a.id]);
   for (const sk of got.slice(0, 4)) { const n = G.skills[sk.id]; h += `<span style="color:${sk.col}">${icon(sk.icon)}${n > 1 ? '<b>' + n + '</b>' : ''}</span>`; }
   if (got.length > 4) h += `<span class="more">+${got.length - 4}</span>`;
@@ -2746,18 +2542,15 @@ function skillLine() {
 }
 function offerSkills() {
   if (!skillOv || !skillCards) return;
-  /* thirteen distinct picks: the near-duplicates stay in the code for old saves but are no longer offered */
   const RETIRED = ['hoard', 'scavenge', 'magnet', 'fortune', 'quickstep', 'rally', 'bulwark', 'steady', 'focus'];
   const pool = SKILLS.filter(s => !RETIRED.includes(s.id) && (G.skills[s.id] || 0) < s.max);
   if (!pool.length) return;
   const bag = pool.slice();
   const picks = [];
-  /* every offer has at least one way to shoot harder, so a level-up never feels like a tax form */
   const FIGHT = ['pierce', 'split', 'rate', 'dmg', 'crit', 'chain'];
   const fight = bag.filter((s) => FIGHT.includes(s.id));
   if (fight.length) { const f = fight[ri(0, fight.length - 1)]; picks.push(f); bag.splice(bag.indexOf(f), 1); }
   while (picks.length < 3 && bag.length) picks.push(bag.splice(ri(0, bag.length - 1), 1)[0]);
-  /* shuffle so the fight card is not always first */
   for (let i = picks.length - 1; i > 0; i--) { const j = ri(0, i); [picks[i], picks[j]] = [picks[j], picks[i]]; }
   skillCards.innerHTML = '';
   for (const s of picks) {
@@ -2830,7 +2623,6 @@ function missionHTML(showNew) {
       (live && !m.done ? `<div class="bar"><i style="width:0" data-w="${pct}%"></i></div>` : '') +
       `</div><div class="rw">+${missionReward(m)}${COIN}</div></div>`;
   }
-  /* a promotion earned this run is part of the mission coins: show it, or the sum doesn't add up */
   if (live && G.rankUp) h += `<div class="ms done rank"><div class="mi">${icon('crown')}</div><div class="mt">${L('RANK UP: ', 'NAIK PANGKAT: ')}${RANKS[G.rankUp.rk]}</div><div class="rw">+${G.rankUp.rr}${COIN}</div></div>`;
   return h ? '<h3>' + L('MISSIONS', 'MISI') + '</h3>' + h : '';
 }
@@ -2848,7 +2640,6 @@ const CAUSE_ID = {
 function causeText(c) { if (!c) return L('WIPED OUT', 'KALAH'); return LANG === 'id' ? (CAUSE_ID[c] || c) : c; }
 function reviveCost() { return Math.max(30, Math.round(G.dist / 8)); }
 function gameOver() {
-  /* the results screen lists missions itself: drop any toast still queued */
   toastQ.length = 0; clearTimeout(toastT); if (toastEl) toastEl.classList.remove('on', 'hush');
   if (G.mode === 'over') return;
   G.mode = 'over';
@@ -2880,7 +2671,6 @@ function gameOver() {
   if (!revived || META.hist.length === 0) META.hist.push(d); else META.hist[META.hist.length - 1] = d;
   while (META.hist.length > 10) META.hist.shift();
   const hmax = Math.max(1, ...META.hist);
-  /* last runs, labelled: this run and the best one carry their distance */
   const short = (v) => v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v + 'm';
   const topK = META.hist.lastIndexOf(hmax);
   const histHTML = META.hist.length > 1 ? `<div class="hist">${META.hist.map((v, k) => {
@@ -2898,11 +2688,10 @@ function gameOver() {
   }
   saveSave();
   overOv.style.display = 'flex';
-  overOv.scrollTop = 0;   /* a tall results screen always opens at its top */
+  overOv.scrollTop = 0;
   overOv.classList.remove('on');
   void overOv.offsetWidth;
   overOv.classList.add('on');
-  /* count the distance up: cheap, and it makes every run feel like a score */
   const el = document.getElementById('overDist');
   const t0 = performance.now();
   const tick = () => {
@@ -2929,7 +2718,6 @@ function gameOver() {
   if (META.runs >= 3 || (isBest && META.runs >= 2)) maybeOfferInstall(); else if (installCard) installCard.style.display = 'none';
   vib(30);
 }
-/* the last moment hangs in slow motion while the camera closes in, then the results */
 const DEATH_T = 1.35;
 function beginDeath() {
   if (G.mode === 'dying' || G.mode === 'over') return;
@@ -2989,8 +2777,6 @@ if (againBtn) againBtn.addEventListener('pointerdown', (e) => {
 });
 const shareBtn = document.getElementById('shareBtn');
 if (shareBtn) shareBtn.innerHTML = icon('share');
-/* share card: a 4:5 branded image of the run, shared as a file where the
-   platform allows it, downloaded otherwise */
 let shareBlob = null;
 function shareCard() {
   const c = document.createElement('canvas'); c.width = 1080; c.height = 1350;
@@ -3046,7 +2832,6 @@ if (shareBtn) shareBtn.addEventListener('pointerdown', async (e) => {
     done();
   } catch (err) { }
 });
-/* results screen: offer the cheapest upgrade you can afford, one tap to buy */
 const quickBuy = document.getElementById('quickBuy');
 function bestBuy() {
   let pick = null;
@@ -3054,8 +2839,6 @@ function bestBuy() {
     const l = META.up[u.id] || 0;
     if (l >= u.max) continue;
     const c = u.cost(l);
-    /* suggest what changes the next run most: a better starting gun, then firepower,
-       then the cheapest of the rest */
     const w = u.id === 'gun' ? 0.35 : u.id === 'fire' ? 0.6 : u.id === 'army' ? 1.6 : 1;
     if (c <= G.coins && (!pick || c * w < pick.c * pick.w)) pick = { u, l, c, w };
   }
@@ -3166,7 +2949,6 @@ function showToast() {
     setTimeout(() => { toastQ.shift(); showToast(); }, 380);
   }, 2300);
 }
-/* confetti for the big wins: plain DOM pieces on a fixed layer, cleaned up when they land */
 function confetti(n) {
   const cols = ['#ffcc33', '#5bd44a', '#4aa3ff', '#ff4d5e', '#ff7ab8', '#fff4dc'];
   const layer = document.createElement('div');
@@ -3205,7 +2987,6 @@ function refreshBadges() {
     if (b) b.classList.toggle('on', can);
   }
 }
-/* your squad on the menu: its portrait and name, a tap away from the armory */
 function squadChipHTML() {
   const sk = skinNow(), por = skinPortrait(sk);
   return `<button type="button" class="chip squadChip">${por ? `<img src="${por}" alt="">` : icon('run')}${sk.name}</button>`;
@@ -3273,10 +3054,8 @@ function loadSave() {
     const st = JSON.parse(localStorage.getItem('mobrun_settings') || 'null');
     if (st) { muted = st.sfx === false; musicOff = st.music === false; vibOff = st.vib === false; shakeOff = st.shake === false; }
     else if (localStorage.getItem('mobrun_mute') === '1') { muted = true; musicOff = true; }
-    /* players who asked their device for less motion start with screen shake off */
     if (!st && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) shakeOff = true;
   } catch (e) { }
-  /* finished-but-unrolled missions (tab closed mid-run) roll now */
   rollMissions();
   renderMenu();
 }
@@ -3317,7 +3096,6 @@ function renderShop() {
       card.innerHTML = `<i>${icon(u.icon)}</i><div class="mid"><b>${u.name}</b><span>${u.desc}<br><b class="v">${u.val(l)}</b>${maxed ? '' : ' → <b class="v nx">' + u.val(l + 1) + '</b>'}</span><div class="pips">${pips}</div></div>` +
         `<div class="price">${maxed ? 'MAX' : cost + COIN}</div>`;
       card.addEventListener('click', (ev) => {
-        /* click, not pointerdown: a swipe that starts on a card scrolls the list instead of buying */
         ev.stopPropagation(); ev.preventDefault();
         if (shopFresh()) return;
         audio();
@@ -3361,8 +3139,6 @@ function renderShop() {
     shopGrid.appendChild(card);
   }
 }
-/* the tap that opens the shop fires its click on whatever card lands under the finger:
-   cards ignore clicks for a moment after opening */
 let shopOpenAt = 0;
 const shopFresh = () => performance.now() - shopOpenAt < 450;
 function openShop(e) {
@@ -3407,16 +3183,11 @@ if (window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover:
   if (hintEl) hintEl.textContent = 'swipe sideways to steer · up for a column · down to spread wide';
 }
 
-/* ---------------- update ---------------- */
 function hurt(e, dmg) {
-  /* a boss shrugs off shots until it makes its entrance: the fight happens up close, not on the horizon */
   if (e.boss && !e.introduced) return;
   if (e.boss && G.skills.execution) dmg *= 1 + G.skills.execution * 0.4;
-  /* a boss soaks at most about a fifth of its health a second, so even a monster squad
-     gets a few seconds of showdown instead of a pop on the horizon */
   if (e.boss && !e.attacking) { const bud = e.budget ?? e.maxhp * 0.25; dmg = Math.min(dmg, Math.max(0, bud)); e.budget = bud - dmg; }
   e.hp -= dmg;
-  /* flash in short pulses so a monster under constant fire keeps its color */
   if (!(e.hitCD > 0)) { e.hitT = 0.07; e.hitCD = 0.22; }
   if (!e.boss) e.wy += Math.min(7, dmg * 0.18);
   if (e.hp > 0 && parts.length < MAXP - 8 && Math.random() < 0.55)
@@ -3430,7 +3201,6 @@ function hurt(e, dmg) {
     G.killChain += 1; G.killChainT = 1.4;
     if ((G.skills.scavenge || 0) > 0 && Math.random() < 0.1 * G.skills.scavenge && coins.length < MAXCOIN)
       coins.push({ x: e.x + rnd(-10, 10), wy: e.wy, spin: rnd(0, 6) });
-    /* combos pay: every 10 kills in a chain throws coins at the squad */
     if (G.killChain % 10 === 0) {
       const n = Math.min(6, G.killChain / 10);
       floatText(e.x, e.wy, L('RAMPAGE ×', 'MENGAMUK ×') + G.killChain, '#e2b657', 22 + Math.min(10, n * 2), 3);
@@ -3440,7 +3210,6 @@ function hurt(e, dmg) {
     }
     if (e.boss) {
       sfx.boss(); sfx.fanfare(); G.shake = 14; G.slow = 0.45; vib([70, 40, 120]); G.bossKills += 1;
-      /* a splitter bursts into three brutes that each carry a quarter of its health */
       if (e.splitter) {
         for (let k = -1; k <= 1; k++) {
           const b2 = mkEnemy('brute', clamp(e.x + k * 55, road.x0 + 20, road.x1 - 20), e.wy + 20 + Math.abs(k) * 20, Math.round(e.maxhp * 0.25));
@@ -3538,9 +3307,6 @@ function takePickup(kind, x) {
   for (let i = 0; i < 12; i++) parts.push(mkPart(x, G.camY + 10, '#7de8ff'));
 }
 
-/* Past what we can draw, a bigger army shows as bigger, burlier soldiers in a
-   looser crowd, so 2,000 never looks like 200. Purely visual: the width still
-   stays inside the road, so nobody falls off for it. */
 let crowdS = 1;
 function crowdTarget() {
   const S = G.soldiers;
@@ -3548,13 +3314,9 @@ function crowdTarget() {
   return 1 + 0.25 * clamp(Math.log(S / visCap) / Math.log(20000 / visCap), 0, 1);
 }
 function formation(n) {
-  /* Width tracks the asphalt. A centered wide line fills the road;
-     steering past the edge, or a narrower road later, drops soldiers. */
   n = Math.max(1, n | 0);
   const wide = (G.form + 1) * 0.5;
   const roadW = Math.max(120, road.x1 - road.x0);
-  /* the default square is about a third of the road, so it fits one gate panel;
-     only a deliberate WIDE spread straddles both */
   const span = roadW * (0.12 + 0.72 * Math.pow(wide, 1.8));
   const spY = (8 + (1 - wide) * 10) * Math.max(0.7, Math.min(1, roadW / 480)) * crowdS;
   const aspect = Math.pow(2.6, G.form);
@@ -3562,7 +3324,6 @@ function formation(n) {
   cols = clamp(cols, 1, Math.min(n, wide > 0.72 ? 16 : 36));
   const body = n - 1;
   const rows = Math.max(1, Math.ceil(Math.max(1, body) / cols));
-  /* small squads stay a tight knot; only big ones fill the road */
   const spX = cols <= 1 ? 0 : Math.min(span / (cols - 1), (22 + wide * 24) * crowdS);
   const out = new Array(n);
   out[0] = { x: 0, y: -((rows - 1) * spY) * 0.45 - spY * 0.9 };
@@ -3582,11 +3343,9 @@ const CROWD = 220;
 const bodyX = new Float32Array(CROWD), bodyY = new Float32Array(CROWD);
 const bodyVX = new Float32Array(CROWD), bodyVY = new Float32Array(CROWD);
 const bodyPh = new Float32Array(CROWD);
-const bodyBorn = new Float32Array(CROWD);   /* crowdT when this soldier joined: drives its pop-in */
+const bodyBorn = new Float32Array(CROWD);
 let refillAcc = 0, needRemap = false;
 const BODY_ARRS = [bodyX, bodyY, bodyVX, bodyVY, bodyPh, bodyBorn];
-/* after the formation changes, every soldier takes the free slot nearest to where it stands
-   (matched row by row), instead of the slot that happens to share its index */
 function remapBodies() {
   const m = Math.min(bodyN, squadNow.length);
   if (m <= 2) return;
@@ -3620,8 +3379,6 @@ function stepBodies(dt) {
   if (bodyN > n) { bodyN = n; needRemap = true; }
   if (needRemap) { needRemap = false; remapBodies(); }
   if (bodyN < n) {
-    /* new soldiers run in from behind the crowd a few at a time, each with its own pop,
-       instead of all appearing in place at once (a fresh squad still forms at once) */
     const instant = bodyN <= 1;
     refillAcc += dt * (n - bodyN > 40 ? 70 : 34);
     let add = instant ? n - bodyN : Math.min(n - bodyN, Math.floor(refillAcc));
@@ -3639,14 +3396,12 @@ function stepBodies(dt) {
     }
     bodyN += Math.max(0, add);
   } else refillAcc = 0;
-  /* ease toward the new size in steps, so the formation is not rebuilt every frame */
   const ct = crowdTarget();
   if (Math.abs(ct - crowdS) > 0.02) crowdS += Math.sign(ct - crowdS) * Math.min(Math.abs(ct - crowdS), 0.02);
   const damp = Math.max(0, 1 - 3.4 * dt);
   for (let i = 0; i < n; i++) {
     const slot = squadNow[i] || squadNow[0];
     const pull = i === 0 ? 16 : 7;
-    /* a big crowd marches tighter: less personal wander as it grows */
     const calm = 1 / (1 + (crowdS - 1) * 4);
     const biasX = i === 0 ? 0 : Math.sin(bodyPh[i]) * 8 * calm;
     const biasY = i === 0 ? 0 : Math.cos(bodyPh[i] * 1.7) * 6 * calm;
@@ -3695,7 +3450,6 @@ function stepBodies(dt) {
     const ox = bodyX[i] - slot.x, oy = bodyY[i] - slot.y;
     const d2 = ox * ox + oy * oy;
     if (d2 > lim * lim) {
-      /* too far from its place: walk back quickly, never teleport */
       const d = Math.sqrt(d2);
       const pull = Math.min(d - lim, 320 * dt);
       bodyX[i] -= ox / d * pull;
@@ -3719,7 +3473,6 @@ function refreshFormation() {
 }
 let squadNow = [{ x: 0, y: 0 }];
 
-/* ---------------- frame ---------------- */
 let last = performance.now();
 const SIM = { on: false };
 function setPause(on) {
@@ -3749,7 +3502,6 @@ function frame(now) {
     draw(now);
     return;
   }
-  /* attract mode: the road keeps rolling behind the menu */
   if (G.mode === 'menu') G.camY += 70 * dt;
   if (G.mode !== 'run') { draw(now); return; }
   if (G.slow > 0) { G.slow -= dt; dt *= 0.35; }
@@ -3760,7 +3512,6 @@ requestAnimationFrame(frame);
 
 function update(dt) {
   if (parts.length > partCap) parts.splice(0, parts.length - partCap);
-  /* a tip waits out a banner instead of running down behind it */
   if (performance.now() > bannerUntil) hintT = Math.max(0, hintT - dt);
   if (coinSfx > 0) coinSfx -= dt;
   if (clashSfx > 0) clashSfx -= dt;
@@ -3845,18 +3596,14 @@ function update(dt) {
   G.shake = Math.max(0, G.shake - dt * 22);
   fovKick = Math.max(0, fovKick - dt * 14);
 
-  /* zone transition banner */
   const zi = (G.level - 1) % ZONES.length;
   if (zi !== zoneIdx) {
     zoneIdx = zi;
     tintProps();
-    /* the Salt Flats are pale: floating text gets a dark halo there */
     document.body.classList.toggle('pale', zi === 3);
     if (G.dist > 100) { pieceZone = zi; pieceAt = G.dist + 70; }
-    /* the zones loop every five levels; later laps say so */
     const lap = Math.floor((G.level - 1) / ZONES.length);
     const zoneName = ZONE_NAMES[zi] + (lap ? ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][Math.min(7, lap - 1)] : '');
-    /* zones turn over on a level-up: hold the name until the skill pick is out of the way */
     if (G.dist > 5) { if (wantSkill) pendingZone = [zoneName, lap ? '#ffcc33' : '']; else bannerFlash(zoneName, lap ? '#ffcc33' : ''); }
   }
 
@@ -3870,7 +3617,6 @@ function update(dt) {
     spawnBoss(G.camY + Math.max(460, LH * 0.7));
   }
 
-  /* squad firing */
   const wt = WT[G.tier];
   const shooters = Math.min(G.soldiers, Q.low ? 22 : Q.phone ? 32 : 60);
   const stand = (G.soldiers < 18 && G.skills.laststand) ? (1 + 0.22 * G.skills.laststand) : 1;
@@ -3882,7 +3628,6 @@ function update(dt) {
   const spread = Math.min(7, wt.spread + (G.skills.split || 0) + (G.upSpread || 0));
   fireAcc += dt;
   const interval = rate / Math.max(1, shooters * 0.11);
-  /* shots leave from just ahead of the crowd's real front row, not from inside a big crowd */
   let front = 0;
   for (let i = 0; i < bodyN; i++) front = Math.max(front, -bodyY[i]);
   const muzzleWy = G.camY + Math.max(30, front + 14);
@@ -3929,7 +3674,6 @@ function update(dt) {
       if (d < best) { best = d; tgt = { x: tx, wy: w.wy }; }
     }
     if (tgt) {
-      /* aim, but within a forward cone: shots sweeping sideways across the road read as clutter */
       const ang = clamp(Math.atan2(tgt.x - mx, Math.max(1, tgt.wy - muzzleWy)), -1.0, 1.0);
       tvx = Math.sin(ang) * 760; twy = Math.cos(ang) * 760;
     }
@@ -3941,7 +3685,6 @@ function update(dt) {
       const focus = 1 - Math.min(0.55, (G.skills.focus || 0) * 0.2);
       const jit = ((s - (spread - 1) / 2) * 0.09 + rnd(-0.025, 0.025)) * focus;
       const cs = Math.cos(jit), sn = Math.sin(jit);
-      /* staggered a little in depth so a volley reads as a stream, not a bundle of straws */
       bullets.push({ x: mx, wy: muzzleWy + rnd(0, 26), vx: tvx * cs - twy * sn, vwy: tvx * sn + twy * cs,
         dmg: shotDmg, col: shotCol, len: wt.tl, wid: wt.tw || 1,
         pierce: G.skills.pierce || 0, pulse: shotPulse });
@@ -3955,7 +3698,6 @@ function update(dt) {
   if (fireAcc > interval * 2) fireAcc = interval;
   if (bullets.length > BULLET_CAP) bullets.splice(0, bullets.length - BULLET_CAP);
 
-  /* bullets — ×N becomes N separate shots, ÷N deletes shots for real */
   const sr = squadRadius();
   const born = [];
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -3964,7 +3706,6 @@ function update(dt) {
     b.x += b.vx * dt; b.wy += b.vwy * dt;
     if (b.pulse) b.pulse = Math.max(0, b.pulse - dt * 3.4);
     if (b.wy < G.camY - 60 || b.wy > G.camY + 1500 || b.x < -40 || b.x > LW + 40) { bullets.splice(i, 1); continue; }
-    /* crossing a gate really multiplies or deletes bullets — damage is per bullet */
     for (const g of gates) {
       if (g.id === b.lastGate || !(prevWy < g.wy && b.wy >= g.wy)) continue;
       b.lastGate = g.id;
@@ -4031,8 +3772,6 @@ function update(dt) {
         hurt(e, b.dmg);
         if (!b.pierced) b.pierced = [];
         b.pierced.push(e);
-        /* overkill carries on: a heavy bullet that drops a small monster keeps its leftover damage,
-           so fewer, heavier bullets (low quality) hit as hard as many light ones */
         const left = e.boss ? 0 : b.dmg - Math.max(0, hpBefore);
         if (e.hp <= 0 && left > 0.5) { b.dmg = left; break; }
         if ((b.pierce || 0) > 0) b.pierce -= 1;
@@ -4070,7 +3809,6 @@ function update(dt) {
     for (let k = 0; k < born.length && bullets.length < BULLET_CAP; k++) bullets.push(born[k]);
   }
 
-  /* enemy projectiles — dodgeable orbs from shooter bosses */
   for (let i = ebullets.length - 1; i >= 0; i--) {
     const p = ebullets[i];
     p.t += dt; p.x += p.vx * dt; p.wy += p.vwy * dt;
@@ -4087,12 +3825,10 @@ function update(dt) {
     }
   }
 
-  /* sprint dust */
   if (G.mode === 'run' && parts.length < MAXP - 4 && Math.random() < 0.35)
     parts.push({ x: G.armyX + rnd(-16, 16), wy: G.camY + rnd(-8, 6), h: 0.15,
       vx: rnd(-8, 8), vwy: -rnd(20, 50), vh: rnd(0.4, 1), t: 0, life: rnd(0.3, 0.6), color: '#7d88ab' });
 
-  /* enemies drift toward the squad */
   drainAcc += dt;
   const drainTick = 0.32;
   const doDrain = drainAcc >= drainTick;
@@ -4112,21 +3848,16 @@ function update(dt) {
     if (e.hitCD > 0) e.hitCD -= dt;
     if (e.kind === 'gold' && Math.random() < 0.22 && parts.length < MAXP - 4)
       parts.push(mkPart(e.x + rnd(-8, 8), e.wy + rnd(-6, 6), '#ffd75d'));
-    /* roar eases back to rest; letting it run negative shrank bosses to nothing */
     if (e.roar > 0) e.roar = Math.max(0, e.roar - dt * 1.4);
-    /* boss entrance: name card, roar, a jolt, the moment it comes into view */
     if (e.boss && !e.introduced && e.wy - G.camY < 540) {
       e.introduced = true; e.roar = 1; e.fightT = 0; e.budget = 0;
       const bt = BOSSES[bossKind(e)].taunts;
       bannerFlash(bossTitle(e) + '!', '#ff5d4a', bt[ri(0, bt.length - 1)]);
       sfx.boss(); G.shake = Math.max(G.shake, 9); fovKick = Math.max(fovKick, 6); vib(60);
     }
-    /* the showdown: once in view the boss keeps its distance, then closes in.
-       Kill it in time or it wades into the squad */
     if (e.boss && e.introduced && e.hp > 0) {
       e.fightT += dt;
       e.budget = Math.min(e.maxhp * 0.22, (e.budget ?? 0) + e.maxhp * 0.22 * dt);
-      /* after a short stomp through the squad it lumbers past and falls behind */
       if (!e.shooter && !e.splitter && e.fightT > 1.2 && e.fightT < 6.4) {
         e.stompT = (e.stompT ?? 0.6) - dt;
         if (e.stompT <= 0) {
@@ -4140,7 +3871,6 @@ function update(dt) {
       const hold = Math.max(0, 500 - e.fightT * 75);
       if (e.fightT < 8.2 && e.wy - G.camY < hold) e.wy = G.camY + hold;
     }
-    /* shooter bosses lob orbs at the squad while in range */
     if (e.shooter && !e._dead) {
       e.fireT -= dt;
       const bd = e.wy - G.camY;
@@ -4168,13 +3898,11 @@ function update(dt) {
       if (Math.random() < 0.55) flingSoldier();
     }
   }
-  /* music heat: anything big within striking distance */
   let heat = 0;
   for (const m of mobs) if (!m.dead && m.wy - G.camY < 700) heat = Math.max(heat, m.clash ? 2 : 1);
   for (const e of enemies) if (e.boss && e.hp > 0 && e.wy - G.camY < 900) heat = Math.max(heat, 1.5);
   musicHeat = heat;
 
-  /* rival mobs: march in, charge sideways, then trade 1:1 on contact */
   const armor = armorFrac();
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i];
@@ -4189,7 +3917,6 @@ function update(dt) {
     m.hw = mobHalfW(m);
     const ahead = m.wy - m.hd - G.camY;
     if (m.band && !m.hinted && ahead < 760) { m.hinted = true; tutorialHint('band'); }
-    /* the first mob ever: explain it once it is actually in view, and not over a tip still being read */
     if (!META.seenMob && ahead < 700 && hintT < 0.6) { META.seenMob = true; showHint(L('RED MOB AHEAD · shoot it down, then outnumber it on contact', 'GEROMBOLAN MERAH · tembak dulu, lalu kalahkan jumlahnya'), 4.5); }
     if (!m.clash) {
       m.wy -= 34 * dt;
@@ -4226,8 +3953,6 @@ function update(dt) {
     }
   }
 
-  /* environmental hazards chip away at the squad while it overlaps them.
-     Hazards get their own, harsher cap — they are supposed to threaten. */
   let hazDmg = 0, hazCause = '';
   const hazZones = [];
   for (let i = hazards.length - 1; i >= 0; i--) {
@@ -4247,7 +3972,6 @@ function update(dt) {
       parts.push({ x: sawX(h) + rnd(-10, 10), wy: h.wy + rnd(-8, 8), h: 0.15,
         vx: rnd(-40, 40), vwy: rnd(-20, 20), vh: rnd(1, 4), t: 0, life: rnd(0.2, 0.45), color: '#ffd75d' });
     if (h.kind === 'meteor') {
-      /* land as the squad arrives: the warning ring is up long before, the rock comes down on time */
       if (!h.armed && h.wy - G.camY < G.speed * (h.stomp ? 1.6 : 1.7)) { h.armed = true; h.tImpact = h.t0 = Math.max(0.45, (h.wy - G.camY) / G.speed); }
       if (h.armed) {
         h.tImpact -= dt;
@@ -4261,7 +3985,6 @@ function update(dt) {
           for (let k = 0; k < 24 && parts.length < MAXP - 26; k++)
             parts.push(mkPart(h.x + rnd(-30, 30), h.wy + rnd(-24, 24), '#ff9d5d'));
           const dd = Math.hypot(h.x - G.armyX, h.wy - G.camY);
-          /* only the soldiers under the disc are hit; a clean dodge costs nothing */
           const inDisc = (x, y) => Math.hypot(x - h.x, y - h.wy) < h.r;
           const share = insideShare(inDisc);
           if (share === 0 && dd < h.r + sr * 2.2) closeCall(h.x, h.wy);
@@ -4293,14 +4016,12 @@ function update(dt) {
       if (!h.paid && h.wy < G.camY - 40) { h.paid = true; if (!h.hit && h.near < 34) closeCall(sawX(h), h.wy); }
     }
     if (!doDrain) continue;
-    /* each hazard hurts the soldiers inside its drawn shape, and only them */
     const hx = h.kind === 'saw' ? sawX(h) : 0;
     const zone = h.kind === 'lava' ? (x, y) => Math.abs(x - h.x) < h.w / 2 && Math.abs(y - h.wy) < h.len / 2
       : h.kind === 'choke' ? (x, y) => Math.abs(y - h.wy) < h.len / 2 && Math.abs(x - h.gapX) > h.gapW / 2 - 7
         : (x, y) => Math.abs(x - hx) < 38 && Math.abs(y - h.wy) < 26;
     const share = insideShare(zone);
     if (share > 0) {
-      /* per tick, of the soldiers inside: about what the old whole-squad drain cost when fully in */
       const rate = h.kind === 'saw' ? 0.15 : 0.04;
       hazDmg += Math.max(1, G.soldiers * share * rate);
       hazZones.push(zone);
@@ -4319,7 +4040,6 @@ function update(dt) {
     loseSoldiers(Math.min(tickDmg + bossDmg, drainCap + bossDmg) * guard, bossDmg ? 'CRUSHED BY A BOSS' : 'OVERRUN BY MONSTERS', (x, y) => y > G.camY - 6);
   if (doDrain) drainAcc = 0;
 
-  /* gates */
   for (let i = gates.length - 1; i >= 0; i--) {
     const g = gates[i];
     if (g.announce && g.wy - G.camY < 900) { g.announce = false; bannerFlash(L('GOLDEN GATE', 'GERBANG EMAS'), '#ffd75d'); tone(1320, 0.1, 'sine', 0.05); }
@@ -4327,7 +4047,6 @@ function update(dt) {
     if (g.wy < G.camY - 200) { removeGate(g); gates.splice(i, 1); }
   }
 
-  /* walls */
   for (let i = walls.length - 1; i >= 0; i--) {
     const w = walls[i];
     if (!w.dead && !w.hinted && w.wy - G.camY < 720) { w.hinted = true; tutorialHint('wall'); }
@@ -4347,7 +4066,6 @@ function update(dt) {
     if (w.wy < G.camY - 200) { scene.remove(w.mesh); w.label.remove(); walls.splice(i, 1); }
   }
 
-  /* pickups */
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i];
     const reach = (sr + 14) * (1 + magLevel() * 0.9);
@@ -4363,7 +4081,6 @@ function update(dt) {
   for (let i = coins.length - 1; i >= 0; i--) {
     const c = coins[i];
     if (c.fly !== undefined) {
-      /* loot coins pop up, hang for a beat, then home in on the squad */
       c.fly -= dt;
       if (c.fly < 0) {
         const k = Math.min(1, dt * (6 - Math.max(-0.5, c.fly) * 8));
@@ -4401,7 +4118,6 @@ function update(dt) {
     }
   }
 
-  /* cages: ram one and half the prisoners get out; leave it behind and they stay */
   for (let i = cages.length - 1; i >= 0; i--) {
     const c = cages[i];
     c.pop = Math.min(1, c.pop + dt * 4);
@@ -4410,7 +4126,6 @@ function update(dt) {
     if (c.dead || c.wy < G.camY - 200) { if (!c.dead) { scene.remove(c.grp); c.label.remove(); } cages.splice(i, 1); }
   }
 
-  /* barrels pop-in / cleanup */
   for (let i = barrels.length - 1; i >= 0; i--) {
     const b = barrels[i];
     b.pop = Math.min(1, b.pop + dt * 4);
@@ -4421,7 +4136,6 @@ function update(dt) {
   for (const p of pickups) p.pop = Math.min(1, p.pop + dt * 4);
   for (const h of hazards) h.pop = Math.min(1, h.pop + dt * 4);
 
-  /* particles & floats */
   if (parts.length > partCap) parts.splice(0, parts.length - partCap);
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.t += dt;
@@ -4438,16 +4152,13 @@ function update(dt) {
     if (enemies[i]._dead) { enemies[i].label.remove(); dropBossBits(enemies[i]); enemies.splice(i, 1); }
   }
   checkMissions();
-  /* level up: a beat of slow motion and a ring before the cards come up */
   if (wantSkill && G.mode === 'run') { skillDelay = 0.55; hitstop(0.5); ringT = 0; ringMat.color.set('#ffcc33'); sfx.fanfare(); }
   if (skillDelay > 0) { skillDelay -= dt; if (skillDelay <= 0 && G.mode === 'run') offerSkills(); }
   else if (pendingZone && G.mode === 'run') { bannerFlash(pendingZone[0], pendingZone[1]); pendingZone = null; }
 }
 
-/* ---------------- draw ---------------- */
 const dummy = new THREE.Object3D();
 const tmpCol = new THREE.Color();
-/* wrap into [0, L) for any sign; scenery z = wrapZ(base + scroll, L) - L + near grows as you run */
 const wrapZ = (v, L) => ((v % L) + L) % L;
 let soldierOffsets = [];
 let soldierBirth = [];
@@ -4455,14 +4166,12 @@ let soldierBirth = [];
 let lastDraw = performance.now(), camIntro = 0, deathCam = 0;
 function draw(now) {
   const t = now * 0.001;
-  /* real frame time: animations run the same speed at 60, 90 or 120 Hz */
   const FD = Math.min(0.05, Math.max(0.001, (now - lastDraw) / 1000)) * (G.slow > 0 && G.mode === 'run' ? 0.35 : G.mode === 'dying' && deathT > 0.5 ? 0.4 : 1);
   lastDraw = now;
   const zi = Math.max(0, zoneIdx);
   const z = ZONES[zi];
 
-  /* zone color lerp */
-  const lp = Math.min(1, FD * 2.4);   /* same blend speed at 60 or 120 Hz */
+  const lp = Math.min(1, FD * 2.4);
   curZone.bg.lerp(col3(z.bg), lp);
   curZone.ground.lerp(col3(z.ground), lp);
   curZone.road.lerp(col3(z.road), lp);
@@ -4489,7 +4198,6 @@ function draw(now) {
   stepWeather(FD, zi, (G.mode === 'run' ? G.speed : G.mode === 'menu' ? 70 : 0) * K, t);
   patchMesh.material.color.copy(tmpCol.copy(curZone.ground).multiplyScalar(0.55));
 
-  /* scorch decals */
   let sci = 0;
   for (let i = scorches.length - 1; i >= 0; i--) {
     const sc = scorches[i];
@@ -4507,23 +4215,19 @@ function draw(now) {
   scorchMesh.count = sci; scorchMesh.instanceMatrix.needsUpdate = true;
   scorchMesh.material.opacity = 0.42;
 
-  /* camera chase + shake + fov kick + bank */
   const axw = wx(G.armyX);
   const shk = shakeOff ? 0 : G.shake;
   const shx = (Math.random() - 0.5) * shk * 0.02;
   const shy = (Math.random() - 0.5) * shk * 0.02;
   const camZoom = Math.max(0, squadRadius() * K - 1.2) * 0.55;
-  /* run start: the camera swoops down from a high wide shot into the chase cam */
   if (camIntro > 0) camIntro = Math.max(0, camIntro - FD / 0.9);
   const swoop = camIntro * camIntro * (3 - 2 * camIntro);
-  /* dying: ease the camera in on the squad as it falls apart */
   const doomK = G.mode === 'dying' ? clamp(1 - deathT / DEATH_T, 0, 1) : G.mode === 'over' ? 1 : 0;
   deathCam += (doomK - deathCam) * Math.min(1, FD * 6);
   const push = deathCam * deathCam * (3 - 2 * deathCam);
   camera.position.set(axw * 0.55 + shx, 10.5 + shy + camZoom * 0.6 + swoop * 9 - push * 4.2, 12.5 + camZoom + swoop * 7 - push * 5.5);
   camera.lookAt(axw * 0.35, 1.0 - swoop * 0.5, -12 - swoop * 10);
   camera.rotateZ(bank);
-  /* wide screens see too much empty roadside at 62deg: tighten so the road fills the frame */
   const baseFov = W / H > 1.25 ? 50 : 62;
   const fovT = baseFov + (shakeOff ? 0 : fovKick) + Math.max(0, G.speed - SPEED_BASE) * 0.02 + (W / H < 0.75 && G.mode === 'run' ? Math.max(0, G.form) * 6 : 0);
   if (Math.abs(camera.fov - fovT) > 0.01) { camera.fov += (fovT - camera.fov) * 0.12; camera.updateProjectionMatrix(); }
@@ -4536,7 +4240,6 @@ function draw(now) {
   }
   lastDanger = danger;
 
-  /* scroll the road markings */
   const scroll = G.camY * K;
   roadTex.offset.y = (scroll / 300) * 22 % 1;
   let pi = 0;
@@ -4559,7 +4262,6 @@ function draw(now) {
   }
   dashMesh.instanceMatrix.needsUpdate = true;
 
-  /* gate shockwave */
   if (ringT < 0.55) {
     ringT += FD;
     const rk = ringT / 0.55;
@@ -4573,7 +4275,6 @@ function draw(now) {
     ringMat.opacity = 0.2 + Math.sin(t * 5) * 0.07;
   } else ringMat.opacity = 0;
 
-  /* speed lines */
   {
     const target = clamp((G.speed - 220) / 160, 0, 0.45);
     speedLineMesh.material.opacity += (target - speedLineMesh.material.opacity) * 0.05;
@@ -4588,7 +4289,6 @@ function draw(now) {
     speedLineMesh.instanceMatrix.needsUpdate = true;
   }
 
-  /* chevrons */
   for (let i = 0; i < NCHEV; i++) {
     const zPos = wrapZ(i * CHEV_GAP + scroll, NCHEV * CHEV_GAP) - NCHEV * CHEV_GAP + 5;
     dummy.position.set(0, 0.065, zPos);
@@ -4599,7 +4299,6 @@ function draw(now) {
   chevMesh.instanceMatrix.needsUpdate = true;
   chevMesh.material.color.copy(curZone.dash);
 
-  /* roadside props */
   let ri2 = 0, si = 0, ci = 0;
   const propLimit = Q.low ? 24 : Q.phone ? 32 : propSeed.length;
   for (let pi = 0; pi < propLimit; pi++) {
@@ -4683,7 +4382,6 @@ function draw(now) {
   ruinMesh.count = ruinN;
   ruinMesh.instanceMatrix.needsUpdate = true;
 
-  /* ground patches */
   let pi2 = 0;
   const patchN = Q.low ? 12 : Q.phone ? 16 : patchSeed.length;
   for (const p of patchSeed) {
@@ -4697,10 +4395,8 @@ function draw(now) {
   }
   patchMesh.count = pi2; patchMesh.instanceMatrix.needsUpdate = true;
 
-  /* shadows (filled across sections below) */
   let shI = 0;
 
-  /* the army count rides above the crowd, the way every crowd runner shows it */
   if (G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' || G.mode === 'dying') {
     const n = Math.round(G.soldiers);
     if (n !== squadShownN) {
@@ -4711,7 +4407,6 @@ function draw(now) {
     }
     setLabel(squadLabel, axw, (Q.phone || Q.low ? 3.3 : 2.5) + (crowdS - 1) * 1.6, 0.9);
   } else squadLabel.style.display = 'none';
-  /* squad */
   const shown = Math.min(G.soldiers, visCap);
   if (G.mode === 'run' && squadNow.length === shown) soldierOffsets = squadNow;
   else if (soldierOffsets.length !== shown || G.mode !== 'run') soldierOffsets = formation(Math.max(1, shown));
@@ -4756,7 +4451,6 @@ function draw(now) {
     dummy.updateMatrix();
     soldierBody.setMatrixAt(i, dummy.matrix);
     if (liveBodies && i > 0) {
-      /* each soldier's shade comes from its own phase, so it keeps its color when slots are reassigned */
       const ph = bodyPh[i];
       tmpCol.set(skinBody).offsetHSL(((ph * 3.7) % 1 - 0.5) * 0.024, 0, ((ph * 7.3) % 1 - 0.5) * 0.075);
       soldierBody.setColorAt(i, tmpCol);
@@ -4788,7 +4482,6 @@ function draw(now) {
   }
   soldierBody.count = drawN;
   if (liveRun && soldierBody.instanceColor) soldierBody.instanceColor.needsUpdate = true;
-  /* grace: the squad shimmers see-through instead of blinking out */
   const ghost = G.grace > 0 && G.mode === 'run';
   if (soldierBody.material.transparent !== ghost) { soldierBody.material.transparent = ghost; soldierBody.material.needsUpdate = true; }
   soldierBody.material.opacity = ghost ? 0.55 + 0.3 * Math.abs(Math.sin(t * 9)) : 1;
@@ -4803,7 +4496,6 @@ function draw(now) {
   if (soldierBody.instanceColor) soldierBody.instanceColor.needsUpdate = true;
   muzzleMesh.material.color.copy(tmpCol.set(WT[G.tier].col));
 
-  /* enemies: per-kind instanced meshes + eyes + shadows */
   const kCount = { runner: 0, normal: 0, brute: 0, split: 0, gold: 0, leaper: 0, boss: 0 };
   let ei = 0;
   for (const e of enemies) {
@@ -4812,7 +4504,7 @@ function draw(now) {
     if (zP > 14) { e.label.style.display = 'none'; if (e.aura) e.aura.visible = false; if (e.acc) e.acc.visible = false; continue; }
     const d = EDEF[e.kind] || EDEF.normal;
     let s = e.r * K * (e.boss ? 1.7 : 1.8) * Math.max(e.boss ? 0.45 : 0, e.pop) * (e.boss ? 1 : (e.attacking ? 1 + Math.sin(t * 14) * 0.08 : 1));
-    if (e.boss) s = Math.max(1.1, Math.min(1.45, s));   /* the ogre is broad: keep it from walling off the road */
+    if (e.boss) s = Math.max(1.1, Math.min(1.45, s));
     if (s < 0.01) s = 0.01;
     if (e.roar) s *= e.boss ? 1 + e.roar * 0.2 : 1 + e.roar * 0.28 * Math.sin(t * 26);
     e._s = s;
@@ -4860,13 +4552,11 @@ function draw(now) {
       }
     }
     const labelY = e.boss ? s * 3.05 + 0.3 : s * d.labelY + 0.4;
-    /* once the boss bar is up it carries the fight; a raw HP number on the body is noise */
     if (e.boss && e.introduced) e.label.style.display = 'none';
     else setLabel(e.label, wx(e.x), labelY, zP, fmtNum(Math.ceil(e.hp)));
     if (e.attacking) e.label.style.color = '#ffb0a0';
     else e.label.style.color = '';
   }
-  /* rival mobs */
   let mu = 0;
   const bossUp = enemies.find((e) => e.boss && e.introduced && e.hp > 0);
   for (const m of mobs) {
@@ -4903,7 +4593,6 @@ function draw(now) {
       dummy.updateMatrix();
       shadowMesh.setMatrixAt(shI++, dummy.matrix);
     }
-    /* a mob standing behind a fighting boss would pin its count on the boss's body */
     if (bossUp && m.wy > bossUp.wy && Math.abs(m.x - bossUp.x) < 95) m.label.style.display = 'none';
     else setLabel(m.label, wx(m.x), 2.0, wz(m.wy - m.hd), fmtNum(m.count));
     m.label.classList.toggle('big', m.count > G.soldiers);
@@ -4913,7 +4602,6 @@ function draw(now) {
   mobUnitMesh.instanceMatrix.needsUpdate = true;
   if (mobUnitMesh.instanceColor) mobUnitMesh.instanceColor.needsUpdate = true;
 
-  /* enemy corpses: fling back + shrink, then publish instance counts */
   for (let i = deadEnemies.length - 1; i >= 0; i--) {
     const dE = deadEnemies[i];
     dE.t += FD;
@@ -4937,7 +4625,6 @@ function draw(now) {
     if (kindMesh[k].instanceColor) kindMesh[k].instanceColor.needsUpdate = true;
   }
 
-  /* soldier corpses */
   let di2 = 0;
   for (let i = deadSoldiers.length - 1; i >= 0; i--) {
     const p = deadSoldiers[i];
@@ -4947,7 +4634,6 @@ function draw(now) {
     p.y += p.vy * FD; p.vy -= (p.off ? 18 : 9.5) * FD;
     if (!p.off && p.y < 0.1) { p.y = 0.1; p.vy *= -0.3; }
     dummy.position.set(wx(p.x), p.y, wz(p.wy));
-    /* a fallen soldier tips over at once instead of standing in the crowd like a dark statue */
     dummy.rotation.set(p.skin ? -Math.min(1.5, p.t * 9) + p.spin * p.t * 0.25 : p.spin * p.t, p.spin * p.t * 0.6, 0);
     const life = p.doom ? 1.35 : 0.8;
     dummy.scale.setScalar(Math.max(0.05, 1.05 * (1 - p.t / life)));
@@ -4966,8 +4652,6 @@ function draw(now) {
   eyeMesh.count = ei; eyeMesh.instanceMatrix.needsUpdate = true;
   if (eyeMesh.instanceColor) eyeMesh.instanceColor.needsUpdate = true;
 
-  /* gates — fade out as they reach the squad so a full-width panel
-     doesn't plaster the camera on the frame you walk through it */
   const gp = 0.32 + Math.sin(t * 4) * 0.14;
   for (const g of gates) {
     const zP = wz(g.wy);
@@ -4985,7 +4669,6 @@ function draw(now) {
     if (g.baseMesh) g.baseMesh.visible = fade > 0.2;
   }
 
-  /* walls */
   for (const w of walls) {
     const zP = wz(w.wy);
     if (w.dead) {
@@ -5009,7 +4692,6 @@ function draw(now) {
     }
   }
 
-  /* hazards */
   for (const h of hazards) {
     const zP = wz(h.wy);
     h.grp.position.z = zP;
@@ -5020,7 +4702,6 @@ function draw(now) {
       h.blade.rotation.z = -(t * 12 + h.phase);
       if (h.grp.children[0]) h.grp.children[0].scale.x = Math.max(0.25, (roadHalf * 2 + 0.5) / (ROADW + 1.4));
     } else if (h.kind === 'meteor') {
-      /* follow h.x: a stomp is aimed after it is spawned */
       h.ring.position.x = h.fill.position.x = h.rock.position.x = h.warn.position.x = wx(h.x);
       if (h.dead) {
         h.rock.visible = h.warn.visible = false;
@@ -5046,7 +4727,6 @@ function draw(now) {
     }
   }
 
-  /* cages */
   for (const c of cages) {
     const zP = wz(c.wy);
     c.grp.visible = zP < 14;
@@ -5061,7 +4741,6 @@ function draw(now) {
     c.label.style.setProperty('--hp', Math.max(0, 100 * c.hp / c.maxhp).toFixed(0) + '%');
   }
 
-  /* barrels */
   for (const b of barrels) {
     if (b._dead) continue;
     const zP = wz(b.wy);
@@ -5082,7 +4761,6 @@ function draw(now) {
   }
   shadowMesh.count = shI; shadowMesh.instanceMatrix.needsUpdate = true;
 
-  /* pickups bob */
   for (const p of pickups) {
     const zP = wz(p.wy);
     p.mesh.visible = zP < 14;
@@ -5090,14 +4768,12 @@ function draw(now) {
     p.mesh.position.set(wx(p.x), 0.7 + Math.sin(t * 3 + p.wy) * 0.25, zP);
   }
 
-  /* coins */
   let coinI = 0;
   for (const c of coins) {
     const zP = wz(c.wy);
     if (zP > 6 || zP < -85) continue;
     const lift = c.fly !== undefined && c.fly > 0 ? Math.sin(Math.min(1, c.fly * 3) * Math.PI) * 1.6 + 0.6 : 0;
     dummy.position.set(wx(c.x), 1.05 + lift + Math.sin(t * 3.2 + c.spin) * 0.12, zP);
-    /* a coin in flight turns its face to you instead of flashing edge-on */
     const flying = c.fly !== undefined;
     dummy.rotation.set(0, flying ? Math.sin(t * 9 + c.spin) * 0.35 : t * 3.4 + c.spin, 0);
     const sc = (flying ? 0.8 : 1) * 1.25 + Math.min(0.3, Math.max(0, -zP) * 0.012);
@@ -5108,7 +4784,6 @@ function draw(now) {
   coinMesh.count = coinI;
   coinMesh.instanceMatrix.needsUpdate = true;
 
-  /* bullets */
   let bi = 0;
   for (const b of bullets) {
     const zP = wz(b.wy);
@@ -5116,7 +4791,6 @@ function draw(now) {
     dummy.position.set(wx(b.x), 0.62 + crowdS * 0.18, zP);
     dummy.rotation.set(0, Math.atan2(b.vx, -b.vwy), 0);
     const pulse = 1 + (b.pulse || 0) * 0.85;
-    /* heavier bullets (a big army behind each shot) read a little thicker */
     const heft = 1 + 0.18 * Math.log10(Math.max(1, b.dmg || 1));
     dummy.scale.set((b.wid || 1) * pulse * heft, (b.wid || 1) * pulse * heft, Math.min(2.4, b.len || 1) * (1 + (b.pulse || 0) * 0.35));
     dummy.updateMatrix();
@@ -5130,12 +4804,10 @@ function draw(now) {
   bulletMesh.instanceMatrix.needsUpdate = true;
   if (bulletMesh.instanceColor) bulletMesh.instanceColor.needsUpdate = true;
 
-  /* enemy projectiles */
   let ebi = 0;
   for (const p of ebullets) {
     const zP = wz(p.wy);
     if (zP > 14) continue;
-    /* fireballs: bigger, pulsing hot, with a ground shadow so you can judge the dodge */
     const pulse = Math.sin(t * 14 + p.t * 9);
     dummy.position.set(wx(p.x), 1.0, zP);
     dummy.rotation.set(0, 0, 0);
@@ -5158,7 +4830,6 @@ function draw(now) {
   ebulletMesh.instanceMatrix.needsUpdate = true;
   if (ebulletMesh.instanceColor) ebulletMesh.instanceColor.needsUpdate = true;
 
-  /* particles */
   let pc = 0;
   for (const p of parts) {
     if (pc >= MAXP) break;
@@ -5173,7 +4844,6 @@ function draw(now) {
   partGeo.attributes.position.needsUpdate = true;
   partGeo.attributes.color.needsUpdate = true;
 
-  /* floats */
   for (const f of floats) {
     const [sx, sy, zz] = project(wx(f.x), f.h, wz(f.wy));
     const a = Math.max(0, 1 - f.t / f.life);
@@ -5184,7 +4854,6 @@ function draw(now) {
     f.el.style.transform = `translate(${sx - W / 2}px,${sy - H / 2}px) translate(-50%,-50%)`;
   }
 
-  /* personal best line */
   {
     const zB = wz(G.best * 40);
     const show = G.best > 0 && (G.mode === 'run' || G.mode === 'dying' || G.mode === 'pick' || G.mode === 'paused') && zB < 14 && zB > -110;
@@ -5217,7 +4886,6 @@ function draw(now) {
     }
   }
 
-  /* HUD: the army number rolls toward the real count, green up / red down */
   if (hudReserve) {
     const rs = G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused' ? Math.round(G.reserve || 0) : 0;
     const full = (G.mode === 'run' || G.mode === 'pick' || G.mode === 'paused') && G.soldiers >= ARMY_CAP;
@@ -5246,7 +4914,6 @@ function draw(now) {
     hudWeapon.style.color = WT[G.tier].col;
   }
   hudDist.textContent = Math.floor(G.dist) + 'm';
-  /* closing in on the record: count it down */
   if (bestInEl) {
     const left = Math.ceil(G.best - G.dist);
     const on = (G.mode === 'run' || G.mode === 'paused') && G.best > 0 && left > 0 && left <= 150;
@@ -5281,7 +4948,6 @@ function draw(now) {
   if (pauseBtn) pauseBtn.style.display = G.mode === 'run' ? 'block' : 'none';
   const formHud = document.getElementById('hudForm');
   if (formHud) { const on = G.mode === 'run' || G.mode === 'pick'; formHud.style.opacity = on ? '1' : '0'; formHud.style.pointerEvents = on ? 'auto' : 'none'; }
-  /* a banner owns the middle of the screen while it is up: the tip steps aside */
   hintEl.style.opacity = hintT > 0 && G.mode === 'run' && performance.now() > bannerUntil ? '0.9' : '0';
   if (tutEl) tutEl.classList.toggle('on', G.mode === 'run' && !G.steered && META.runs <= 3 && G.time > 0.6 && G.time < 14);
   labelsEl.style.visibility = G.mode === 'pick' ? 'hidden' : 'visible';
@@ -5290,7 +4956,6 @@ function draw(now) {
   if (!SIM.noRender) renderer.render(scene, camera);
 }
 
-/* test hook: ?debug exposes state so headless playtests can drive the run */
 if (/[?&]debug\b/.test(location.search)) {
   window.__mob = {
     G, SIM, META, UPGRADES, beginDeath, update, draw, shareCard, scrollProbe() { const m = new THREE.Matrix4(); dashMesh.getMatrixAt(3, m); const dz = m.elements[14]; trunkMesh.getMatrixAt(2, m); const tz = m.elements[14]; const g = gates.find((q) => q.grp); return { dash: +dz.toFixed(2), tree: +tz.toFixed(2), gate: g ? +g.grp.position.z.toFixed(2) : null }; }, addEnemy(kind, x, wy, hp) { const e = mkEnemy(kind, x, wy, hp); enemies.push(e); return e; }, get rinfo() { return renderer.info.render; }, get rmem() { return renderer.info.memory; }, geoLive() { const m = new Map(); scene.traverse((o) => { if (o.geometry) m.set(o.geometry.uuid, (o.geometry.type || '') + ':' + (o.geometry.attributes.position ? o.geometry.attributes.position.count : 0)); }); return [...m.values()]; }, geoStats() { const out = []; scene.traverse((o) => { if (!o.isMesh || !o.visible) return; const g = o.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; const n = o.isInstancedMesh ? o.count : 1; if (tri * n > 2000) out.push([o.name || g.type, Math.round(tri), n, Math.round(tri * n)]); }); return out.sort((a, b) => b[3] - a[3]); }, startGame, gameOver, chooseSkill, transformCount, gateMid, revive, addSoldiers, spawnMob, hurtMob, spawnBoss, spawnHazard, spawnWall, spawnMeteor, spawnBarrels, spawnCage, get cages() { return cages; },

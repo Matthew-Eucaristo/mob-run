@@ -1,5 +1,3 @@
-// Late-run features: every zone set-piece shows up on a long run, and reserves bank the
-// surplus past the army cap and march it back in after a loss.
 const { chromium } = require('playwright');
 const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode = 1; } else console.log('ok:', m); };
 (async () => {
@@ -10,7 +8,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await p.evaluate(() => localStorage.setItem('mobrun_lang', 'en'));
   await p.reload(); await p.waitForTimeout(800);
 
-  // 1. set-pieces: one per zone visit, announced with a two-line banner
   const pieces = await p.evaluate(() => {
     const M = window.__mob, G = M.G; M.SIM.on = true; M.SIM.noRender = true; M.startGame();
     const zb = document.getElementById('zoneBanner'); const seen = new Set();
@@ -27,7 +24,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   });
   assert(pieces.length === 5, 'all five zone set-pieces appear by 900m (' + pieces.join(', ') + ')');
 
-  // 2. reserves: overflow past the cap banks a third, then refills the army after a loss
   const r = await p.evaluate(() => {
     const M = window.__mob, G = M.G; M.SIM.on = true; M.startGame();
     for (let i = 0; i < 30; i++) M.update(1 / 60);

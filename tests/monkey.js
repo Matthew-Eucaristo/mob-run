@@ -1,5 +1,3 @@
-// Monkey test: random taps, swipes, keys and visible-button presses across every screen.
-// Fails on page errors, NaN state, or a mode that stays stuck with no way out.
 const { chromium } = require('playwright');
 (async () => {
   const secs = +process.argv[2] || 90;

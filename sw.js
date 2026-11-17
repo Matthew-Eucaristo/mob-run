@@ -1,6 +1,3 @@
-/* MOB RUN cache.
-   The big Three.js file stays cached. The game shell prefers the network
-   so a refresh picks up changes, and falls back to cache within 1.2s. */
 const CACHE = 'mobrun-v34';
 const PRECACHE = [
   './',
@@ -34,7 +31,6 @@ function isShell(url) {
   return path.endsWith('.js') || path.endsWith('.html') || path.endsWith('.webmanifest') || path.endsWith('/');
 }
 
-/* offline, ?q=low or a share link's query string still finds the cached page */
 async function matchLoose(req) {
   return (await caches.match(req)) || caches.match(req, { ignoreSearch: true });
 }

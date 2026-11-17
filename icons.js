@@ -1,5 +1,3 @@
-/* MOB RUN icon set: chunky single-color shapes on a 24x24 grid.
-   One source for the HTML UI (inline SVG) and the 3D world (Path2D on canvas). */
 export const ICONS = {
   flag: 'M4 2h3v20H4z M7 3h13l-3.5 4.5L20 12H7z',
   gun: 'M2 6h18v2h2v5h-6.5l-1.5 2.5h-3L10 22H4.5l2-8.5H2z',
@@ -39,13 +37,11 @@ export const ICONS = {
   phone: 'M6 1h12a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zm1 3v14h10V4z M10.5 19.5h3v2h-3z',
 };
 
-/* inline SVG for the DOM; color comes from CSS currentColor */
 export function icon(name, cls) {
   const d = ICONS[name] || ICONS.star;
   return `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${d}"/></svg>`;
 }
 
-/* draw onto a 2D canvas: outlined in ink, filled in color */
 export function drawIcon(g, name, x, y, size, fill, ink) {
   const p = new Path2D(ICONS[name] || ICONS.star);
   g.save();

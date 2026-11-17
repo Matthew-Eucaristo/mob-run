@@ -6,7 +6,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('http://localhost:8787/index.html?debug');
   await p.waitForTimeout(600);
-  // find a mystery gate by fast-forwarding, then show it on screen
   const r = await p.evaluate(() => {
     const M = window.__mob; M.startGame(); M.SIM.on = true;
     for (let i = 0; i < 60 * 300; i++) {
@@ -24,7 +23,6 @@ const assert = (c, m) => { if (!c) { console.log('FAIL:', m); process.exitCode =
   await p.screenshot({ path: 'mys1.png' });
   await p.waitForTimeout(2600);
   await p.screenshot({ path: 'mys2.png' });
-  // splitter boss splits on death
   const sp = await p.evaluate(() => {
     const M = window.__mob; M.SIM.on = true;
     M.G.level = 4;

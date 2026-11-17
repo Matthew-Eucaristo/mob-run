@@ -1,8 +1,7 @@
-// Headless balance sim: a "decent player" bot drives N runs with fixed dt.
 const { chromium } = require('playwright');
 (async () => {
   const runs = +process.argv[2] || 12;
-  const skill = process.argv[3] || 'good'; // good | sloppy
+  const skill = process.argv[3] || 'good';
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: 420, height: 860 } });
   const errs = [];
@@ -26,7 +25,6 @@ const { chromium } = require('playwright');
         }
         if (M.G.mode === 'dying') { M.gameOver(); }
         if (M.G.mode === 'over') break;
-        // --- bot brain
         const G = M.G, road = M.road;
         const cx = (road.x0 + road.x1) / 2;
         let target = cx;
@@ -66,7 +64,6 @@ const { chromium } = require('playwright');
           if (!fullWidth) { const fl = w.x0 - road.x0, fr = road.x1 - w.x1; target = fl > fr ? (road.x0 + w.x0)/2 : (w.x1 + road.x1)/2; }
         }
         if (skill !== 'good') target += Math.sin(steps * 0.03) * 60;
-        // narrow formation if road is narrow or dodging
         const roadW = road.x1 - road.x0;
         M.setAim(target, roadW < 300 ? -0.6 : -0.2);
         const before = G.soldiers;
@@ -76,7 +73,6 @@ const { chromium } = require('playwright');
         steps++;
         if (steps % 900 === 0) trace.push(Math.floor(G.dist) + 'm:' + G.soldiers);
       }
-      /* spend like a player: cheapest affordable upgrade first, until broke */
       const bought = [];
       for (let guard = 0; guard < 20; guard++) {
         let pick = null;
